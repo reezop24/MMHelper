@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MM HELPER Setup</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <h1>MM HELPER</h1>
+      <p>Semua transaksi dalam MM Helper ni kita guna USD ye.</p>
+    </header>
+
+    <form id="setupForm" class="card">
+      <div class="field">
+        <label class="question" for="name"><strong>1. Nama</strong></label>
+        <input id="name" name="name" type="text" placeholder="Nama timangan pun boleh" required />
+      </div>
+
+      <div class="field">
+        <label class="question" for="initial_capital_usd"><strong>2. Modal Permulaan</strong></label>
+        <p class="hint"><em>ini ada lah modal permulaan sekarang</em></p>
+        <div class="with-suffix with-prefix">
+          <span class="affix">USD</span>
+          <input
+            id="initial_capital_usd"
+            name="initial_capital_usd"
+            type="number"
+            inputmode="decimal"
+            min="0"
+            step="0.01"
+            placeholder="USD"
+            required
+          />
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="question" for="risk_per_trade_pct"><strong>3. Risk per trade</strong></label>
+        <p class="hint"><em>berapa % kau sanggup rugi dalam 1 trade?</em></p>
+        <div class="with-suffix">
+          <input
+            id="risk_per_trade_pct"
+            name="risk_per_trade_pct"
+            type="number"
+            inputmode="decimal"
+            min="0"
+            step="0.01"
+            placeholder="contoh : 1% , 3% , 5%"
+            required
+          />
+          <span class="affix">%</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="question" for="max_daily_loss_pct"><strong>4. Max loss sehari</strong></label>
+        <p class="hint"><em>berapa % kau sanggup loss dalam sehari?</em></p>
+        <div class="with-suffix">
+          <input
+            id="max_daily_loss_pct"
+            name="max_daily_loss_pct"
+            type="number"
+            inputmode="decimal"
+            min="0"
+            step="0.01"
+            placeholder="contoh : 10% , 20% , 30%"
+            required
+          />
+          <span class="affix">%</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="question" for="daily_profit_target_pct"><strong>5. Profit target sehari</strong></label>
+        <p class="hint"><em>berapa % kau target utk capai dalam sehari?</em></p>
+        <div class="with-suffix">
+          <input
+            id="daily_profit_target_pct"
+            name="daily_profit_target_pct"
+            type="number"
+            inputmode="decimal"
+            min="0"
+            step="0.01"
+            placeholder="contoh : 10% , 20% , 30%"
+            required
+          />
+          <span class="affix">%</span>
+        </div>
+      </div>
+
+      <button id="submitBtn" type="submit">💾 Simpan Setup</button>
+      <p id="formStatus" class="status" aria-live="polite"></p>
+    </form>
+  </main>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Local secrets/config
+.env
+
+# Runtime data
+mmhelper_db.json
+
+# OS/editor
+.DS_Store
+.vscode/
