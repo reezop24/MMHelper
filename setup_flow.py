@@ -779,13 +779,12 @@ async def _handle_risk_calculator_submit(payload: dict, update: Update, context:
     summary_text = (
         "*Risk Calculator Result*\n\n"
         "Jom kita kira\n"
-        f"{gold_price:.2f} ÷ {int(leverage)} = *{margin_per_001:.4f}*\n"
+        f"Harga XAUUSD sekarang ${gold_price:.2f} , bahagi dengan leverage kau {int(leverage)} = *{margin_per_001:.4f}*\n"
         "_ini margin kau untuk setiap 0.01 lot_\n\n"
         f"Sekarang modal kau *USD {balance_usd:.2f}*, risk kau pulak *{risk_pct:.2f}%*.\n"
         f"Maknanya kau cuma ambil risiko *USD {balance_usd:.2f} x {risk_pct:.2f}% = USD {modal_a_usd:.2f}* untuk setup ni.\n\n"
         f"Jadi *USD {modal_a_usd:.2f} ÷ {margin_per_001:.4f} = {lot_units_001:.2f}* unit 0.01 lot.\n"
-        f"*Lot size boleh buka: {lot_size:.2f} lot*\n\n"
-        f"Anggaran risiko jika SL {zone_pips:.1f} pips kena: *USD {loss_if_sl_usd:.2f}*"
+        f"*Lot size boleh buka: {lot_size:.2f} lot*"
     )
     await send_screen(
         context,

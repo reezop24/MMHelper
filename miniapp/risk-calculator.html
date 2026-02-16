@@ -59,6 +59,7 @@
     .result-line {
       margin: 0 0 7px;
       line-height: 1.35;
+      font-size: 12px;
     }
 
     .result-line:last-child {
@@ -68,6 +69,7 @@
     .result-value {
       font-weight: 800;
       color: #9fd3ff;
+      font-size: 13px;
     }
 
     .result-note {
@@ -157,7 +159,7 @@
       </div>
 
       <div class="field">
-        <p class="prompt">3. Saiz zon entry dan SL kau berapa pips?</p>
+        <p class="prompt">3. Saiz zon entry ditambah dengan SL kau berapa pips?</p>
         <input id="zonePipsInput" name="zone_pips" type="number" inputmode="decimal" min="0.1" step="0.1" placeholder="Contoh 60" required />
       </div>
 
@@ -177,12 +179,12 @@
       <div class="result-card">
         <p class="result-title">Live Result</p>
         <p class="result-line"><strong>Jom kita kira</strong></p>
-        <p class="result-line"><span id="linePrice" class="result-value">0.00</span> ÷ <span id="lineLeverage" class="result-value">0</span> = <span id="lineMargin" class="result-value">0.0000</span> <span class="result-note">ini margin kau untuk setiap 0.01 lot</span></p>
+        <p class="result-line">Harga XAUUSD sekarang <span class="result-value">$<span id="linePrice">0.00</span></span> , bahagi dengan leverage kau <span id="lineLeverage" class="result-value">0</span> = <span id="lineMargin" class="result-value">0.0000</span></p>
+        <p class="result-line result-note">ini margin kau untuk setiap 0.01 lot</p>
         <p class="result-line">sekarang modal kau <span class="result-value">USD <span id="lineModal">0.00</span></span>, risk kau pulak <span class="result-value"><span id="lineRisk">0.00</span>%</span></p>
         <p class="result-line">maknanya kau cuma ambil risiko <span class="result-value">USD <span id="lineModal2">0.00</span> x <span id="lineRisk2">0.00</span>% = USD <span id="lineModalA">0.00</span></span> untuk setup ni</p>
         <p class="result-line">jadi <span class="result-value">USD <span id="lineModalA2">0.00</span> ÷ <span id="lineMargin2">0.0000</span> = <span id="lineLotUnits">0.00</span></span> unit 0.01 lot</p>
         <p class="result-line"><strong>Lot size boleh buka: <span class="result-value"><span id="lineLotFinal">0.00</span> lot</span></strong></p>
-        <p class="result-line">anggaran risiko jika SL <span id="linePips" class="result-value">0.0</span> pips kena: <span class="result-value">USD <span id="lineLoss">0.00</span></span></p>
       </div>
 
       <button id="submitBtn" type="submit" class="submit-btn" disabled>✅ Simpan Result</button>

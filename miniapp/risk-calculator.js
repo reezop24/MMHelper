@@ -18,7 +18,7 @@
   document.getElementById("summaryBalance").textContent = currentBalance.toFixed(2);
 
   var introText = document.getElementById("introText");
-  introText.textContent = "Risk calculator ni bantu kau dapatkan jawapan berapa lot size kau boleh buka dengan modal tertentu dan risk size tertentu, contoh current balance kau sekarang ada USD " + currentBalance.toFixed(2) + " berapa lot kau boleh buka ikut risk yang kau tetapkan.. ko isi je semua box tu";
+  introText.textContent = "Risk calculator ni bantu kau dapatkan jawapan berapa lot size kau boleh buka dengan modal tertentu dan risk size tertentu , contoh current balance kau sekarang ada USD " + currentBalance.toFixed(2) + " berapa lot kau boleh buka ikut risk yang kau tetapkan.. ko isi je semua box tu";
 
   var topBackBtn = document.getElementById("topBackBtn");
   var backBtn = document.getElementById("backToMainBtn");
@@ -44,8 +44,6 @@
   var lineMargin2 = document.getElementById("lineMargin2");
   var lineLotUnits = document.getElementById("lineLotUnits");
   var lineLotFinal = document.getElementById("lineLotFinal");
-  var linePips = document.getElementById("linePips");
-  var lineLoss = document.getElementById("lineLoss");
 
   function toNum(value) {
     var num = Number((value || "").trim());
@@ -125,9 +123,6 @@
     lineLotUnits.textContent = calc.lotUnits001.toFixed(2);
     lineLotFinal.textContent = calc.lotFinal.toFixed(2);
 
-    linePips.textContent = Number.isFinite(calc.zonePips) ? calc.zonePips.toFixed(1) : "0.0";
-    lineLoss.textContent = calc.lossIfSlUsd.toFixed(2);
-
     submitBtn.disabled = !calc.valid;
   }
 
@@ -174,10 +169,6 @@
 
     statusEl.textContent = "Preview mode: buka dari Telegram untuk submit.";
   });
-
-  if (currentBalance > 0) {
-    balanceInput.value = currentBalance.toFixed(2);
-  }
 
   render();
 })();
