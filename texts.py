@@ -65,7 +65,7 @@ PROJECT_GROW_OPENED_TEXT = "Project Grow _dibuka_."
 STATISTIC_OPENED_TEXT = "Statistic _dibuka_."
 EXTRA_OPENED_TEXT = "Extra _dibuka_."
 
-DEPOSIT_ACTIVITY_OPENED_TEXT = "Update Deposit Activitiy _dibuka_."
+DEPOSIT_ACTIVITY_SAVED_TEXT = "Update Deposit Activitiy _dikemas kini_."
 WITHDRAWAL_ACTIVITY_SAVED_TEXT = "Update Withdrawal Activity _dikemas kini_."
 TRADING_ACTIVITY_OPENED_TEXT = "Update Trading Activity _dibuka_."
 TABUNG_OPENED_TEXT = "Update Tabung _dibuka_."

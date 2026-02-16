@@ -46,9 +46,14 @@ def mm_helper_setting_keyboard(initial_capital_reset_url: str) -> ReplyKeyboardM
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
 
-def account_activity_keyboard(withdrawal_activity_url: str) -> ReplyKeyboardMarkup:
+def account_activity_keyboard(deposit_activity_url: str, withdrawal_activity_url: str) -> ReplyKeyboardMarkup:
     rows = [
-        [SUBMENU_ACCOUNT_BUTTON_DEPOSIT_ACTIVITY],
+        [
+            KeyboardButton(
+                SUBMENU_ACCOUNT_BUTTON_DEPOSIT_ACTIVITY,
+                web_app=WebAppInfo(url=deposit_activity_url),
+            )
+        ],
         [
             KeyboardButton(
                 SUBMENU_ACCOUNT_BUTTON_WITHDRAWAL_ACTIVITY,

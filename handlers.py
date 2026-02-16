@@ -11,7 +11,6 @@ from menu import (
     MAIN_MENU_BUTTON_PROJECT_GROW,
     MAIN_MENU_BUTTON_RISK,
     MAIN_MENU_BUTTON_STATISTIC,
-    SUBMENU_ACCOUNT_BUTTON_DEPOSIT_ACTIVITY,
     SUBMENU_ACCOUNT_BUTTON_TABUNG,
     SUBMENU_ACCOUNT_BUTTON_TRADING_ACTIVITY,
     SUBMENU_MM_BUTTON_BACK_MAIN,
@@ -22,6 +21,7 @@ from menu import (
     mm_helper_setting_keyboard,
 )
 from settings import (
+    get_deposit_activity_webapp_url,
     get_initial_capital_reset_webapp_url,
     get_withdrawal_activity_webapp_url,
 )
@@ -35,7 +35,6 @@ from storage import (
 from texts import (
     ACCOUNT_ACTIVITY_OPENED_TEXT,
     CORRECTION_OPENED_TEXT,
-    DEPOSIT_ACTIVITY_OPENED_TEXT,
     EXTRA_OPENED_TEXT,
     MAIN_MENU_OPENED_TEXT,
     MM_HELPER_SETTING_OPENED_TEXT,
@@ -64,14 +63,29 @@ def _build_mm_setting_keyboard_for_user(user_id: int):
 
 def _build_account_activity_keyboard_for_user(user_id: int):
     summary = get_initial_setup_summary(user_id)
+    current_balance = get_current_balance_usd(user_id)
+    current_profit = get_current_profit_usd(user_id)
+
+    deposit_url = get_deposit_activity_webapp_url(
+        name=summary["name"],
+        initial_capital_usd=summary["initial_capital_usd"],
+        current_balance_usd=current_balance,
+        saved_date=summary["saved_date"],
+        current_profit_usd=current_profit,
+    )
+
     withdrawal_url = get_withdrawal_activity_webapp_url(
         name=summary["name"],
         initial_capital_usd=summary["initial_capital_usd"],
-        current_balance_usd=get_current_balance_usd(user_id),
+        current_balance_usd=current_balance,
         saved_date=summary["saved_date"],
-        current_profit_usd=get_current_profit_usd(user_id),
+        current_profit_usd=current_profit,
     )
-    return account_activity_keyboard(withdrawal_url)
+
+    return account_activity_keyboard(
+        deposit_activity_url=deposit_url,
+        withdrawal_activity_url=withdrawal_url,
+    )
 
 
 async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -175,16 +189,6 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
             message.chat_id,
             SYSTEM_INFO_OPENED_TEXT,
             reply_markup=_build_mm_setting_keyboard_for_user(user.id),
-            parse_mode="Markdown",
-        )
-        return
-
-    if text == SUBMENU_ACCOUNT_BUTTON_DEPOSIT_ACTIVITY:
-        await send_screen(
-            context,
-            message.chat_id,
-            DEPOSIT_ACTIVITY_OPENED_TEXT,
-            reply_markup=_build_account_activity_keyboard_for_user(user.id),
             parse_mode="Markdown",
         )
         return

@@ -108,25 +108,34 @@ def get_current_profit_usd(user_id: int) -> float:
     return 0.0
 
 
-def get_total_withdrawal_usd(user_id: int) -> float:
-    db = load_db()
-    user = db.get("users", {}).get(str(user_id), {})
-    sections = user.get("sections", {})
-    withdrawal_data = sections.get("withdrawal_activity", {}).get("data", {})
-    records = withdrawal_data.get("records", [])
-
+def _sum_records(records: Any, field: str) -> float:
     total = 0.0
     if not isinstance(records, list):
         return total
-
     for item in records:
         if not isinstance(item, dict):
             continue
         try:
-            total += float(item.get("amount_usd", 0))
+            total += float(item.get(field, 0))
         except (TypeError, ValueError):
             continue
     return total
+
+
+def get_total_withdrawal_usd(user_id: int) -> float:
+    db = load_db()
+    user = db.get("users", {}).get(str(user_id), {})
+    sections = user.get("sections", {})
+    records = sections.get("withdrawal_activity", {}).get("data", {}).get("records", [])
+    return _sum_records(records, "amount_usd")
+
+
+def get_total_deposit_usd(user_id: int) -> float:
+    db = load_db()
+    user = db.get("users", {}).get(str(user_id), {})
+    sections = user.get("sections", {})
+    records = sections.get("deposit_activity", {}).get("data", {}).get("records", [])
+    return _sum_records(records, "amount_usd")
 
 
 def get_current_balance_usd(user_id: int) -> float:
@@ -134,7 +143,8 @@ def get_current_balance_usd(user_id: int) -> float:
     initial_capital = float(summary.get("initial_capital_usd") or 0)
     current_profit = get_current_profit_usd(user_id)
     total_withdrawn = get_total_withdrawal_usd(user_id)
-    return initial_capital + current_profit - total_withdrawn
+    total_deposited = get_total_deposit_usd(user_id)
+    return initial_capital + current_profit + total_deposited - total_withdrawn
 
 
 def has_any_transactions(user_id: int) -> bool:
@@ -200,7 +210,7 @@ def save_user_setup_section(
     save_db(db)
 
 
-def add_withdrawal_activity(user_id: int, reason: str, amount_usd: float, current_profit_usd: float) -> bool:
+def _append_activity_record(user_id: int, section_name: str, reason: str, amount_usd: float, current_profit_usd: float) -> bool:
     if amount_usd <= 0:
         return False
 
@@ -215,10 +225,10 @@ def add_withdrawal_activity(user_id: int, reason: str, amount_usd: float, curren
     saved_time = now.strftime("%H:%M:%S")
 
     sections = user.setdefault("sections", {})
-    withdrawal_section = sections.setdefault(
-        "withdrawal_activity",
+    activity_section = sections.setdefault(
+        section_name,
         {
-            "section": "withdrawal_activity",
+            "section": section_name,
             "user_id": user_id,
             "telegram_name": user.get("telegram_name") or str(user_id),
             "saved_at": saved_at_iso,
@@ -229,7 +239,7 @@ def add_withdrawal_activity(user_id: int, reason: str, amount_usd: float, curren
         },
     )
 
-    records = withdrawal_section.setdefault("data", {}).setdefault("records", [])
+    records = activity_section.setdefault("data", {}).setdefault("records", [])
     records.append(
         {
             "amount_usd": float(amount_usd),
@@ -242,14 +252,22 @@ def add_withdrawal_activity(user_id: int, reason: str, amount_usd: float, curren
         }
     )
 
-    withdrawal_section["saved_at"] = saved_at_iso
-    withdrawal_section["saved_date"] = saved_date
-    withdrawal_section["saved_time"] = saved_time
-    withdrawal_section["timezone"] = "Asia/Kuala_Lumpur"
+    activity_section["saved_at"] = saved_at_iso
+    activity_section["saved_date"] = saved_date
+    activity_section["saved_time"] = saved_time
+    activity_section["timezone"] = "Asia/Kuala_Lumpur"
 
     user["updated_at"] = saved_at_iso
     save_db(db)
     return True
+
+
+def add_withdrawal_activity(user_id: int, reason: str, amount_usd: float, current_profit_usd: float) -> bool:
+    return _append_activity_record(user_id, "withdrawal_activity", reason, amount_usd, current_profit_usd)
+
+
+def add_deposit_activity(user_id: int, reason: str, amount_usd: float, current_profit_usd: float) -> bool:
+    return _append_activity_record(user_id, "deposit_activity", reason, amount_usd, current_profit_usd)
 
 
 def apply_initial_capital_reset(user_id: int, new_initial_capital: float) -> bool:
