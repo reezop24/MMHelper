@@ -327,14 +327,19 @@ async def _handle_initial_capital_reset(payload: dict, update: Update, context: 
             context,
             message.chat_id,
             "❌ Reset tak dibenarkan sebab dah ada rekod transaksi.",
-            reply_markup=main_menu_keyboard(user_id),
+            reply_markup=_build_mm_setting_keyboard_for_user(user_id),
         )
         return
 
     try:
         new_initial_capital = float(payload.get("new_initial_capital_usd"))
     except (TypeError, ValueError):
-        await send_screen(context, message.chat_id, "❌ Nilai baru modal tak sah.")
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Nilai baru modal tak sah.",
+            reply_markup=_build_mm_setting_keyboard_for_user(user_id),
+        )
         return
 
     ok = apply_initial_capital_reset(user_id, new_initial_capital)
@@ -343,7 +348,7 @@ async def _handle_initial_capital_reset(payload: dict, update: Update, context: 
             context,
             message.chat_id,
             "❌ Reset gagal. Cuba semula dari menu.",
-            reply_markup=main_menu_keyboard(user_id),
+            reply_markup=_build_mm_setting_keyboard_for_user(user_id),
         )
         return
 
@@ -351,7 +356,7 @@ async def _handle_initial_capital_reset(payload: dict, update: Update, context: 
         context,
         message.chat_id,
         INITIAL_CAPITAL_RESET_SUCCESS_TEXT,
-        reply_markup=main_menu_keyboard(user_id),
+        reply_markup=_build_mm_setting_keyboard_for_user(user_id),
     )
 
 
@@ -363,7 +368,12 @@ async def _handle_balance_adjustment(payload: dict, update: Update, context: Con
     try:
         amount_usd = float(payload.get("amount_usd"))
     except (TypeError, ValueError):
-        await send_screen(context, message.chat_id, "❌ Nilai balance adjustment tak sah.")
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Nilai balance adjustment tak sah.",
+            reply_markup=_build_mm_setting_keyboard_for_user(user_id),
+        )
         return
 
     ok, status_text = apply_balance_adjustment(user_id, mode, amount_usd)
@@ -400,13 +410,23 @@ async def _handle_withdrawal_activity(payload: dict, update: Update, context: Co
 
     reason = (payload.get("reason") or "").strip()
     if not reason:
-        await send_screen(context, message.chat_id, "❌ Pilih reason dulu bro.")
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Pilih reason dulu bro.",
+            reply_markup=_build_account_activity_keyboard_for_user(user_id),
+        )
         return
 
     try:
         amount_usd = float(payload.get("amount_usd"))
     except (TypeError, ValueError):
-        await send_screen(context, message.chat_id, "❌ Jumlah withdraw tak sah.")
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Jumlah withdraw tak sah.",
+            reply_markup=_build_account_activity_keyboard_for_user(user_id),
+        )
         return
 
     ok = add_withdrawal_activity(
@@ -416,14 +436,19 @@ async def _handle_withdrawal_activity(payload: dict, update: Update, context: Co
         current_profit_usd=get_current_profit_usd(user_id),
     )
     if not ok:
-        await send_screen(context, message.chat_id, "❌ Gagal simpan withdrawal activity.")
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Gagal simpan withdrawal activity.",
+            reply_markup=_build_account_activity_keyboard_for_user(user_id),
+        )
         return
 
     await send_screen(
         context,
         message.chat_id,
         _build_withdrawal_saved_text(user_id, amount_usd),
-        reply_markup=main_menu_keyboard(user_id),
+        reply_markup=_build_account_activity_keyboard_for_user(user_id),
         parse_mode="Markdown",
     )
 
@@ -434,13 +459,23 @@ async def _handle_deposit_activity(payload: dict, update: Update, context: Conte
 
     reason = (payload.get("reason") or "").strip()
     if not reason:
-        await send_screen(context, message.chat_id, "❌ Pilih reason dulu bro.")
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Pilih reason dulu bro.",
+            reply_markup=_build_account_activity_keyboard_for_user(user_id),
+        )
         return
 
     try:
         amount_usd = float(payload.get("amount_usd"))
     except (TypeError, ValueError):
-        await send_screen(context, message.chat_id, "❌ Jumlah deposit tak sah.")
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Jumlah deposit tak sah.",
+            reply_markup=_build_account_activity_keyboard_for_user(user_id),
+        )
         return
 
     ok = add_deposit_activity(
@@ -450,14 +485,19 @@ async def _handle_deposit_activity(payload: dict, update: Update, context: Conte
         current_profit_usd=get_current_profit_usd(user_id),
     )
     if not ok:
-        await send_screen(context, message.chat_id, "❌ Gagal simpan deposit activity.")
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Gagal simpan deposit activity.",
+            reply_markup=_build_account_activity_keyboard_for_user(user_id),
+        )
         return
 
     await send_screen(
         context,
         message.chat_id,
         _build_deposit_saved_text(user_id, amount_usd),
-        reply_markup=main_menu_keyboard(user_id),
+        reply_markup=_build_account_activity_keyboard_for_user(user_id),
         parse_mode="Markdown",
     )
 
@@ -471,7 +511,12 @@ async def _handle_trading_activity_update(payload: dict, update: Update, context
     try:
         amount_usd = float(payload.get("amount_usd"))
     except (TypeError, ValueError):
-        await send_screen(context, message.chat_id, "❌ Jumlah update tak sah.")
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Jumlah update tak sah.",
+            reply_markup=_build_account_activity_keyboard_for_user(user_id),
+        )
         return
 
     ok = add_trading_activity_update(
@@ -480,14 +525,19 @@ async def _handle_trading_activity_update(payload: dict, update: Update, context
         amount_usd=amount_usd,
     )
     if not ok:
-        await send_screen(context, message.chat_id, "❌ Gagal simpan trading activity.")
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Gagal simpan trading activity.",
+            reply_markup=_build_account_activity_keyboard_for_user(user_id),
+        )
         return
 
     await send_screen(
         context,
         message.chat_id,
         _build_trading_saved_text(user_id, mode, amount_usd),
-        reply_markup=main_menu_keyboard(user_id),
+        reply_markup=_build_account_activity_keyboard_for_user(user_id),
         parse_mode="Markdown",
     )
 
@@ -501,28 +551,53 @@ async def _handle_set_new_goal(payload: dict, update: Update, context: ContextTy
     try:
         target_balance_usd = float(payload.get("target_balance_usd"))
     except (TypeError, ValueError):
-        await send_screen(context, message.chat_id, "❌ Isi target account yang valid dulu bro.")
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Isi target account yang valid dulu bro.",
+            reply_markup=_build_project_grow_keyboard_for_user(user.id),
+        )
         return
 
     if target_balance_usd <= 0:
-        await send_screen(context, message.chat_id, "❌ Target account kena lebih dari 0.")
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Target account kena lebih dari 0.",
+            reply_markup=_build_project_grow_keyboard_for_user(user.id),
+        )
         return
 
     target_days_raw = str(payload.get("target_days") or "").strip()
     target_label = (payload.get("target_label") or "").strip()
 
     if target_days_raw not in {"30", "90", "180"}:
-        await send_screen(context, message.chat_id, "❌ Tempoh target tak sah.")
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Tempoh target tak sah.",
+            reply_markup=_build_project_grow_keyboard_for_user(user.id),
+        )
         return
 
     try:
         unlock_amount_usd = float(payload.get("unlock_amount_usd"))
     except (TypeError, ValueError):
-        await send_screen(context, message.chat_id, "❌ Nilai unlock mission/tabung tak sah.")
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Nilai unlock mission/tabung tak sah.",
+            reply_markup=_build_project_grow_keyboard_for_user(user.id),
+        )
         return
 
     if unlock_amount_usd < 10:
-        await send_screen(context, message.chat_id, "❌ Nilai unlock minimum USD 10.")
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Nilai unlock minimum USD 10.",
+            reply_markup=_build_project_grow_keyboard_for_user(user.id),
+        )
         return
 
     current_balance = get_current_balance_usd(user.id)
@@ -531,6 +606,7 @@ async def _handle_set_new_goal(payload: dict, update: Update, context: ContextTy
             context,
             message.chat_id,
             f"❌ Unlock tak boleh lebih dari Current Balance kau sekarang ({current_balance:.2f}).",
+            reply_markup=_build_project_grow_keyboard_for_user(user.id),
         )
         return
 
@@ -540,6 +616,7 @@ async def _handle_set_new_goal(payload: dict, update: Update, context: ContextTy
             context,
             message.chat_id,
             f"❌ Target minimum kena USD {minimum_target:.2f} (current balance + 100).",
+            reply_markup=_build_project_grow_keyboard_for_user(user.id),
         )
         return
 
@@ -572,7 +649,7 @@ async def _handle_set_new_goal(payload: dict, update: Update, context: ContextTy
         context,
         message.chat_id,
         _build_set_new_goal_saved_text(user.id, target_balance_usd, unlock_amount_usd, target_label),
-        reply_markup=main_menu_keyboard(user.id),
+        reply_markup=_build_project_grow_keyboard_for_user(user.id),
         parse_mode="Markdown",
     )
 
@@ -588,21 +665,26 @@ async def _handle_project_grow_mission_start(payload: dict, update: Update, cont
             context,
             message.chat_id,
             "❌ Mission tak boleh start lagi. Pastikan goal dah set dan tabung minimum USD 10.",
-            reply_markup=main_menu_keyboard(user.id),
+            reply_markup=_build_project_grow_keyboard_for_user(user.id),
         )
         return
 
     mode = (payload.get("mode") or "").strip().lower()
     ok = start_project_grow_mission(user.id, mode)
     if not ok:
-        await send_screen(context, message.chat_id, "❌ Mission gagal diaktifkan. Cuba lagi.")
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Mission gagal diaktifkan. Cuba lagi.",
+            reply_markup=_build_project_grow_keyboard_for_user(user.id),
+        )
         return
 
     await send_screen(
         context,
         message.chat_id,
         MISSION_STARTED_TEXT,
-        reply_markup=main_menu_keyboard(user.id),
+        reply_markup=_build_project_grow_keyboard_for_user(user.id),
         parse_mode="Markdown",
     )
 
