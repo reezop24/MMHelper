@@ -15,9 +15,14 @@ from menu import (
     SUBMENU_MM_BUTTON_BACK_MAIN,
     SUBMENU_MM_BUTTON_CORRECTION,
     SUBMENU_MM_BUTTON_SYSTEM_INFO,
+    SUBMENU_PROJECT_BUTTON_ACHIEVEMENT,
+    SUBMENU_PROJECT_BUTTON_MISSION,
+    SUBMENU_PROJECT_BUTTON_SET_NEW_GOAL,
+    SUBMENU_PROJECT_BUTTON_TABUNG_PROGRESS,
     account_activity_keyboard,
     main_menu_keyboard,
     mm_helper_setting_keyboard,
+    project_grow_keyboard,
 )
 from settings import (
     get_deposit_activity_webapp_url,
@@ -39,15 +44,19 @@ from storage import (
 )
 from texts import (
     ACCOUNT_ACTIVITY_OPENED_TEXT,
+    ACHIEVEMENT_OPENED_TEXT,
     CORRECTION_OPENED_TEXT,
     EXTRA_OPENED_TEXT,
     MAIN_MENU_OPENED_TEXT,
+    MISSION_OPENED_TEXT,
     MM_HELPER_SETTING_OPENED_TEXT,
     PROJECT_GROW_OPENED_TEXT,
     RISK_CALCULATOR_OPENED_TEXT,
+    SET_NEW_GOAL_OPENED_TEXT,
     STATISTIC_OPENED_TEXT,
     SYSTEM_INFO_OPENED_TEXT,
     TABUNG_OPENED_TEXT,
+    TABUNG_PROGRESS_OPENED_TEXT,
 )
 from ui import clear_last_screen, send_screen
 from welcome import start
@@ -149,7 +158,7 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
             context,
             message.chat_id,
             PROJECT_GROW_OPENED_TEXT,
-            reply_markup=main_menu_keyboard(),
+            reply_markup=project_grow_keyboard(),
             parse_mode="Markdown",
         )
         return
@@ -210,6 +219,46 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
             message.chat_id,
             TABUNG_OPENED_TEXT,
             reply_markup=_build_account_activity_keyboard_for_user(user.id),
+            parse_mode="Markdown",
+        )
+        return
+
+    if text == SUBMENU_PROJECT_BUTTON_SET_NEW_GOAL:
+        await send_screen(
+            context,
+            message.chat_id,
+            SET_NEW_GOAL_OPENED_TEXT,
+            reply_markup=project_grow_keyboard(),
+            parse_mode="Markdown",
+        )
+        return
+
+    if text == SUBMENU_PROJECT_BUTTON_MISSION:
+        await send_screen(
+            context,
+            message.chat_id,
+            MISSION_OPENED_TEXT,
+            reply_markup=project_grow_keyboard(),
+            parse_mode="Markdown",
+        )
+        return
+
+    if text == SUBMENU_PROJECT_BUTTON_TABUNG_PROGRESS:
+        await send_screen(
+            context,
+            message.chat_id,
+            TABUNG_PROGRESS_OPENED_TEXT,
+            reply_markup=project_grow_keyboard(),
+            parse_mode="Markdown",
+        )
+        return
+
+    if text == SUBMENU_PROJECT_BUTTON_ACHIEVEMENT:
+        await send_screen(
+            context,
+            message.chat_id,
+            ACHIEVEMENT_OPENED_TEXT,
+            reply_markup=project_grow_keyboard(),
             parse_mode="Markdown",
         )
         return

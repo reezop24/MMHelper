@@ -20,6 +20,11 @@ SUBMENU_ACCOUNT_BUTTON_WITHDRAWAL_ACTIVITY = "💸 Update Withdrawal Activity"
 SUBMENU_ACCOUNT_BUTTON_TRADING_ACTIVITY = "📉 Update Trading Activity"
 SUBMENU_ACCOUNT_BUTTON_TABUNG = "🏦 Update Tabung"
 
+SUBMENU_PROJECT_BUTTON_SET_NEW_GOAL = "🎯 Set New Goal"
+SUBMENU_PROJECT_BUTTON_MISSION = "🧭 Mission"
+SUBMENU_PROJECT_BUTTON_TABUNG_PROGRESS = "🏦 Tabung Progress"
+SUBMENU_PROJECT_BUTTON_ACHIEVEMENT = "🏆 Achievement"
+
 MAIN_MENU_ROWS = [
     [MAIN_MENU_BUTTON_MM_SETTING, MAIN_MENU_BUTTON_RISK],
     [MAIN_MENU_BUTTON_ACCOUNT_ACTIVITY, MAIN_MENU_BUTTON_PROJECT_GROW],
@@ -71,6 +76,15 @@ def account_activity_keyboard(
             )
         ],
         [SUBMENU_ACCOUNT_BUTTON_TABUNG],
+        [SUBMENU_MM_BUTTON_BACK_MAIN],
+    ]
+    return ReplyKeyboardMarkup(rows, resize_keyboard=True)
+
+
+def project_grow_keyboard() -> ReplyKeyboardMarkup:
+    rows = [
+        [SUBMENU_PROJECT_BUTTON_SET_NEW_GOAL, SUBMENU_PROJECT_BUTTON_MISSION],
+        [SUBMENU_PROJECT_BUTTON_TABUNG_PROGRESS, SUBMENU_PROJECT_BUTTON_ACHIEVEMENT],
         [SUBMENU_MM_BUTTON_BACK_MAIN],
     ]
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
