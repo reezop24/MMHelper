@@ -16,6 +16,7 @@
   var currentBalance = Number(params.get("current_balance_usd") || 0);
   var capital = Number(params.get("capital_usd") || 0);
   var savedDate = params.get("saved_date") || "-";
+  var minTarget = currentBalance + 100;
 
   document.getElementById("summaryName").textContent = name;
   document.getElementById("summaryBalance").textContent = formatUsd(currentBalance);
@@ -24,28 +25,33 @@
 
   document.getElementById("introText").textContent = content.setNewGoalIntro || "";
   document.getElementById("goalPrompt").textContent = content.setNewGoalPrompt || "";
+  document.getElementById("balanceHint").textContent = (content.setNewGoalBalanceHintPrefix || "Baki semasa") + ": USD " + formatUsd(currentBalance);
+  document.getElementById("minTargetHint").textContent = (content.setNewGoalMinTargetPrefix || "Minimum target") + ": USD " + formatUsd(minTarget);
   document.getElementById("targetPrompt").textContent = content.setNewGoalTargetPrompt || "";
+  document.getElementById("unlockPrompt").textContent = content.setNewGoalUnlockPrompt || "";
   document.getElementById("finalPrompt").textContent = content.setNewGoalFinalPrompt || "";
 
   var form = document.getElementById("setGoalForm");
   var statusEl = document.getElementById("formStatus");
-  var goalInput = document.getElementById("newGoal");
+  var targetBalanceInput = document.getElementById("targetBalance");
   var targetSelect = document.getElementById("targetDays");
+  var unlockAmountInput = document.getElementById("unlockAmount");
 
   form.addEventListener("submit", function (event) {
     event.preventDefault();
 
-    var newGoal = (goalInput.value || "").trim();
+    var targetBalance = Number((targetBalanceInput.value || "").trim());
     var targetDays = (targetSelect.value || "").trim();
+    var unlockAmount = Number((unlockAmountInput.value || "").trim());
     var targetLabel = "";
 
-    if (!newGoal) {
-      statusEl.textContent = "Isi sasaran dulu bro.";
+    if (Number.isNaN(targetBalance) || targetBalance <= 0) {
+      statusEl.textContent = "Isi target account yang valid dulu bro.";
       return;
     }
 
-    if (newGoal.length < 8) {
-      statusEl.textContent = "Bagi sasaran yang lebih jelas sikit (min 8 aksara).";
+    if (targetBalance < minTarget) {
+      statusEl.textContent = "Target kena minimum USD " + formatUsd(minTarget) + ".";
       return;
     }
 
@@ -54,13 +60,19 @@
       return;
     }
 
+    if (Number.isNaN(unlockAmount) || unlockAmount < 10) {
+      statusEl.textContent = "Untuk unlock, nilai minimum ialah USD 10.";
+      return;
+    }
+
     targetLabel = targetDays + " hari";
 
     var payload = {
       type: "set_new_goal",
-      new_goal: newGoal,
+      target_balance_usd: targetBalance,
       target_days: Number(targetDays),
-      target_label: targetLabel
+      target_label: targetLabel,
+      unlock_amount_usd: unlockAmount
     };
 
     if (tg) {

@@ -103,7 +103,10 @@ window.MMHELPER_CONTENT = {
     "So masa isi goal ni, isi betul-betul ikut target yang kau nak capai."
   ].join("\n"),
 
-  setNewGoalPrompt: "New Goal (sasaran account kau nak capai)",
+  setNewGoalPrompt: "Target account (USD) yang kau nak capai",
+  setNewGoalBalanceHintPrefix: "Baki semasa kau sekarang",
+  setNewGoalMinTargetPrefix: "Minimum target yang dibenarkan",
   setNewGoalTargetPrompt: "Target masa untuk capai sasaran",
-  setNewGoalFinalPrompt: "Bila dah yakin, submit. Kita akan sync dengan mission flow lepas ni."
+  setNewGoalUnlockPrompt: "Unlock Mission & Tabung (minimum USD 10)",
+  setNewGoalFinalPrompt: "Bila dah yakin, submit. Lepas ni kita sambung flow mission."
 };

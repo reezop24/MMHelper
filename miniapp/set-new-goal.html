@@ -38,7 +38,7 @@
       color: #e8f0ff;
     }
 
-    textarea,
+    input,
     select {
       width: 100%;
       border: 1px solid var(--border-input);
@@ -49,17 +49,21 @@
       font-size: 15px;
     }
 
-    textarea {
-      min-height: 108px;
-      resize: vertical;
-      font-family: inherit;
-      line-height: 1.4;
+    input::placeholder {
+      color: #9eb4e2;
     }
 
     .target-hint {
       margin-top: 8px;
       font-size: 12px;
       color: #afc4e9;
+    }
+
+    .balance-hint {
+      margin: 0 0 8px;
+      font-size: 12px;
+      color: #b7c9eb;
+      line-height: 1.3;
     }
 
     @media (max-width: 640px) {
@@ -94,12 +98,21 @@
 
       <div class="field">
         <p id="goalPrompt" class="prompt"></p>
-        <textarea
-          id="newGoal"
-          name="new_goal"
-          placeholder="Contoh: Nak grow account ke USD 2,000 dengan setup yang konsisten"
-          required
-        ></textarea>
+        <p id="balanceHint" class="balance-hint"></p>
+        <p id="minTargetHint" class="balance-hint"></p>
+        <div class="with-prefix with-suffix">
+          <span class="affix">USD</span>
+          <input
+            id="targetBalance"
+            name="target_balance_usd"
+            type="number"
+            inputmode="decimal"
+            min="0"
+            step="0.01"
+            placeholder="Contoh: 1200"
+            required
+          />
+        </div>
       </div>
 
       <div class="field">
@@ -112,8 +125,26 @@
         <p class="target-hint">Pilihan 3 bulan dan 6 bulan akan dibuka dalam update seterusnya.</p>
       </div>
 
+      <div class="field">
+        <p id="unlockPrompt" class="prompt"></p>
+        <p class="target-hint">Untuk unlock mission dan tabung, isi minimum USD 10.</p>
+        <div class="with-prefix with-suffix">
+          <span class="affix">USD</span>
+          <input
+            id="unlockAmount"
+            name="unlock_amount_usd"
+            type="number"
+            inputmode="decimal"
+            min="10"
+            step="0.01"
+            placeholder="Minimum 10"
+            required
+          />
+        </div>
+      </div>
+
       <p id="finalPrompt" class="prompt"></p>
-      <button id="submitBtn" type="submit">✅ Save Goal</button>
+      <button id="submitBtn" type="submit">✅ Save Goal & Unlock Tabung</button>
       <p id="formStatus" class="status" aria-live="polite"></p>
     </form>
   </main>

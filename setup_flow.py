@@ -14,6 +14,7 @@ from storage import (
     add_withdrawal_activity,
     apply_initial_capital_reset,
     can_reset_initial_capital,
+    get_current_balance_usd,
     get_current_profit_usd,
     save_user_setup_section,
 )
@@ -219,9 +220,14 @@ async def _handle_set_new_goal(payload: dict, update: Update, context: ContextTy
     if not user:
         return
 
-    new_goal = (payload.get("new_goal") or "").strip()
-    if not new_goal:
-        await send_screen(context, message.chat_id, "❌ Isi sasaran dulu bro.")
+    try:
+        target_balance_usd = float(payload.get("target_balance_usd"))
+    except (TypeError, ValueError):
+        await send_screen(context, message.chat_id, "❌ Isi target account yang valid dulu bro.")
+        return
+
+    if target_balance_usd <= 0:
+        await send_screen(context, message.chat_id, "❌ Target account kena lebih dari 0.")
         return
 
     target_days_raw = str(payload.get("target_days") or "").strip()
@@ -229,6 +235,26 @@ async def _handle_set_new_goal(payload: dict, update: Update, context: ContextTy
 
     if target_days_raw not in {"14", "30"}:
         await send_screen(context, message.chat_id, "❌ Tempoh target tak sah.")
+        return
+
+    try:
+        unlock_amount_usd = float(payload.get("unlock_amount_usd"))
+    except (TypeError, ValueError):
+        await send_screen(context, message.chat_id, "❌ Nilai unlock mission/tabung tak sah.")
+        return
+
+    if unlock_amount_usd < 10:
+        await send_screen(context, message.chat_id, "❌ Nilai unlock minimum USD 10.")
+        return
+
+    current_balance = get_current_balance_usd(user.id)
+    minimum_target = current_balance + 100.0
+    if target_balance_usd < minimum_target:
+        await send_screen(
+            context,
+            message.chat_id,
+            f"❌ Target minimum kena USD {minimum_target:.2f} (baki semasa + 100).",
+        )
         return
 
     target_days = int(target_days_raw)
@@ -241,7 +267,10 @@ async def _handle_set_new_goal(payload: dict, update: Update, context: ContextTy
         telegram_name=telegram_name,
         section="project_grow_goal",
         payload={
-            "new_goal": new_goal,
+            "target_balance_usd": float(target_balance_usd),
+            "unlock_amount_usd": float(unlock_amount_usd),
+            "minimum_target_usd": float(minimum_target),
+            "current_balance_usd": float(current_balance),
             "target_days": target_days,
             "target_label": target_label,
         },
