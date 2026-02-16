@@ -36,19 +36,40 @@
     .flow-steps {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 0;
       margin: 0 0 14px;
+      overflow: hidden;
+      border-radius: 10px;
     }
 
     .step-pill {
       flex: 1;
       border: 1px solid #2b4c84;
       background: rgba(9, 30, 63, 0.78);
-      border-radius: 999px;
+      border-radius: 0;
       text-align: center;
-      padding: 7px 10px;
+      padding: 8px 14px;
       font-size: 12px;
       color: #b8cdf1;
+      position: relative;
+    }
+
+    .step-pill:not(:last-child) {
+      margin-right: 2px;
+    }
+
+    .step-pill:not(:last-child)::after {
+      content: "";
+      position: absolute;
+      top: -1px;
+      right: -12px;
+      width: 0;
+      height: 0;
+      border-top: 17px solid transparent;
+      border-bottom: 17px solid transparent;
+      border-left: 12px solid rgba(9, 30, 63, 0.9);
+      z-index: 1;
+      pointer-events: none;
     }
 
     .step-pill.active {
@@ -59,12 +80,8 @@
       box-shadow: 0 0 0 1px rgba(127, 179, 255, 0.25) inset;
     }
 
-    .step-arrow {
-      color: #7ea3d9;
-      font-size: 13px;
-      font-weight: 700;
-      line-height: 1;
-      user-select: none;
+    .step-pill.active:not(:last-child)::after {
+      border-left-color: rgba(23, 59, 114, 0.95);
     }
 
     .mode-grid {
@@ -200,16 +217,12 @@
       }
 
       .flow-steps {
-        gap: 6px;
+        border-radius: 9px;
       }
 
       .step-pill {
         min-width: 0;
-        padding: 7px 8px;
-        font-size: 11px;
-      }
-
-      .step-arrow {
+        padding: 8px 6px;
         font-size: 11px;
       }
 
@@ -259,9 +272,7 @@
 
       <div class="flow-steps">
         <div id="stepMode" class="step-pill active">1. Pilih Mode</div>
-        <span class="step-arrow">→</span>
         <div id="stepAmount" class="step-pill">2. Isi Amount</div>
-        <span class="step-arrow">→</span>
         <div id="stepReview" class="step-pill">3. Review & Submit</div>
       </div>
 
