@@ -668,7 +668,7 @@ def apply_tabung_update_action(user_id: int, action: str, amount_usd: float) -> 
     saved_date = now.strftime("%Y-%m-%d")
     saved_time = now.strftime("%H:%M:%S")
 
-    sections, tabung_section, tabung_data, records, current_tabung_balance = _ensure_tabung_section(
+    _, tabung_section, tabung_data, records, current_tabung_balance = _ensure_tabung_section(
         user, user_id, saved_at_iso, saved_date, saved_time
     )
     current_balance = get_current_balance_usd(user_id)
