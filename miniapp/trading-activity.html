@@ -189,11 +189,20 @@
     }
 
     @media (max-width: 640px) {
-      .summary,
       .flow-steps,
       .quick-amounts,
       .impact-grid {
         grid-template-columns: 1fr;
+      }
+
+      .summary {
+        gap: 6px;
+        padding: 10px;
+      }
+
+      .summary-item {
+        font-size: 12.5px;
+        line-height: 1.25;
       }
     }
   </style>
