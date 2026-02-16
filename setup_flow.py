@@ -7,7 +7,8 @@ import json
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from menu import main_menu_keyboard
+from menu import main_menu_keyboard, project_grow_keyboard
+from settings import get_project_grow_mission_webapp_url, get_set_new_goal_webapp_url
 from storage import (
     add_deposit_activity,
     add_trading_activity_update,
@@ -16,8 +17,16 @@ from storage import (
     apply_initial_capital_reset,
     can_open_project_grow_mission,
     can_reset_initial_capital,
+    get_capital_usd,
     get_current_balance_usd,
     get_current_profit_usd,
+    get_initial_setup_summary,
+    get_project_grow_goal_summary,
+    get_project_grow_mission_state,
+    get_project_grow_mission_status_text,
+    get_tabung_balance_usd,
+    get_tabung_start_date,
+    reset_project_grow_goal,
     reset_project_grow_mission,
     save_user_setup_section,
     start_project_grow_mission,
@@ -25,14 +34,62 @@ from storage import (
 from texts import (
     DEPOSIT_ACTIVITY_SAVED_TEXT,
     INITIAL_CAPITAL_RESET_SUCCESS_TEXT,
+    PROJECT_GROW_OPENED_TEXT,
     MISSION_RESET_TEXT,
     MISSION_STARTED_TEXT,
+    SET_NEW_GOAL_RESET_TEXT,
     SET_NEW_GOAL_SAVED_TEXT,
     SETUP_SAVED_TEXT,
     TRADING_ACTIVITY_SAVED_TEXT,
     WITHDRAWAL_ACTIVITY_SAVED_TEXT,
 )
 from ui import send_screen
+
+
+def _build_project_grow_keyboard_for_user(user_id: int):
+    summary = get_initial_setup_summary(user_id)
+    goal_summary = get_project_grow_goal_summary(user_id)
+    mission_state = get_project_grow_mission_state(user_id)
+    tabung_balance = get_tabung_balance_usd(user_id)
+    current_balance = get_current_balance_usd(user_id)
+    mission_status = get_project_grow_mission_status_text(user_id)
+    tabung_start_date = get_tabung_start_date(user_id)
+    grow_target_usd = max(float(goal_summary["target_balance_usd"]) - current_balance, 0.0)
+
+    mission_url = get_project_grow_mission_webapp_url(
+        name=summary["name"],
+        current_balance_usd=current_balance,
+        capital_usd=get_capital_usd(user_id),
+        saved_date=summary["saved_date"],
+        target_balance_usd=goal_summary["target_balance_usd"],
+        target_days=goal_summary["target_days"],
+        target_label=goal_summary["target_label"],
+        tabung_balance_usd=tabung_balance,
+        tabung_start_date=tabung_start_date,
+        mission_status=mission_status,
+        mission_active=mission_state["active"],
+        mission_mode=mission_state["mode"],
+        mission_started_date=mission_state["started_date"],
+    )
+
+    set_new_goal_url = get_set_new_goal_webapp_url(
+        name=summary["name"],
+        current_balance_usd=current_balance,
+        capital_usd=get_capital_usd(user_id),
+        saved_date=summary["saved_date"],
+        tabung_start_date=tabung_start_date,
+        mission_status=mission_status,
+        has_goal=goal_summary["target_balance_usd"] > 0,
+        target_balance_usd=goal_summary["target_balance_usd"],
+        grow_target_usd=grow_target_usd,
+        target_label=goal_summary["target_label"],
+    )
+
+    return project_grow_keyboard(
+        set_new_goal_url=set_new_goal_url,
+        mission_url=mission_url,
+        can_open_mission=can_open_project_grow_mission(user_id),
+    )
 
 
 async def _handle_initial_setup(payload: dict, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -347,7 +404,47 @@ async def _handle_project_grow_mission_reset(payload: dict, update: Update, cont
         context,
         message.chat_id,
         MISSION_RESET_TEXT,
-        reply_markup=main_menu_keyboard(),
+        reply_markup=_build_project_grow_keyboard_for_user(user.id),
+        parse_mode="Markdown",
+    )
+
+
+async def _handle_project_grow_goal_reset(payload: dict, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    user = update.effective_user
+    if not user:
+        return
+
+    confirm_reset = str(payload.get("confirm_reset") or "0").strip()
+    if confirm_reset != "1":
+        await send_screen(context, message.chat_id, "❌ Reset goal dibatalkan.")
+        return
+
+    ok = reset_project_grow_goal(user.id)
+    if not ok:
+        await send_screen(context, message.chat_id, "❌ Goal belum ada atau reset gagal.")
+        return
+
+    await send_screen(
+        context,
+        message.chat_id,
+        SET_NEW_GOAL_RESET_TEXT,
+        reply_markup=_build_project_grow_keyboard_for_user(user.id),
+        parse_mode="Markdown",
+    )
+
+
+async def _handle_project_grow_back_to_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    user = update.effective_user
+    if not user:
+        return
+
+    await send_screen(
+        context,
+        message.chat_id,
+        PROJECT_GROW_OPENED_TEXT,
+        reply_markup=_build_project_grow_keyboard_for_user(user.id),
         parse_mode="Markdown",
     )
 
@@ -394,6 +491,14 @@ async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if payload_type == "project_grow_mission_reset":
         await _handle_project_grow_mission_reset(payload, update, context)
+        return
+
+    if payload_type == "project_grow_goal_reset":
+        await _handle_project_grow_goal_reset(payload, update, context)
+        return
+
+    if payload_type == "project_grow_back_to_menu":
+        await _handle_project_grow_back_to_menu(update, context)
         return
 
     await send_screen(

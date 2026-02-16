@@ -154,6 +154,14 @@
       gap: 10px;
     }
 
+    .form-actions {
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 10px;
+    }
+
     .back-btn {
       margin: 0;
       width: auto;
@@ -205,6 +213,12 @@
         font-size: 13px;
         padding: 9px 8px;
       }
+
+      .running-actions,
+      .form-actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
     }
   </style>
 </head>
@@ -219,6 +233,8 @@
       <div class="summary-item"><strong>Nama:</strong> <span id="summaryName">-</span></div>
       <div class="summary-item"><strong>Current Balance:</strong> USD <span id="summaryBalance">0.00</span></div>
       <div class="summary-item"><strong>Capital:</strong> USD <span id="summaryCapital">0.00</span></div>
+      <div class="summary-item"><strong>Tarikh mula tabung:</strong> <span id="summaryTabungStartDate">-</span></div>
+      <div class="summary-item"><strong>Mission Status:</strong> <span id="summaryMissionStatus">-</span></div>
       <div class="summary-item"><strong>Tarikh mula:</strong> <span id="summaryDate">-</span></div>
     </section>
 
@@ -252,6 +268,9 @@
       </div>
 
       <button id="startMissionBtn" type="button">🚀 Start Mission (Normal)</button>
+      <div class="form-actions">
+        <button id="beforeBackToMenuBtn" type="button" class="back-btn">⬅️ Back to Project Grow</button>
+      </div>
       <p id="beforeStatus" class="status" aria-live="polite"></p>
     </section>
 

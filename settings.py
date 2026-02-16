@@ -157,6 +157,12 @@ def get_set_new_goal_webapp_url(
     current_balance_usd: float,
     capital_usd: float,
     saved_date: str,
+    tabung_start_date: str,
+    mission_status: str,
+    has_goal: bool,
+    target_balance_usd: float,
+    grow_target_usd: float,
+    target_label: str,
 ) -> str:
     page = f"{_miniapp_base_url()}/set-new-goal.html"
     query = urlencode(
@@ -165,6 +171,12 @@ def get_set_new_goal_webapp_url(
             "current_balance_usd": f"{current_balance_usd:.2f}",
             "capital_usd": f"{capital_usd:.2f}",
             "saved_date": saved_date,
+            "tabung_start_date": tabung_start_date,
+            "mission_status": mission_status,
+            "has_goal": "1" if has_goal else "0",
+            "target_balance_usd": f"{target_balance_usd:.2f}",
+            "grow_target_usd": f"{grow_target_usd:.2f}",
+            "target_label": target_label,
         }
     )
     return f"{page}?{query}"
@@ -179,6 +191,8 @@ def get_project_grow_mission_webapp_url(
     target_days: int,
     target_label: str,
     tabung_balance_usd: float,
+    tabung_start_date: str,
+    mission_status: str,
     mission_active: bool,
     mission_mode: str,
     mission_started_date: str,
@@ -194,6 +208,8 @@ def get_project_grow_mission_webapp_url(
             "target_days": str(target_days),
             "target_label": target_label,
             "tabung_balance_usd": f"{tabung_balance_usd:.2f}",
+            "tabung_start_date": tabung_start_date,
+            "mission_status": mission_status,
             "mission_active": "1" if mission_active else "0",
             "mission_mode": mission_mode,
             "mission_started_date": mission_started_date,

@@ -43,6 +43,8 @@ from storage import (
     get_monthly_performance_usd,
     get_project_grow_goal_summary,
     get_project_grow_mission_state,
+    get_project_grow_mission_status_text,
+    get_tabung_start_date,
     get_tabung_balance_usd,
     get_total_balance_usd,
     get_weekly_performance_usd,
@@ -119,24 +121,36 @@ def _build_project_grow_keyboard_for_user(user_id: int):
     goal_summary = get_project_grow_goal_summary(user_id)
     mission_state = get_project_grow_mission_state(user_id)
     tabung_balance = get_tabung_balance_usd(user_id)
+    current_balance = get_current_balance_usd(user_id)
+    mission_status = get_project_grow_mission_status_text(user_id)
+    tabung_start_date = get_tabung_start_date(user_id)
+    grow_target_usd = max(float(goal_summary["target_balance_usd"]) - current_balance, 0.0)
     mission_url = get_project_grow_mission_webapp_url(
         name=summary["name"],
-        current_balance_usd=get_current_balance_usd(user_id),
+        current_balance_usd=current_balance,
         capital_usd=get_capital_usd(user_id),
         saved_date=summary["saved_date"],
         target_balance_usd=goal_summary["target_balance_usd"],
         target_days=goal_summary["target_days"],
         target_label=goal_summary["target_label"],
         tabung_balance_usd=tabung_balance,
+        tabung_start_date=tabung_start_date,
+        mission_status=mission_status,
         mission_active=mission_state["active"],
         mission_mode=mission_state["mode"],
         mission_started_date=mission_state["started_date"],
     )
     set_new_goal_url = get_set_new_goal_webapp_url(
         name=summary["name"],
-        current_balance_usd=get_current_balance_usd(user_id),
+        current_balance_usd=current_balance,
         capital_usd=get_capital_usd(user_id),
         saved_date=summary["saved_date"],
+        tabung_start_date=tabung_start_date,
+        mission_status=mission_status,
+        has_goal=goal_summary["target_balance_usd"] > 0,
+        target_balance_usd=goal_summary["target_balance_usd"],
+        grow_target_usd=grow_target_usd,
+        target_label=goal_summary["target_label"],
     )
     return project_grow_keyboard(
         set_new_goal_url=set_new_goal_url,

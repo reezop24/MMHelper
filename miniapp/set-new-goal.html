@@ -66,6 +66,71 @@
       line-height: 1.3;
     }
 
+    .form-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .ghost-btn {
+      margin: 0;
+      width: auto;
+      min-width: 160px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid #4a70ac;
+      background: rgba(11, 34, 71, 0.9);
+      color: #e6f0ff;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .reset-link-btn {
+      margin: 0;
+      width: auto;
+      border: 0;
+      padding: 3px 2px;
+      background: transparent;
+      color: #b3c6e6;
+      font-size: 11px;
+      font-weight: 600;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      opacity: 0.72;
+    }
+
+    .reset-link-btn:hover {
+      opacity: 1;
+      color: #d0dcf0;
+    }
+
+    .configured-card {
+      border: 1px solid rgba(95, 145, 215, 0.4);
+      border-radius: 12px;
+      background: rgba(8, 26, 55, 0.78);
+      padding: 12px;
+      margin-top: 12px;
+    }
+
+    .configured-title {
+      margin: 0 0 8px;
+      font-size: 15px;
+      color: #f4f9ff;
+    }
+
+    .configured-item {
+      margin: 0;
+      font-size: 13px;
+      color: #d0e1ff;
+      line-height: 1.4;
+    }
+
+    .configured-item + .configured-item {
+      margin-top: 6px;
+    }
+
     @media (max-width: 640px) {
       .summary {
         gap: 6px;
@@ -75,6 +140,11 @@
       .summary-item {
         font-size: 12.5px;
         line-height: 1.25;
+      }
+
+      .form-actions {
+        flex-direction: column;
+        align-items: stretch;
       }
     }
   </style>
@@ -90,10 +160,12 @@
       <div class="summary-item"><strong>Nama:</strong> <span id="summaryName">-</span></div>
       <div class="summary-item"><strong>Current Balance:</strong> USD <span id="summaryBalance">0.00</span></div>
       <div class="summary-item"><strong>Capital:</strong> USD <span id="summaryCapital">0.00</span></div>
+      <div class="summary-item"><strong>Tarikh mula tabung:</strong> <span id="summaryTabungStartDate">-</span></div>
+      <div class="summary-item"><strong>Mission Status:</strong> <span id="summaryMissionStatus">-</span></div>
       <div class="summary-item"><strong>Tarikh mula:</strong> <span id="summaryDate">-</span></div>
     </section>
 
-    <form id="setGoalForm" class="card">
+    <form id="setGoalForm" class="card hidden">
       <p id="introText" class="long-copy"></p>
 
       <div class="field">
@@ -113,6 +185,7 @@
             required
           />
         </div>
+        <p id="growTargetHint" class="balance-hint"></p>
       </div>
 
       <div class="field">
@@ -146,8 +219,28 @@
 
       <p id="finalPrompt" class="prompt"></p>
       <button id="submitBtn" type="submit">✅ Save Goal & Unlock Tabung</button>
+      <div class="form-actions">
+        <button id="backToMenuBtn" type="button" class="ghost-btn">⬅️ Back to Project Grow</button>
+        <button id="resetGoalBtn" type="button" class="reset-link-btn">Reset New Goal</button>
+      </div>
       <p id="formStatus" class="status" aria-live="polite"></p>
     </form>
+
+    <section id="configuredLayer" class="card hidden">
+      <p id="configuredIntro" class="long-copy"></p>
+      <div class="configured-card">
+        <h3 id="configuredTitle" class="configured-title">Target Capital dah diset ✅</h3>
+        <p class="configured-item"><strong>Target Capital:</strong> USD <span id="configuredTargetCapital">0.00</span></p>
+        <p class="configured-item"><strong>Grow Target:</strong> USD <span id="configuredGrowTarget">0.00</span></p>
+        <p class="configured-item"><strong>Target Tempoh:</strong> <span id="configuredTargetLabel">-</span></p>
+      </div>
+      <p id="resetInfoText" class="target-hint"></p>
+      <div class="form-actions">
+        <button id="configuredBackBtn" type="button" class="ghost-btn">⬅️ Back to Project Grow</button>
+        <button id="configuredResetBtn" type="button" class="reset-link-btn">Reset New Goal</button>
+      </div>
+      <p id="configuredStatus" class="status" aria-live="polite"></p>
+    </section>
   </main>
 
   <script src="https://telegram.org/js/telegram-web-app.js"></script>

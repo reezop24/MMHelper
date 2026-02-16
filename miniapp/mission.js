@@ -21,6 +21,8 @@
   var currentBalance = Number(params.get("current_balance_usd") || 0);
   var capital = Number(params.get("capital_usd") || 0);
   var savedDate = params.get("saved_date") || "-";
+  var tabungStartDate = params.get("tabung_start_date") || "-";
+  var missionStatus = params.get("mission_status") || "-";
   var targetBalance = Number(params.get("target_balance_usd") || 0);
   var targetDays = Number(params.get("target_days") || 0);
   var targetLabel = params.get("target_label") || (targetDays ? String(targetDays) + " hari" : "-");
@@ -36,6 +38,8 @@
   document.getElementById("summaryBalance").textContent = formatUsd(currentBalance);
   document.getElementById("summaryCapital").textContent = formatUsd(capital);
   document.getElementById("summaryDate").textContent = savedDate;
+  document.getElementById("summaryTabungStartDate").textContent = tabungStartDate;
+  document.getElementById("summaryMissionStatus").textContent = missionStatus;
 
   var lockedCard = document.getElementById("lockedCard");
   var beforeLayer = document.getElementById("beforeStartLayer");
@@ -50,6 +54,7 @@
   var advancedModePanel = document.getElementById("advancedModePanel");
   var startMissionBtn = document.getElementById("startMissionBtn");
   var beforeStatus = document.getElementById("beforeStatus");
+  var beforeBackToMenuBtn = document.getElementById("beforeBackToMenuBtn");
 
   var level1Toggle = document.getElementById("level1Toggle");
   var level2Toggle = document.getElementById("level2Toggle");
@@ -127,6 +132,18 @@
     backToMenuBtn.textContent = content.missionBackToMenuBtn || "⬅️ Back to Menu";
   }
 
+  function sendBackToProjectGrow(statusEl) {
+    var payload = { type: "project_grow_back_to_menu" };
+
+    if (tg) {
+      tg.sendData(JSON.stringify(payload));
+      tg.close();
+      return;
+    }
+
+    statusEl.textContent = "Preview mode: buka dari Telegram untuk kembali ke Project Grow.";
+  }
+
   if (!canOpen) {
     lockedCard.classList.remove("hidden");
     document.getElementById("lockedText").textContent = content.missionLockedText || "Mission locked.";
@@ -137,11 +154,7 @@
     renderRunning();
 
     backToMenuBtn.addEventListener("click", function () {
-      if (tg) {
-        tg.close();
-        return;
-      }
-      window.history.back();
+      sendBackToProjectGrow(runningStatus);
     });
 
     resetMissionBtn.addEventListener("click", function () {
@@ -171,6 +184,11 @@
   }
 
   renderBeforeStart();
+
+  beforeBackToMenuBtn.textContent = content.missionBackToMenuBtn || "⬅️ Back to Project Grow";
+  beforeBackToMenuBtn.addEventListener("click", function () {
+    sendBackToProjectGrow(beforeStatus);
+  });
 
   normalModeBtn.addEventListener("click", function () {
     setMode("normal");

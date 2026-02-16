@@ -358,6 +358,34 @@ def can_open_project_grow_mission(user_id: int) -> bool:
     return has_project_grow_goal(user_id) and get_tabung_balance_usd(user_id) >= 10
 
 
+def get_tabung_start_date(user_id: int) -> str:
+    sections = _get_user_sections(user_id)
+    tabung_section = sections.get("tabung", {})
+    tabung_data = tabung_section.get("data", {})
+
+    earliest: date | None = None
+
+    records = tabung_data.get("records") if isinstance(tabung_data, dict) else None
+    if isinstance(records, list):
+        for rec in records:
+            if not isinstance(rec, dict):
+                continue
+            rec_date = _record_date_myt(rec)
+            if rec_date is None:
+                continue
+            if earliest is None or rec_date < earliest:
+                earliest = rec_date
+
+    if earliest is not None:
+        return earliest.isoformat()
+
+    saved_date = tabung_section.get("saved_date")
+    if isinstance(saved_date, str) and saved_date:
+        return saved_date
+
+    return "-"
+
+
 def get_project_grow_mission_state(user_id: int) -> dict[str, Any]:
     sections = _get_user_sections(user_id)
     mission_data = sections.get("project_grow_mission", {}).get("data", {})
@@ -370,6 +398,15 @@ def get_project_grow_mission_state(user_id: int) -> dict[str, Any]:
         "started_at": str(mission_data.get("started_at") or ""),
         "started_date": str(mission_data.get("started_date") or ""),
     }
+
+
+def get_project_grow_mission_status_text(user_id: int) -> str:
+    state = get_project_grow_mission_state(user_id)
+    if state["active"]:
+        return f"Active ({state['mode'].capitalize()})"
+    if can_open_project_grow_mission(user_id):
+        return "Ready to Start"
+    return "Locked"
 
 
 def apply_project_grow_unlock_to_tabung(user_id: int, unlock_amount_usd: float) -> bool:
@@ -484,6 +521,29 @@ def reset_project_grow_mission(user_id: int) -> bool:
         return False
 
     sections.pop("project_grow_mission", None)
+    user["updated_at"] = malaysia_now().isoformat()
+    save_db(db)
+    return True
+
+
+def reset_project_grow_goal(user_id: int) -> bool:
+    db = load_db()
+    user = db.get("users", {}).get(str(user_id))
+    if not user:
+        return False
+
+    sections = user.setdefault("sections", {})
+    changed = False
+    if "project_grow_goal" in sections:
+        sections.pop("project_grow_goal", None)
+        changed = True
+    if "project_grow_mission" in sections:
+        sections.pop("project_grow_mission", None)
+        changed = True
+
+    if not changed:
+        return False
+
     user["updated_at"] = malaysia_now().isoformat()
     save_db(db)
     return True
