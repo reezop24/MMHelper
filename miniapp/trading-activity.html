@@ -34,13 +34,14 @@
     }
 
     .flow-steps {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      display: flex;
+      align-items: center;
       gap: 8px;
       margin: 0 0 14px;
     }
 
     .step-pill {
+      flex: 1;
       border: 1px solid #2b4c84;
       background: rgba(9, 30, 63, 0.78);
       border-radius: 999px;
@@ -56,6 +57,14 @@
       color: #ffffff;
       font-weight: 700;
       box-shadow: 0 0 0 1px rgba(127, 179, 255, 0.25) inset;
+    }
+
+    .step-arrow {
+      color: #7ea3d9;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1;
+      user-select: none;
     }
 
     .mode-grid {
@@ -103,30 +112,6 @@
     .prompt {
       margin: 0 0 8px;
       color: #e8f0ff;
-    }
-
-    .quick-amounts {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 8px;
-      margin-top: 10px;
-    }
-
-    .quick-btn {
-      margin: 0;
-      border: 1px solid #2e518e;
-      border-radius: 10px;
-      padding: 8px 10px;
-      background: rgba(8, 27, 57, 0.86);
-      color: #dce9ff;
-      font-size: 13px;
-      font-weight: 600;
-    }
-
-    .quick-btn.active {
-      border-color: #82b6ff;
-      background: rgba(31, 72, 132, 0.8);
-      color: #ffffff;
     }
 
     .impact-card {
@@ -210,10 +195,22 @@
     }
 
     @media (max-width: 640px) {
-      .flow-steps,
-      .quick-amounts,
       .impact-grid {
         grid-template-columns: 1fr;
+      }
+
+      .flow-steps {
+        gap: 6px;
+      }
+
+      .step-pill {
+        min-width: 0;
+        padding: 7px 8px;
+        font-size: 11px;
+      }
+
+      .step-arrow {
+        font-size: 11px;
       }
 
       .summary {
@@ -262,7 +259,9 @@
 
       <div class="flow-steps">
         <div id="stepMode" class="step-pill active">1. Pilih Mode</div>
+        <span class="step-arrow">→</span>
         <div id="stepAmount" class="step-pill">2. Isi Amount</div>
+        <span class="step-arrow">→</span>
         <div id="stepReview" class="step-pill">3. Review & Submit</div>
       </div>
 
@@ -294,12 +293,6 @@
               placeholder="USD"
               required
             />
-          </div>
-
-          <div class="quick-amounts">
-            <button type="button" class="quick-btn" data-amount="10">+10</button>
-            <button type="button" class="quick-btn" data-amount="25">+25</button>
-            <button type="button" class="quick-btn" data-amount="50">+50</button>
           </div>
         </div>
       </div>

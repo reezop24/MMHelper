@@ -70,7 +70,6 @@
   var profitBtn = document.getElementById("profitBtn");
   var dynamicFields = document.getElementById("dynamicFields");
   var amountInput = document.getElementById("tradeAmount");
-  var quickBtns = Array.prototype.slice.call(document.querySelectorAll(".quick-btn"));
 
   var impactCard = document.getElementById("impactCard");
   var impactMode = document.getElementById("impactMode");
@@ -110,13 +109,6 @@
     stepMode.classList.add("active");
     stepAmount.classList.toggle("active", Boolean(selectedMode));
     stepReview.classList.toggle("active", Boolean(selectedMode) && isValidAmount(amount));
-  }
-
-  function highlightQuickButton(amount) {
-    quickBtns.forEach(function (btn) {
-      var btnAmount = Number(btn.getAttribute("data-amount") || 0);
-      btn.classList.toggle("active", amount === btnAmount);
-    });
   }
 
   function updatePreview() {
@@ -172,22 +164,7 @@
     setMode("profit");
   });
 
-  quickBtns.forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      var amount = Number(btn.getAttribute("data-amount") || 0);
-      if (!amount) return;
-
-      amountInput.value = amount.toFixed(2);
-      highlightQuickButton(amount);
-      updatePreview();
-      amountInput.focus();
-      statusEl.textContent = "";
-    });
-  });
-
   amountInput.addEventListener("input", function () {
-    var amount = getNumericInputValue(amountInput);
-    highlightQuickButton(amount);
     updatePreview();
     statusEl.textContent = "";
   });
