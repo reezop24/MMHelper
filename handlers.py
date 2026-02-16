@@ -3,10 +3,9 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from texts import BETA_RESET_DONE_TEXT
 from storage import reset_all_data
-from welcome import start
 from ui import clear_last_screen
+from welcome import start
 
 
 async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -20,5 +19,4 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
         reset_all_data()
         await clear_last_screen(context, message.chat_id)
         context.user_data.clear()
-        await message.reply_text(BETA_RESET_DONE_TEXT)
         await start(update, context)
