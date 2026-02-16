@@ -27,6 +27,7 @@ from menu import (
 from settings import (
     get_deposit_activity_webapp_url,
     get_initial_capital_reset_webapp_url,
+    get_set_new_goal_webapp_url,
     get_trading_activity_webapp_url,
     get_withdrawal_activity_webapp_url,
 )
@@ -108,6 +109,17 @@ def _build_account_activity_keyboard_for_user(user_id: int):
     )
 
 
+def _build_project_grow_keyboard_for_user(user_id: int):
+    summary = get_initial_setup_summary(user_id)
+    set_new_goal_url = get_set_new_goal_webapp_url(
+        name=summary["name"],
+        current_balance_usd=get_current_balance_usd(user_id),
+        capital_usd=get_capital_usd(user_id),
+        saved_date=summary["saved_date"],
+    )
+    return project_grow_keyboard(set_new_goal_url)
+
+
 async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     user = update.effective_user
@@ -158,7 +170,7 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
             context,
             message.chat_id,
             PROJECT_GROW_OPENED_TEXT,
-            reply_markup=project_grow_keyboard(),
+            reply_markup=_build_project_grow_keyboard_for_user(user.id),
             parse_mode="Markdown",
         )
         return
@@ -228,7 +240,7 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
             context,
             message.chat_id,
             SET_NEW_GOAL_OPENED_TEXT,
-            reply_markup=project_grow_keyboard(),
+            reply_markup=_build_project_grow_keyboard_for_user(user.id),
             parse_mode="Markdown",
         )
         return
@@ -238,7 +250,7 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
             context,
             message.chat_id,
             MISSION_OPENED_TEXT,
-            reply_markup=project_grow_keyboard(),
+            reply_markup=_build_project_grow_keyboard_for_user(user.id),
             parse_mode="Markdown",
         )
         return
@@ -248,7 +260,7 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
             context,
             message.chat_id,
             TABUNG_PROGRESS_OPENED_TEXT,
-            reply_markup=project_grow_keyboard(),
+            reply_markup=_build_project_grow_keyboard_for_user(user.id),
             parse_mode="Markdown",
         )
         return
@@ -258,7 +270,7 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
             context,
             message.chat_id,
             ACHIEVEMENT_OPENED_TEXT,
-            reply_markup=project_grow_keyboard(),
+            reply_markup=_build_project_grow_keyboard_for_user(user.id),
             parse_mode="Markdown",
         )
         return

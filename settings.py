@@ -150,3 +150,21 @@ def get_trading_activity_webapp_url(
         monthly_performance_usd=monthly_performance_usd,
     )
     return f"{page}?{query}"
+
+
+def get_set_new_goal_webapp_url(
+    name: str,
+    current_balance_usd: float,
+    capital_usd: float,
+    saved_date: str,
+) -> str:
+    page = f"{_miniapp_base_url()}/set-new-goal.html"
+    query = urlencode(
+        {
+            "name": name,
+            "current_balance_usd": f"{current_balance_usd:.2f}",
+            "capital_usd": f"{capital_usd:.2f}",
+            "saved_date": saved_date,
+        }
+    )
+    return f"{page}?{query}"

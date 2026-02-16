@@ -81,9 +81,15 @@ def account_activity_keyboard(
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
 
-def project_grow_keyboard() -> ReplyKeyboardMarkup:
+def project_grow_keyboard(set_new_goal_url: str) -> ReplyKeyboardMarkup:
     rows = [
-        [SUBMENU_PROJECT_BUTTON_SET_NEW_GOAL, SUBMENU_PROJECT_BUTTON_MISSION],
+        [
+            KeyboardButton(
+                SUBMENU_PROJECT_BUTTON_SET_NEW_GOAL,
+                web_app=WebAppInfo(url=set_new_goal_url),
+            ),
+            SUBMENU_PROJECT_BUTTON_MISSION,
+        ],
         [SUBMENU_PROJECT_BUTTON_TABUNG_PROGRESS, SUBMENU_PROJECT_BUTTON_ACHIEVEMENT],
         [SUBMENU_MM_BUTTON_BACK_MAIN],
     ]

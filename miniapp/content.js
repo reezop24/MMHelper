@@ -93,5 +93,17 @@ window.MMHELPER_CONTENT = {
     }
 
     return "Cek semua kalau dah betul, tekan submit.";
-  }
+  },
+
+  setNewGoalIntro: [
+    "Project Grow ni bukan sekadar letak angka dan berharap magic jadi.",
+    "Kau set sasaran, kita lock tempoh, lepas tu kita jalan ikut plan.",
+    "",
+    "Lepas ni akan ada Mission khas untuk bantu kau kekal konsisten.",
+    "So masa isi goal ni, isi betul-betul ikut target yang kau nak capai."
+  ].join("\n"),
+
+  setNewGoalPrompt: "New Goal (sasaran account kau nak capai)",
+  setNewGoalTargetPrompt: "Target masa untuk capai sasaran",
+  setNewGoalFinalPrompt: "Bila dah yakin, submit. Kita akan sync dengan mission flow lepas ni."
 };

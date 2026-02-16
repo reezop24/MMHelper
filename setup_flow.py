@@ -20,6 +20,7 @@ from storage import (
 from texts import (
     DEPOSIT_ACTIVITY_SAVED_TEXT,
     INITIAL_CAPITAL_RESET_SUCCESS_TEXT,
+    SET_NEW_GOAL_SAVED_TEXT,
     SETUP_SAVED_TEXT,
     TRADING_ACTIVITY_SAVED_TEXT,
     WITHDRAWAL_ACTIVITY_SAVED_TEXT,
@@ -212,6 +213,49 @@ async def _handle_trading_activity_update(payload: dict, update: Update, context
     )
 
 
+async def _handle_set_new_goal(payload: dict, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    user = update.effective_user
+    if not user:
+        return
+
+    new_goal = (payload.get("new_goal") or "").strip()
+    if not new_goal:
+        await send_screen(context, message.chat_id, "❌ Isi sasaran dulu bro.")
+        return
+
+    target_days_raw = str(payload.get("target_days") or "").strip()
+    target_label = (payload.get("target_label") or "").strip()
+
+    if target_days_raw not in {"14", "30"}:
+        await send_screen(context, message.chat_id, "❌ Tempoh target tak sah.")
+        return
+
+    target_days = int(target_days_raw)
+    if not target_label:
+        target_label = f"{target_days} hari"
+
+    telegram_name = (user.full_name or "").strip() or str(user.id)
+    save_user_setup_section(
+        user_id=user.id,
+        telegram_name=telegram_name,
+        section="project_grow_goal",
+        payload={
+            "new_goal": new_goal,
+            "target_days": target_days,
+            "target_label": target_label,
+        },
+    )
+
+    await send_screen(
+        context,
+        message.chat_id,
+        SET_NEW_GOAL_SAVED_TEXT,
+        reply_markup=main_menu_keyboard(),
+        parse_mode="Markdown",
+    )
+
+
 async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     if not message or not message.web_app_data:
@@ -242,6 +286,10 @@ async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if payload_type == "trading_activity_update":
         await _handle_trading_activity_update(payload, update, context)
+        return
+
+    if payload_type == "set_new_goal":
+        await _handle_set_new_goal(payload, update, context)
         return
 
     await send_screen(

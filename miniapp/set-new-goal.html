@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Set New Goal</title>
+  <link rel="stylesheet" href="global.css" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 16px;
+      background: rgba(6, 20, 47, 0.55);
+      border: 1px solid var(--border-input);
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .summary-item {
+      font-size: 14px;
+      color: #dce8ff;
+    }
+
+    .summary-item strong {
+      color: #fff;
+    }
+
+    .long-copy {
+      white-space: pre-line;
+      line-height: 1.45;
+      margin: 12px 0 12px;
+    }
+
+    .prompt {
+      margin: 0 0 8px;
+      color: #e8f0ff;
+    }
+
+    textarea,
+    select {
+      width: 100%;
+      border: 1px solid var(--border-input);
+      background: #06142f;
+      color: var(--text);
+      border-radius: 10px;
+      padding: 11px 12px;
+      font-size: 15px;
+    }
+
+    textarea {
+      min-height: 108px;
+      resize: vertical;
+      font-family: inherit;
+      line-height: 1.4;
+    }
+
+    .target-hint {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #afc4e9;
+    }
+
+    @media (max-width: 640px) {
+      .summary {
+        gap: 6px;
+        padding: 10px;
+      }
+
+      .summary-item {
+        font-size: 12.5px;
+        line-height: 1.25;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <img class="logo" src="logo.png" alt="MM HELPER Logo" />
+      <h1>Set New Goal</h1>
+    </header>
+
+    <section class="summary">
+      <div class="summary-item"><strong>Nama:</strong> <span id="summaryName">-</span></div>
+      <div class="summary-item"><strong>Current Balance:</strong> USD <span id="summaryBalance">0.00</span></div>
+      <div class="summary-item"><strong>Capital:</strong> USD <span id="summaryCapital">0.00</span></div>
+      <div class="summary-item"><strong>Tarikh mula:</strong> <span id="summaryDate">-</span></div>
+    </section>
+
+    <form id="setGoalForm" class="card">
+      <p id="introText" class="long-copy"></p>
+
+      <div class="field">
+        <p id="goalPrompt" class="prompt"></p>
+        <textarea
+          id="newGoal"
+          name="new_goal"
+          placeholder="Contoh: Nak grow account ke USD 2,000 dengan setup yang konsisten"
+          required
+        ></textarea>
+      </div>
+
+      <div class="field">
+        <p id="targetPrompt" class="prompt"></p>
+        <select id="targetDays" name="target_days" required>
+          <option value="">Pilih tempoh target</option>
+          <option value="14">14 hari</option>
+          <option value="30">30 hari</option>
+        </select>
+        <p class="target-hint">Pilihan 3 bulan dan 6 bulan akan dibuka dalam update seterusnya.</p>
+      </div>
+
+      <p id="finalPrompt" class="prompt"></p>
+      <button id="submitBtn" type="submit">✅ Save Goal</button>
+      <p id="formStatus" class="status" aria-live="polite"></p>
+    </form>
+  </main>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="content.js"></script>
+  <script src="set-new-goal.js"></script>
+</body>
+</html>

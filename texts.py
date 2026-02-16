@@ -66,6 +66,7 @@ SET_NEW_GOAL_OPENED_TEXT = "Set New Goal _dibuka_."
 MISSION_OPENED_TEXT = "Mission _dibuka_."
 TABUNG_PROGRESS_OPENED_TEXT = "Tabung Progress _dibuka_."
 ACHIEVEMENT_OPENED_TEXT = "Achievement _dibuka_."
+SET_NEW_GOAL_SAVED_TEXT = "Set New Goal _dikemas kini_. Mission akan menyusul."
 STATISTIC_OPENED_TEXT = "Statistic _dibuka_."
 EXTRA_OPENED_TEXT = "Extra _dibuka_."
 
