@@ -968,13 +968,12 @@ def get_tabung_progress_summary(user_id: int) -> dict[str, Any]:
     sections = _get_user_sections(user_id)
     goal_section = sections.get("project_grow_goal", {})
 
-    current_balance = get_current_balance_usd(user_id)
     tabung_balance = get_tabung_balance_usd(user_id)
     target_balance = _to_float(goal.get("target_balance_usd"))
     baseline_balance = _to_float(goal.get("current_balance_usd"))
     total_grow_target = max(target_balance - baseline_balance, 0.0)
-    remaining_grow_target = max(target_balance - current_balance, 0.0)
-    achieved = max(current_balance - baseline_balance, 0.0)
+    achieved = max(tabung_balance, 0.0)
+    remaining_grow_target = max(total_grow_target - achieved, 0.0)
     grow_progress_pct = 0.0 if total_grow_target <= 0 else min((achieved / total_grow_target) * 100.0, 100.0)
 
     target_days = int(goal.get("target_days") or 0)
