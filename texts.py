@@ -24,7 +24,7 @@ Kalau tak boleh hadam benda ni, boleh keluar awal-awal.
 Kalau tekan Teruskan, maknanya kau setuju dan kita proceed macam orang matang 😎"""
 
 DECLINED_TEXT = (
-    "❌ Okey, kau pilih untuk stop dulu.\\n\\n"
+    "❌ Okey, kau pilih untuk stop dulu.\n\n"
     "No hal. Tekan /start balik bila dah ready nak proceed."
 )
 
@@ -54,20 +54,24 @@ Jangan tipu modal… nanti sistem tak boleh selamatkan kau 😌
 
 Tekan Initial Setup untuk teruskan."""
 
-SETUP_SAVED_TEXT = """Setup dah lock 🔒
-Modal kau dah masuk sistem.
+MAIN_MENU_OPENED_TEXT = "Main Menu _dibuka_."
+MM_HELPER_SETTING_OPENED_TEXT = "MM Helper Setting _dibuka_."
+CORRECTION_OPENED_TEXT = "Correction _dibuka_."
+SYSTEM_INFO_OPENED_TEXT = "System Info _dibuka_."
 
-Sekarang kita tengok kau betul-betul nak jaga akaun…
-atau nak ulang cerita “burn account” lagi 😏
+RISK_CALCULATOR_OPENED_TEXT = "Risk Calculator _dibuka_."
+TRANSACTION_OPENED_TEXT = "Transaction _dibuka_."
+PROJECT_GROW_OPENED_TEXT = "Project Grow _dibuka_."
+STATISTIC_OPENED_TEXT = "Statistic _dibuka_."
+EXTRA_OPENED_TEXT = "Extra _dibuka_."
 
-Main Menu ready !!"""
+SETUP_SAVED_TEXT = MAIN_MENU_OPENED_TEXT
+RETURNING_USER_TEXT = MAIN_MENU_OPENED_TEXT
 
-RETURNING_USER_TEXT = (
-    "👋 Welcome back! Setup kau dah siap, jadi tak payah isi lagi.\\n\\n"
-    "Main Menu terus, jom jalan."
-)
+INITIAL_CAPITAL_RESET_SUCCESS_TEXT = """Initial Capital reset berjaya ✅
 
-BETA_RESET_DONE_TEXT = (
-    "🧪 BETA RESET done. Semua data dah clear.\\n\\n"
-    "Kita start balik dari awal, no mercy 😎"
-)
+Modal updated.
+Rekod lama clear, kiraan baru dah aktif.
+
+Sekarang tak ada alasan.
+Main ikut sistem."""

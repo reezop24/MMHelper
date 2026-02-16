@@ -8,24 +8,17 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from menu import main_menu_keyboard
-from storage import save_user_setup_section
-from texts import SETUP_SAVED_TEXT
+from storage import (
+    apply_initial_capital_reset,
+    can_reset_initial_capital,
+    save_user_setup_section,
+)
+from texts import INITIAL_CAPITAL_RESET_SUCCESS_TEXT, SETUP_SAVED_TEXT
 from ui import send_screen
 
 
-async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def _handle_initial_setup(payload: dict, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
-    if not message or not message.web_app_data:
-        return
-
-    try:
-        payload = json.loads(message.web_app_data.data)
-    except json.JSONDecodeError:
-        await send_screen(context, message.chat_id, "❌ Eh data tak lepas. Cuba submit lagi sekali.")
-        return
-
-    if payload.get("type") != "setup_profile":
-        return
 
     name = (payload.get("name") or "").strip()
     if not name:
@@ -70,4 +63,63 @@ async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE
         message.chat_id,
         SETUP_SAVED_TEXT,
         reply_markup=main_menu_keyboard(),
+        parse_mode="Markdown",
     )
+
+
+async def _handle_initial_capital_reset(payload: dict, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    user_id = update.effective_user.id
+
+    if not can_reset_initial_capital(user_id):
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Reset tak dibenarkan sebab dah ada rekod transaksi.",
+            reply_markup=main_menu_keyboard(),
+        )
+        return
+
+    try:
+        new_initial_capital = float(payload.get("new_initial_capital_usd"))
+    except (TypeError, ValueError):
+        await send_screen(context, message.chat_id, "❌ Nilai baru modal tak sah.")
+        return
+
+    ok = apply_initial_capital_reset(user_id, new_initial_capital)
+    if not ok:
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Reset gagal. Cuba semula dari menu.",
+            reply_markup=main_menu_keyboard(),
+        )
+        return
+
+    await send_screen(
+        context,
+        message.chat_id,
+        INITIAL_CAPITAL_RESET_SUCCESS_TEXT,
+        reply_markup=main_menu_keyboard(),
+    )
+
+
+async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    if not message or not message.web_app_data:
+        return
+
+    try:
+        payload = json.loads(message.web_app_data.data)
+    except json.JSONDecodeError:
+        await send_screen(context, message.chat_id, "❌ Eh data tak lepas. Cuba submit lagi sekali.")
+        return
+
+    payload_type = payload.get("type")
+    if payload_type == "setup_profile":
+        await _handle_initial_setup(payload, update, context)
+        return
+
+    if payload_type == "initial_capital_reset":
+        await _handle_initial_capital_reset(payload, update, context)
+        return

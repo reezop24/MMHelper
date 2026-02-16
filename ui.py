@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from telegram import ReplyMarkup
+from typing import Any
+
 from telegram.ext import ContextTypes
 
 
@@ -21,12 +22,21 @@ async def send_screen(
     context: ContextTypes.DEFAULT_TYPE,
     chat_id: int,
     text: str,
-    reply_markup: ReplyMarkup | None = None,
+    reply_markup: Any = None,
+    parse_mode: str | None = None,
 ) -> None:
-    await clear_last_screen(context, chat_id)
+    old_msg_id = context.user_data.get("last_screen_message_id")
+
     sent = await context.bot.send_message(
         chat_id=chat_id,
         text=text,
         reply_markup=reply_markup,
+        parse_mode=parse_mode,
     )
     context.user_data["last_screen_message_id"] = sent.message_id
+
+    if old_msg_id:
+        try:
+            await context.bot.delete_message(chat_id=chat_id, message_id=old_msg_id)
+        except Exception:
+            pass

@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Initial Capital Reset</title>
+  <link rel="stylesheet" href="global.css" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .summary {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      margin-bottom: 16px;
+      background: rgba(6, 20, 47, 0.55);
+      border: 1px solid var(--border-input);
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .summary-item {
+      font-size: 14px;
+      color: #dce8ff;
+    }
+
+    .summary-item strong {
+      color: #fff;
+    }
+
+    .warning {
+      white-space: pre-line;
+      line-height: 1.45;
+      margin: 12px 0 16px;
+    }
+
+    .disabled-note {
+      margin-top: 8px;
+      color: #ffc1c9;
+      font-weight: 600;
+    }
+
+    #submitBtn[disabled] {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <img class="logo" src="logo.png" alt="MM HELPER Logo" />
+      <h1>Initial Capital Reset</h1>
+    </header>
+
+    <section class="summary">
+      <div class="summary-item"><strong>Nama:</strong> <span id="summaryName">-</span></div>
+      <div class="summary-item"><strong>Initial Capital:</strong> USD <span id="summaryCapital">0.00</span></div>
+      <div class="summary-item"><strong>Tarikh:</strong> <span id="summaryDate">-</span></div>
+    </section>
+
+    <form id="resetForm" class="card">
+      <p class="warning">🔄 Initial Capital Reset
+
+Nak tukar modal awal?
+
+Boleh.
+Tapi ada syarat.
+
+Reset hanya dibenarkan kalau kau belum buat sebarang transaksi dalam sistem.
+
+Kenapa?
+Sebab bila dah ada rekod trade, modal tu dah jadi asas kiraan.
+Kalau tukar sesuka hati, kiraan lama jadi tak valid.
+
+📌 Ringkasnya:
+
+✔️ Belum ada transaksi → boleh reset
+❌ Dah ada transaksi → reset tak dibenarkan
+
+Kalau layak, tekan Reset untuk masukkan jumlah baru (USD)</p>
+
+      <div class="field">
+        <label class="question" for="newInitialCapital"><strong>Masukkan semula Initial Capital</strong></label>
+        <div class="with-prefix with-suffix">
+          <span class="affix">USD</span>
+          <input
+            id="newInitialCapital"
+            name="new_initial_capital_usd"
+            type="number"
+            inputmode="decimal"
+            min="0"
+            step="0.01"
+            placeholder="USD"
+            required
+          />
+        </div>
+      </div>
+
+      <button id="submitBtn" type="submit">🔁 Submit Reset</button>
+      <p id="disabledNote" class="disabled-note" hidden>Reset tak dibenarkan sebab akaun ni dah ada transaksi.</p>
+      <p id="formStatus" class="status" aria-live="polite"></p>
+    </form>
+  </main>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="capital-reset.js"></script>
+</body>
+</html>
