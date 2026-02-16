@@ -517,6 +517,14 @@ async def _handle_set_new_goal(payload: dict, update: Update, context: ContextTy
         return
 
     current_balance = get_current_balance_usd(user.id)
+    if unlock_amount_usd > current_balance:
+        await send_screen(
+            context,
+            message.chat_id,
+            f"❌ Unlock tak boleh lebih dari Current Balance kau sekarang ({current_balance:.2f}).",
+        )
+        return
+
     minimum_target = current_balance + 100.0
     if target_balance_usd < minimum_target:
         await send_screen(

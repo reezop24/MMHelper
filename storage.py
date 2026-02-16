@@ -943,14 +943,14 @@ def apply_project_grow_unlock_to_tabung(user_id: int, unlock_amount_usd: float) 
 
     tabung_data = tabung_section.setdefault("data", {})
     records = tabung_data.setdefault("records", [])
-    current_balance = 0.0
+    current_tabung_balance = 0.0
     for key in ("balance_usd", "tabung_balance_usd", "current_balance_usd", "amount_usd"):
         try:
-            current_balance = float(tabung_data.get(key, 0))
+            current_tabung_balance = float(tabung_data.get(key, 0))
             break
         except (TypeError, ValueError):
             continue
-    new_balance = max(current_balance, float(unlock_amount_usd))
+    new_balance = current_tabung_balance + float(unlock_amount_usd)
 
     tabung_data["balance_usd"] = new_balance
     records.append(
@@ -965,10 +965,51 @@ def apply_project_grow_unlock_to_tabung(user_id: int, unlock_amount_usd: float) 
         }
     )
 
+    # Transfer out from current balance into tabung.
+    _append_monthly_record(
+        user_id,
+        "balance_adjustment",
+        {
+            "mode": "project_grow_unlock_transfer_out",
+            "amount_usd": float(unlock_amount_usd),
+            "net_usd": -float(unlock_amount_usd),
+            "saved_at": saved_at_iso,
+            "saved_date": saved_date,
+            "saved_time": saved_time,
+            "timezone": "Asia/Kuala_Lumpur",
+        },
+        now.date(),
+    )
+    adjustment_section = sections.setdefault(
+        "balance_adjustment",
+        {
+            "section": "balance_adjustment",
+            "user_id": user_id,
+            "telegram_name": user.get("telegram_name") or str(user_id),
+            "saved_at": saved_at_iso,
+            "saved_date": saved_date,
+            "saved_time": saved_time,
+            "timezone": "Asia/Kuala_Lumpur",
+            "data": {"record_count": 0},
+        },
+    )
+    adjustment_data = adjustment_section.setdefault("data", {})
+    adjustment_data["record_count"] = _to_int(adjustment_data.get("record_count")) + 1
+    adjustment_section["saved_at"] = saved_at_iso
+    adjustment_section["saved_date"] = saved_date
+    adjustment_section["saved_time"] = saved_time
+    adjustment_section["timezone"] = "Asia/Kuala_Lumpur"
+
     tabung_section["saved_at"] = saved_at_iso
     tabung_section["saved_date"] = saved_date
     tabung_section["saved_time"] = saved_time
     tabung_section["timezone"] = "Asia/Kuala_Lumpur"
+    _bump_rollup(
+        user,
+        saved_at_iso=saved_at_iso,
+        balance_adjustment_delta=-float(unlock_amount_usd),
+        balance_adjustment_count=1,
+    )
     user["updated_at"] = saved_at_iso
     save_core_db(db)
     return True
