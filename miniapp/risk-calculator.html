@@ -45,6 +45,7 @@
       border: 1px solid #2a4f8d;
       background: linear-gradient(165deg, rgba(10, 28, 57, 0.92), rgba(7, 19, 40, 0.96));
       padding: 12px;
+      color: #e8f2ff;
     }
 
     .result-title {
@@ -55,26 +56,18 @@
       letter-spacing: 0.05em;
     }
 
-    .result-lines {
-      margin: 0;
-      padding: 0;
-      list-style: none;
-      display: grid;
-      gap: 8px;
-    }
-
-    .result-lines li {
-      margin: 0;
-      border-radius: 10px;
-      border: 1px solid rgba(93, 136, 202, 0.36);
-      background: rgba(8, 25, 52, 0.75);
-      padding: 9px 10px;
-      color: #e8f2ff;
+    .result-line {
+      margin: 0 0 7px;
       line-height: 1.35;
     }
 
-    .result-lines strong {
-      color: #ffffff;
+    .result-line:last-child {
+      margin-bottom: 0;
+    }
+
+    .result-value {
+      font-weight: 800;
+      color: #9fd3ff;
     }
 
     .result-note {
@@ -183,15 +176,13 @@
 
       <div class="result-card">
         <p class="result-title">Live Result</p>
-        <ul class="result-lines">
-          <li><strong>Jom kita kira</strong></li>
-          <li>(<span id="lineLeverage">0</span>) / (<span id="linePrice">0.00</span>) = <strong><span id="lineMargin">0.00</span></strong> <span class="result-note">ini margin kau untuk setiap 0.01 lot</span></li>
-          <li>sekarang modal kau <strong>USD <span id="lineModal">0.00</span></strong>, risk kau pulak <strong><span id="lineRisk">0.00</span>%</strong></li>
-          <li>maknanya kau cuma ambil risiko <strong>(USD <span id="lineModal2">0.00</span> x <span id="lineRisk2">0.00</span>%) = USD <span id="lineModalA">0.00</span></strong> untuk setup ni</li>
-          <li>jadi <strong>(USD <span id="lineModalA2">0.00</span>) / (<span id="lineMargin2">0.00</span>) = <span id="lineLotUnits">0.00</span></strong> unit 0.01 lot</li>
-          <li><strong>Lot size boleh buka: <span id="lineLotFinal">0.00</span> lot</strong></li>
-          <li>anggaran risiko jika SL <span id="linePips">0.0</span> pips kena: <strong>USD <span id="lineLoss">0.00</span></strong></li>
-        </ul>
+        <p class="result-line"><strong>Jom kita kira</strong></p>
+        <p class="result-line"><span id="linePrice" class="result-value">0.00</span> ÷ <span id="lineLeverage" class="result-value">0</span> = <span id="lineMargin" class="result-value">0.0000</span> <span class="result-note">ini margin kau untuk setiap 0.01 lot</span></p>
+        <p class="result-line">sekarang modal kau <span class="result-value">USD <span id="lineModal">0.00</span></span>, risk kau pulak <span class="result-value"><span id="lineRisk">0.00</span>%</span></p>
+        <p class="result-line">maknanya kau cuma ambil risiko <span class="result-value">USD <span id="lineModal2">0.00</span> x <span id="lineRisk2">0.00</span>% = USD <span id="lineModalA">0.00</span></span> untuk setup ni</p>
+        <p class="result-line">jadi <span class="result-value">USD <span id="lineModalA2">0.00</span> ÷ <span id="lineMargin2">0.0000</span> = <span id="lineLotUnits">0.00</span></span> unit 0.01 lot</p>
+        <p class="result-line"><strong>Lot size boleh buka: <span class="result-value"><span id="lineLotFinal">0.00</span> lot</span></strong></p>
+        <p class="result-line">anggaran risiko jika SL <span id="linePips" class="result-value">0.0</span> pips kena: <span class="result-value">USD <span id="lineLoss">0.00</span></span></p>
       </div>
 
       <button id="submitBtn" type="submit" class="submit-btn" disabled>✅ Simpan Result</button>
