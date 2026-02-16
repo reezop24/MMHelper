@@ -250,7 +250,7 @@ def get_tabung_balance_usd(user_id: int) -> float:
 
 
 def get_capital_usd(user_id: int) -> float:
-    return get_total_balance_usd(user_id) + get_tabung_balance_usd(user_id)
+    return get_current_balance_usd(user_id) + get_tabung_balance_usd(user_id)
 
 
 def get_current_balance_usd(user_id: int) -> float:

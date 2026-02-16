@@ -53,7 +53,6 @@
   var growTargetHint = document.getElementById("growTargetHint");
 
   var backToMenuBtn = document.getElementById("backToMenuBtn");
-  var resetGoalBtn = document.getElementById("resetGoalBtn");
   var configuredBackBtn = document.getElementById("configuredBackBtn");
   var configuredResetBtn = document.getElementById("configuredResetBtn");
 
@@ -65,7 +64,6 @@
   document.getElementById("unlockPrompt").textContent = content.setNewGoalUnlockPrompt || "";
   document.getElementById("finalPrompt").textContent = content.setNewGoalFinalPrompt || "";
   backToMenuBtn.textContent = content.setNewGoalBackToMenuBtn || "⬅️ Back to Project Grow";
-  resetGoalBtn.textContent = content.setNewGoalResetBtn || "Reset New Goal";
 
   document.getElementById("configuredIntro").textContent = content.setNewGoalIntro || "";
   document.getElementById("configuredTitle").textContent = content.setNewGoalConfiguredTitle || "Target Capital dah diset ✅";
@@ -115,9 +113,6 @@
   backToMenuBtn.addEventListener("click", sendBackToProjectGrow);
   configuredBackBtn.addEventListener("click", sendBackToProjectGrow);
 
-  resetGoalBtn.addEventListener("click", function () {
-    handleResetGoal(formStatusEl);
-  });
   configuredResetBtn.addEventListener("click", function () {
     handleResetGoal(configuredStatusEl);
   });
