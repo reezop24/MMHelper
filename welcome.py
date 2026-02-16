@@ -20,8 +20,8 @@ TNC_DECLINE = "TNC_DECLINE"
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     keyboard = InlineKeyboardMarkup(
         [
-            [InlineKeyboardButton("✅ Setuju & Teruskan", callback_data=TNC_ACCEPT)],
-            [InlineKeyboardButton("🚪 Tidak Setuju", callback_data=TNC_DECLINE)],
+            [InlineKeyboardButton("Agree & Continue", callback_data=TNC_ACCEPT)],
+            [InlineKeyboardButton("Decline", callback_data=TNC_DECLINE)],
         ]
     )
 
@@ -44,7 +44,7 @@ async def handle_tnc_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
             [
                 [
                     KeyboardButton(
-                        "🚀 Mula Setup",
+                        "Initial Setup",
                         web_app=WebAppInfo(url=get_setup_webapp_url()),
                     )
                 ]

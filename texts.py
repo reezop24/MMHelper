@@ -52,9 +52,10 @@ Sebelum mula, masukkan:
 Sistem akan kira berdasarkan angka yang kau beri.
 Jangan tipu modal… nanti sistem tak boleh selamatkan kau 😌
 
-Tekan Mula Setup untuk teruskan."""
+Tekan Initial Setup untuk teruskan."""
 
 SETUP_SAVED_TEXT = (
     "✅ Setup anda berjaya disimpan.\n\n"
-    "MM HELPER dah rekod tetapan asas anda dalam USD."
+    "MM HELPER dah rekod tetapan asas anda dalam USD.\n"
+    "Anda dibawa ke Main Menu."
 )

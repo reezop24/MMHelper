@@ -1,0 +1,166 @@
+:root {
+  --bg: #010712;
+  --panel: #061127;
+  --panel-soft: #0a1a36;
+  --text: #f4f8ff;
+  --muted: #aebedf;
+  --accent-red: #d9324b;
+  --accent-white: #ffffff;
+  --border-card: #7d3944;
+  --border-input: #355c99;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background:
+    radial-gradient(circle at top right, #0b2148 0%, rgba(11, 33, 72, 0) 35%),
+    radial-gradient(circle at top left, #081730 0%, rgba(8, 23, 48, 0) 32%),
+    linear-gradient(180deg, #01040d 0%, var(--bg) 100%);
+  color: var(--text);
+  position: relative;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: url("reezo.png");
+  background-repeat: no-repeat;
+  background-position: center 58%;
+  background-size: min(72vw, 540px);
+  opacity: 0.05;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+  position: relative;
+  z-index: 1;
+}
+
+.hero {
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.logo {
+  width: 152px;
+  height: 152px;
+  object-fit: contain;
+  margin: 0 auto 12px;
+  display: block;
+  filter: drop-shadow(0 7px 16px rgba(0, 0, 0, 0.45));
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: 32px;
+  color: var(--accent-white);
+}
+
+.hero p {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
+.card {
+  background: linear-gradient(160deg, var(--panel) 0%, var(--panel-soft) 100%);
+  border: 1px solid var(--border-card);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.38),
+    0 0 0 1px rgba(125, 57, 68, 0.22) inset;
+}
+
+.field + .field {
+  margin-top: 16px;
+}
+
+.question {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.hint {
+  margin: 0 0 8px;
+  color: #d8e3ff;
+}
+
+input {
+  width: 100%;
+  border: 1px solid var(--border-input);
+  background: #06142f;
+  color: var(--text);
+  border-radius: 10px;
+  padding: 11px 12px;
+  font-size: 15px;
+}
+
+input::placeholder {
+  color: #9eb4e2;
+}
+
+.with-suffix,
+.with-prefix {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border-input);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #06142f;
+}
+
+.with-suffix input,
+.with-prefix input {
+  border: 0;
+  border-radius: 0;
+}
+
+.affix {
+  padding: 0 12px;
+  color: #f4f8ff;
+  background: #143262;
+  height: 43px;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+
+button {
+  margin-top: 22px;
+  width: 100%;
+  border: 0;
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--accent-white);
+  background: linear-gradient(90deg, #cf2f47 0%, #ff5a70 100%);
+}
+
+.status {
+  min-height: 22px;
+  margin: 10px 0 0;
+  color: #ffd3d9;
+}
+
+@media (max-width: 640px) {
+  .logo {
+    width: 124px;
+    height: 124px;
+  }
+
+  .hero h1 {
+    font-size: 27px;
+  }
+}

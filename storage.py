@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from time_utils import malaysia_now
+
 DB_PATH = Path(__file__).with_name("mmhelper_db.json")
 
 
@@ -37,8 +39,43 @@ def save_db(data: dict[str, Any]) -> None:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def save_user_setup(user_id: int, payload: dict[str, Any]) -> None:
+def save_user_setup_section(
+    user_id: int,
+    telegram_name: str,
+    section: str,
+    payload: dict[str, Any],
+) -> None:
+    now = malaysia_now()
+    saved_at_iso = now.isoformat()
+    saved_date = now.strftime("%Y-%m-%d")
+    saved_time = now.strftime("%H:%M:%S")
+
     db = load_db()
     users = db.setdefault("users", {})
-    users[str(user_id)] = payload
+    user_key = str(user_id)
+    user_obj = users.setdefault(
+        user_key,
+        {
+            "user_id": user_id,
+            "telegram_name": telegram_name,
+            "sections": {},
+        },
+    )
+
+    user_obj["user_id"] = user_id
+    user_obj["telegram_name"] = telegram_name
+    user_obj["updated_at"] = saved_at_iso
+
+    sections = user_obj.setdefault("sections", {})
+    sections[section] = {
+        "section": section,
+        "user_id": user_id,
+        "telegram_name": telegram_name,
+        "saved_at": saved_at_iso,
+        "saved_date": saved_date,
+        "saved_time": saved_time,
+        "timezone": "Asia/Kuala_Lumpur",
+        "data": payload,
+    }
+
     save_db(db)

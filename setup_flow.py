@@ -7,7 +7,8 @@ import json
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from storage import save_user_setup
+from menu import main_menu_keyboard
+from storage import save_user_setup_section
 from texts import SETUP_SAVED_TEXT
 
 
@@ -48,9 +49,13 @@ async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE
         await message.reply_text("❌ Nilai peratus mesti lebih besar dari 0.")
         return
 
-    save_user_setup(
-        update.effective_user.id,
-        {
+    telegram_name = (update.effective_user.full_name or "").strip() or str(update.effective_user.id)
+
+    save_user_setup_section(
+        user_id=update.effective_user.id,
+        telegram_name=telegram_name,
+        section="initial_setup",
+        payload={
             "name": name,
             "initial_capital_usd": initial_capital,
             "risk_per_trade_pct": risk_per_trade,
@@ -59,4 +64,7 @@ async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE
         },
     )
 
-    await message.reply_text(SETUP_SAVED_TEXT)
+    await message.reply_text(
+        SETUP_SAVED_TEXT,
+        reply_markup=main_menu_keyboard(),
+    )
