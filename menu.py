@@ -2,9 +2,9 @@
 
 from telegram import KeyboardButton, ReplyKeyboardMarkup, WebAppInfo
 
-MAIN_MENU_BUTTON_MM_SETTING = "⚙️ MM Helper setting"
+MAIN_MENU_BUTTON_MM_SETTING = "⚙️ MM Helper Setting"
 MAIN_MENU_BUTTON_RISK = "🧮 Risk Calculator"
-MAIN_MENU_BUTTON_TRANSACTION = "💳 Transaction"
+MAIN_MENU_BUTTON_ACCOUNT_ACTIVITY = "📒 Account Activity"
 MAIN_MENU_BUTTON_PROJECT_GROW = "📈 Project Grow"
 MAIN_MENU_BUTTON_STATISTIC = "📊 Statistic"
 MAIN_MENU_BUTTON_EXTRA = "🧰 Extra"
@@ -15,9 +15,14 @@ SUBMENU_MM_BUTTON_CORRECTION = "🛠️ Correction"
 SUBMENU_MM_BUTTON_SYSTEM_INFO = "ℹ️ System Info"
 SUBMENU_MM_BUTTON_BACK_MAIN = "⬅️ Back to Main Menu"
 
+SUBMENU_ACCOUNT_BUTTON_DEPOSIT_ACTIVITY = "💵 Update Deposit Activitiy"
+SUBMENU_ACCOUNT_BUTTON_WITHDRAWAL_ACTIVITY = "💸 Update Withdrawal Activity"
+SUBMENU_ACCOUNT_BUTTON_TRADING_ACTIVITY = "📉 Update Trading Activity"
+SUBMENU_ACCOUNT_BUTTON_TABUNG = "🏦 Update Tabung"
+
 MAIN_MENU_ROWS = [
     [MAIN_MENU_BUTTON_MM_SETTING, MAIN_MENU_BUTTON_RISK],
-    [MAIN_MENU_BUTTON_TRANSACTION, MAIN_MENU_BUTTON_PROJECT_GROW],
+    [MAIN_MENU_BUTTON_ACCOUNT_ACTIVITY, MAIN_MENU_BUTTON_PROJECT_GROW],
     [MAIN_MENU_BUTTON_STATISTIC, MAIN_MENU_BUTTON_EXTRA],
     [MAIN_MENU_BUTTON_BETA_RESET],
 ]
@@ -37,5 +42,15 @@ def mm_helper_setting_keyboard(initial_capital_reset_url: str) -> ReplyKeyboardM
         ],
         [SUBMENU_MM_BUTTON_CORRECTION, SUBMENU_MM_BUTTON_SYSTEM_INFO],
         [SUBMENU_MM_BUTTON_BACK_MAIN],
+    ]
+    return ReplyKeyboardMarkup(rows, resize_keyboard=True)
+
+
+def account_activity_keyboard() -> ReplyKeyboardMarkup:
+    rows = [
+        [SUBMENU_ACCOUNT_BUTTON_DEPOSIT_ACTIVITY],
+        [SUBMENU_ACCOUNT_BUTTON_WITHDRAWAL_ACTIVITY],
+        [SUBMENU_ACCOUNT_BUTTON_TRADING_ACTIVITY],
+        [SUBMENU_ACCOUNT_BUTTON_TABUNG],
     ]
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
