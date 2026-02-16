@@ -78,3 +78,23 @@ def get_deposit_activity_webapp_url(
         }
     )
     return f"{page}?{query}"
+
+
+def get_trading_activity_webapp_url(
+    name: str,
+    initial_capital_usd: float,
+    current_balance_usd: float,
+    saved_date: str,
+    current_profit_usd: float,
+) -> str:
+    page = f"{_miniapp_base_url()}/trading-activity.html"
+    query = urlencode(
+        {
+            "name": name,
+            "initial_capital_usd": f"{initial_capital_usd:.2f}",
+            "current_balance_usd": f"{current_balance_usd:.2f}",
+            "saved_date": saved_date,
+            "current_profit_usd": f"{current_profit_usd:.2f}",
+        }
+    )
+    return f"{page}?{query}"

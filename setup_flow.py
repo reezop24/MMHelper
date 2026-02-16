@@ -10,6 +10,7 @@ from telegram.ext import ContextTypes
 from menu import main_menu_keyboard
 from storage import (
     add_deposit_activity,
+    add_trading_activity_update,
     add_withdrawal_activity,
     apply_initial_capital_reset,
     can_reset_initial_capital,
@@ -20,6 +21,7 @@ from texts import (
     DEPOSIT_ACTIVITY_SAVED_TEXT,
     INITIAL_CAPITAL_RESET_SUCCESS_TEXT,
     SETUP_SAVED_TEXT,
+    TRADING_ACTIVITY_SAVED_TEXT,
     WITHDRAWAL_ACTIVITY_SAVED_TEXT,
 )
 from ui import send_screen
@@ -180,6 +182,36 @@ async def _handle_deposit_activity(payload: dict, update: Update, context: Conte
     )
 
 
+async def _handle_trading_activity_update(payload: dict, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    user_id = update.effective_user.id
+
+    mode = (payload.get("mode") or "").strip().lower()
+
+    try:
+        amount_usd = float(payload.get("amount_usd"))
+    except (TypeError, ValueError):
+        await send_screen(context, message.chat_id, "❌ Jumlah update tak sah.")
+        return
+
+    ok = add_trading_activity_update(
+        user_id=user_id,
+        mode=mode,
+        amount_usd=amount_usd,
+    )
+    if not ok:
+        await send_screen(context, message.chat_id, "❌ Gagal simpan trading activity.")
+        return
+
+    await send_screen(
+        context,
+        message.chat_id,
+        TRADING_ACTIVITY_SAVED_TEXT,
+        reply_markup=main_menu_keyboard(),
+        parse_mode="Markdown",
+    )
+
+
 async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     if not message or not message.web_app_data:
@@ -206,4 +238,8 @@ async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if payload_type == "deposit_activity":
         await _handle_deposit_activity(payload, update, context)
+        return
+
+    if payload_type == "trading_activity_update":
+        await _handle_trading_activity_update(payload, update, context)
         return

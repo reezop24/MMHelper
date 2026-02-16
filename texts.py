@@ -67,7 +67,7 @@ EXTRA_OPENED_TEXT = "Extra _dibuka_."
 
 DEPOSIT_ACTIVITY_SAVED_TEXT = "Update Deposit Activitiy _dikemas kini_."
 WITHDRAWAL_ACTIVITY_SAVED_TEXT = "Update Withdrawal Activity _dikemas kini_."
-TRADING_ACTIVITY_OPENED_TEXT = "Update Trading Activity _dibuka_."
+TRADING_ACTIVITY_SAVED_TEXT = "Update Trading Activity _dikemas kini_."
 TABUNG_OPENED_TEXT = "Update Tabung _dibuka_."
 
 SETUP_SAVED_TEXT = MAIN_MENU_OPENED_TEXT

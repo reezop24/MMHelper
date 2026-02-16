@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Update Trading Activity</title>
+  <link rel="stylesheet" href="global.css" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .summary {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+      margin-bottom: 16px;
+      background: rgba(6, 20, 47, 0.55);
+      border: 1px solid var(--border-input);
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .summary-item {
+      font-size: 14px;
+      color: #dce8ff;
+    }
+
+    .summary-item strong {
+      color: #fff;
+    }
+
+    .long-copy {
+      white-space: pre-line;
+      line-height: 1.45;
+      margin: 12px 0 14px;
+    }
+
+    .mode-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 0 0 14px;
+    }
+
+    .mode-btn {
+      margin: 0;
+      border: 1px solid transparent;
+      border-radius: 11px;
+      padding: 10px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      color: #fff;
+      width: 100%;
+    }
+
+    .mode-btn.loss {
+      background: linear-gradient(90deg, #7d1f2d 0%, #b63b4e 100%);
+    }
+
+    .mode-btn.profit {
+      background: linear-gradient(90deg, #1d4d91 0%, #3f74c3 100%);
+    }
+
+    .mode-btn.active {
+      border-color: #ffd6dc;
+      box-shadow: 0 0 0 1px rgba(255, 214, 220, 0.35) inset;
+      transform: translateY(-1px);
+    }
+
+    .prompt {
+      margin: 0 0 8px;
+      color: #e8f0ff;
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <img class="logo" src="logo.png" alt="MM HELPER Logo" />
+      <h1>Update Trading Activity</h1>
+    </header>
+
+    <section class="summary">
+      <div class="summary-item"><strong>Nama:</strong> <span id="summaryName">-</span></div>
+      <div class="summary-item"><strong>Initial Capital:</strong> USD <span id="summaryCapital">0.00</span></div>
+      <div class="summary-item"><strong>Current Balance:</strong> USD <span id="summaryBalance">0.00</span></div>
+      <div class="summary-item"><strong>Tarikh mula:</strong> <span id="summaryDate">-</span></div>
+    </section>
+
+    <form id="tradingForm" class="card">
+      <p id="introText" class="long-copy"></p>
+
+      <div class="mode-grid">
+        <button id="lossBtn" type="button" class="mode-btn loss">📉 Loss</button>
+        <button id="profitBtn" type="button" class="mode-btn profit">📈 Profit</button>
+      </div>
+
+      <div id="dynamicFields" class="hidden">
+        <p id="modePrompt" class="prompt"></p>
+
+        <div class="field">
+          <p id="amountPrompt" class="prompt"></p>
+          <div class="with-prefix with-suffix">
+            <span class="affix">USD</span>
+            <input
+              id="tradeAmount"
+              name="amount_usd"
+              type="number"
+              inputmode="decimal"
+              min="0"
+              step="0.01"
+              placeholder="USD"
+              required
+            />
+          </div>
+        </div>
+      </div>
+
+      <p id="finalPrompt" class="prompt"></p>
+      <button id="submitBtn" type="submit">✅ Submit</button>
+      <p id="formStatus" class="status" aria-live="polite"></p>
+    </form>
+  </main>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="content.js"></script>
+  <script src="trading-activity.js"></script>
+</body>
+</html>

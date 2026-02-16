@@ -270,6 +270,68 @@ def add_deposit_activity(user_id: int, reason: str, amount_usd: float, current_p
     return _append_activity_record(user_id, "deposit_activity", reason, amount_usd, current_profit_usd)
 
 
+def add_trading_activity_update(user_id: int, mode: str, amount_usd: float) -> bool:
+    if mode not in {"profit", "loss"}:
+        return False
+    if amount_usd <= 0:
+        return False
+
+    db = load_db()
+    user = db.get("users", {}).get(str(user_id))
+    if not user:
+        return False
+
+    now = malaysia_now()
+    saved_at_iso = now.isoformat()
+    saved_date = now.strftime("%Y-%m-%d")
+    saved_time = now.strftime("%H:%M:%S")
+
+    net_usd = float(amount_usd) if mode == "profit" else -float(amount_usd)
+
+    sections = user.setdefault("sections", {})
+    trading_section = sections.setdefault(
+        "trading_activity",
+        {
+            "section": "trading_activity",
+            "user_id": user_id,
+            "telegram_name": user.get("telegram_name") or str(user_id),
+            "saved_at": saved_at_iso,
+            "saved_date": saved_date,
+            "saved_time": saved_time,
+            "timezone": "Asia/Kuala_Lumpur",
+            "data": {"records": [], "current_profit_usd": 0.0},
+        },
+    )
+
+    trading_data = trading_section.setdefault("data", {})
+    records = trading_data.setdefault("records", [])
+    running_profit = float(trading_data.get("current_profit_usd", 0) or 0)
+    running_profit += net_usd
+
+    records.append(
+        {
+            "mode": mode,
+            "amount_usd": float(amount_usd),
+            "net_usd": net_usd,
+            "saved_at": saved_at_iso,
+            "saved_date": saved_date,
+            "saved_time": saved_time,
+            "timezone": "Asia/Kuala_Lumpur",
+        }
+    )
+
+    trading_data["current_profit_usd"] = running_profit
+
+    trading_section["saved_at"] = saved_at_iso
+    trading_section["saved_date"] = saved_date
+    trading_section["saved_time"] = saved_time
+    trading_section["timezone"] = "Asia/Kuala_Lumpur"
+
+    user["updated_at"] = saved_at_iso
+    save_db(db)
+    return True
+
+
 def apply_initial_capital_reset(user_id: int, new_initial_capital: float) -> bool:
     if new_initial_capital <= 0:
         return False

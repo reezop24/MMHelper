@@ -37,7 +37,7 @@ window.MMHELPER_CONTENT = {
     return [
       "Berapa kau deposit tadi?",
       "",
-      "Aku cek tadi keseluruhan kau tengah untung " + profitUsdFormatted + ". Bagus kalau nak top up modal, cuma pastikan jumlah masuk tu memang ikut plan." 
+      "Aku cek tadi keseluruhan kau tengah untung " + profitUsdFormatted + ". Bagus kalau nak top up modal, cuma pastikan jumlah masuk tu memang ikut plan."
     ].join("\n");
   },
 
@@ -45,11 +45,37 @@ window.MMHELPER_CONTENT = {
     return [
       "Berapa kau deposit tadi?",
       "",
-      "Aku cek tadi keseluruhan kau tengah rugi " + lossUsdFormatted + ". Kalau nak top up, pastikan ni untuk stabilkan plan, bukan revenge trade." 
+      "Aku cek tadi keseluruhan kau tengah rugi " + lossUsdFormatted + ". Kalau nak top up, pastikan ni untuk stabilkan plan, bukan revenge trade."
     ].join("\n");
   },
 
   depositReasonPrompt: "pilih sebab apa kau deposit . aku simpan dalam rekod",
   depositAmountPrompt: "Masukkan jumlah yang kau deposit. check betul-betul sebab tak boleh ubah",
-  depositFinalPrompt: "Cek semua kalau dah betul , tekan submit"
+  depositFinalPrompt: "Cek semua kalau dah betul , tekan submit",
+
+  tradingIntro: [
+    "Untung kau bangga cerita.",
+    "Rugi kau senyap simpan?",
+    "",
+    "Kat sini tak ada tempat sorok,",
+    "memang kau sorang je tengok",
+    "",
+    "Pilih je apa yang nak kau update"
+  ].join("\n"),
+
+  getTradingModePrompt: function (mode) {
+    if (mode === "profit") {
+      return "Masukkan jumlah profit yang baru kau lock. Kita simpan untuk kiraan seterusnya.";
+    }
+    return "Masukkan jumlah loss yang kena tadi. Kita rekod terus supaya kiraan tak lari.";
+  },
+
+  getTradingAmountPrompt: function (mode) {
+    if (mode === "profit") {
+      return "Jumlah profit (USD)";
+    }
+    return "Jumlah loss (USD)";
+  },
+
+  tradingFinalPrompt: "Cek semua kalau dah betul , tekan submit"
 };

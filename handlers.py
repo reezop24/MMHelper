@@ -12,7 +12,6 @@ from menu import (
     MAIN_MENU_BUTTON_RISK,
     MAIN_MENU_BUTTON_STATISTIC,
     SUBMENU_ACCOUNT_BUTTON_TABUNG,
-    SUBMENU_ACCOUNT_BUTTON_TRADING_ACTIVITY,
     SUBMENU_MM_BUTTON_BACK_MAIN,
     SUBMENU_MM_BUTTON_CORRECTION,
     SUBMENU_MM_BUTTON_SYSTEM_INFO,
@@ -23,6 +22,7 @@ from menu import (
 from settings import (
     get_deposit_activity_webapp_url,
     get_initial_capital_reset_webapp_url,
+    get_trading_activity_webapp_url,
     get_withdrawal_activity_webapp_url,
 )
 from storage import (
@@ -43,7 +43,6 @@ from texts import (
     STATISTIC_OPENED_TEXT,
     SYSTEM_INFO_OPENED_TEXT,
     TABUNG_OPENED_TEXT,
-    TRADING_ACTIVITY_OPENED_TEXT,
 )
 from ui import clear_last_screen, send_screen
 from welcome import start
@@ -82,9 +81,18 @@ def _build_account_activity_keyboard_for_user(user_id: int):
         current_profit_usd=current_profit,
     )
 
+    trading_url = get_trading_activity_webapp_url(
+        name=summary["name"],
+        initial_capital_usd=summary["initial_capital_usd"],
+        current_balance_usd=current_balance,
+        saved_date=summary["saved_date"],
+        current_profit_usd=current_profit,
+    )
+
     return account_activity_keyboard(
         deposit_activity_url=deposit_url,
         withdrawal_activity_url=withdrawal_url,
+        trading_activity_url=trading_url,
     )
 
 
@@ -189,16 +197,6 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
             message.chat_id,
             SYSTEM_INFO_OPENED_TEXT,
             reply_markup=_build_mm_setting_keyboard_for_user(user.id),
-            parse_mode="Markdown",
-        )
-        return
-
-    if text == SUBMENU_ACCOUNT_BUTTON_TRADING_ACTIVITY:
-        await send_screen(
-            context,
-            message.chat_id,
-            TRADING_ACTIVITY_OPENED_TEXT,
-            reply_markup=_build_account_activity_keyboard_for_user(user.id),
             parse_mode="Markdown",
         )
         return
