@@ -37,7 +37,7 @@ window.MMHELPER_CONTENT = {
     return [
       "Berapa kau deposit tadi?",
       "",
-      "Aku cek tadi keseluruhan kau tengah untung " + profitUsdFormatted + ". Bagus kalau nak top up modal, cuma pastikan jumlah masuk tu memang ikut plan."
+      "Minggu ni flow kau tengah hijau " + profitUsdFormatted + ". Kalau nak top up modal, nice. Pastikan jumlah masuk tu memang ikut plan, bukan ikut emosi."
     ].join("\n");
   },
 
@@ -45,7 +45,7 @@ window.MMHELPER_CONTENT = {
     return [
       "Berapa kau deposit tadi?",
       "",
-      "Aku cek tadi keseluruhan kau tengah rugi " + lossUsdFormatted + ". Kalau nak top up, pastikan ni untuk stabilkan plan, bukan revenge trade."
+      "Minggu ni akaun tengah merah " + lossUsdFormatted + ". Kalau nak top up boleh, tapi biar untuk stabilkan setup, bukan sebab nak cover rugi laju-laju."
     ].join("\n");
   },
 

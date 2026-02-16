@@ -44,13 +44,13 @@
   var amountPrompt = document.getElementById("amountPrompt");
   var finalPrompt = document.getElementById("finalPrompt");
 
-  var profitAbs = Math.abs(currentProfit).toFixed(2);
-  var profitLabel = "(USD " + profitAbs + ")";
+  var weeklyAbs = Math.abs(weeklyPerformance).toFixed(2);
+  var weeklyLabel = "(USD " + weeklyAbs + ")";
 
-  if (currentProfit >= 0) {
-    introText.textContent = (content.getDepositIntro || function () { return ""; })(profitLabel);
+  if (weeklyPerformance >= 0) {
+    introText.textContent = (content.getDepositIntro || function () { return ""; })(weeklyLabel);
   } else {
-    introText.textContent = (content.getDepositIntroLoss || function () { return ""; })(profitLabel);
+    introText.textContent = (content.getDepositIntroLoss || function () { return ""; })(weeklyLabel);
   }
 
   reasonPrompt.textContent = content.depositReasonPrompt || "";
