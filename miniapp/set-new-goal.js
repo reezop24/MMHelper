@@ -27,6 +27,7 @@
   var tabungStartDate = params.get("tabung_start_date") || "-";
   var missionStatus = params.get("mission_status") || "-";
   var hasGoal = (params.get("has_goal") || "0") === "1";
+  var goalReached = (params.get("goal_reached") || "0") === "1";
   var currentTargetBalance = Number(params.get("target_balance_usd") || 0);
   var currentGrowTarget = Number(params.get("grow_target_usd") || 0);
   var currentTargetLabel = params.get("target_label") || "-";
@@ -41,9 +42,11 @@
 
   var form = document.getElementById("setGoalForm");
   var configuredLayer = document.getElementById("configuredLayer");
+  var reachedLayer = document.getElementById("reachedLayer");
 
   var formStatusEl = document.getElementById("formStatus");
   var configuredStatusEl = document.getElementById("configuredStatus");
+  var reachedStatusEl = document.getElementById("reachedStatus");
 
   var targetBalanceInput = document.getElementById("targetBalance");
   var targetSelect = document.getElementById("targetDays");
@@ -54,6 +57,8 @@
   var topBackBtn = document.getElementById("topBackBtn");
   var configuredBackBtn = document.getElementById("configuredBackBtn");
   var configuredResetBtn = document.getElementById("configuredResetBtn");
+  var reachedBackBtn = document.getElementById("reachedBackBtn");
+  var reachedSetGoalBtn = document.getElementById("reachedSetGoalBtn");
 
   document.getElementById("introText").textContent = content.setNewGoalIntro || "";
   document.getElementById("goalPrompt").textContent = content.setNewGoalPrompt || "";
@@ -73,6 +78,14 @@
   document.getElementById("resetInfoText").textContent = content.setNewGoalResetInfoText || "";
   configuredBackBtn.textContent = content.setNewGoalBackToMenuBtn || "⬅️ Back to Project Grow";
   configuredResetBtn.textContent = content.setNewGoalResetBtn || "Reset New Goal";
+  document.getElementById("reachedIntro").textContent = content.setNewGoalReachedIntro || "";
+  document.getElementById("reachedTitle").textContent = content.setNewGoalReachedTitle || "Goal semasa dah capai 🎯";
+  document.getElementById("reachedTargetCapital").textContent = formatUsd(currentTargetBalance);
+  document.getElementById("reachedGrowTarget").textContent = formatUsd(Math.max(currentGrowTarget, 0));
+  document.getElementById("reachedTargetLabel").textContent = currentTargetLabel || "-";
+  document.getElementById("reachedInfoText").textContent = content.setNewGoalReachedInfoText || "";
+  reachedBackBtn.textContent = content.setNewGoalBackToMenuBtn || "⬅️ Back to Project Grow";
+  reachedSetGoalBtn.textContent = content.setNewGoalReachedBtn || "🎯 Set New Goal";
 
   function sendBackToProjectGrow() {
     var payload = { type: "project_grow_back_to_menu" };
@@ -85,6 +98,18 @@
 
     formStatusEl.textContent = "Preview mode: buka dari Telegram untuk kembali ke Project Grow.";
     configuredStatusEl.textContent = "Preview mode: buka dari Telegram untuk kembali ke Project Grow.";
+    reachedStatusEl.textContent = "Preview mode: buka dari Telegram untuk kembali ke Project Grow.";
+  }
+
+  function showNewGoalFormFromReached() {
+    reachedLayer.classList.add("hidden");
+    configuredLayer.classList.add("hidden");
+    form.classList.remove("hidden");
+    formStatusEl.textContent = "Isi goal baru kau kat bawah. Bila submit, goal lama akan diganti dengan goal baru.";
+    targetBalanceInput.value = "";
+    targetSelect.value = "";
+    unlockAmountInput.value = "";
+    updateGrowTargetHint(0, currentBalance, growTargetHint);
   }
 
   function handleResetGoal(statusEl) {
@@ -113,17 +138,25 @@
   topBackBtn.addEventListener("click", sendBackToProjectGrow);
   backToMenuBtn.addEventListener("click", sendBackToProjectGrow);
   configuredBackBtn.addEventListener("click", sendBackToProjectGrow);
+  reachedBackBtn.addEventListener("click", sendBackToProjectGrow);
 
   configuredResetBtn.addEventListener("click", function () {
     handleResetGoal(configuredStatusEl);
   });
+  reachedSetGoalBtn.addEventListener("click", showNewGoalFormFromReached);
 
-  if (hasGoal) {
-    configuredLayer.classList.remove("hidden");
-    form.classList.add("hidden");
-  } else {
+  if (!hasGoal) {
     form.classList.remove("hidden");
     configuredLayer.classList.add("hidden");
+    reachedLayer.classList.add("hidden");
+  } else if (goalReached) {
+    reachedLayer.classList.remove("hidden");
+    configuredLayer.classList.add("hidden");
+    form.classList.add("hidden");
+  } else {
+    configuredLayer.classList.remove("hidden");
+    form.classList.add("hidden");
+    reachedLayer.classList.add("hidden");
   }
 
   updateGrowTargetHint(Number((targetBalanceInput.value || "").trim()), currentBalance, growTargetHint);

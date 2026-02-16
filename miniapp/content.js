@@ -121,6 +121,13 @@ window.MMHELPER_CONTENT = {
   setNewGoalResetPreviewText: "Preview mode: reset hanya berfungsi bila buka dari Telegram.",
   setNewGoalConfiguredTitle: "Target Capital dah diset ✅",
   setNewGoalConfiguredHint: "Kalau nak tukar setup, reset dulu kemudian set semula.",
+  setNewGoalReachedIntro: [
+    "Nice, target semasa kau dah lepas.",
+    "Kau boleh lock momentum ni dan terus set objective baru ikut pace account terkini."
+  ].join("\n"),
+  setNewGoalReachedTitle: "Goal semasa dah capai 🎯",
+  setNewGoalReachedInfoText: "Bila ready, tekan Set New Goal untuk sambung fasa seterusnya tanpa reset flow lama.",
+  setNewGoalReachedBtn: "🎯 Set New Goal",
 
   missionLockedText: "Mission belum boleh dibuka. Set New Goal dulu, kemudian pastikan balance tabung minimum USD 10.",
   missionBeforeStartIntro: [
