@@ -207,7 +207,8 @@ def _build_account_summary_text(user_id: int) -> str:
     mission_state = get_project_grow_mission_state(user_id)
     mission = get_mission_progress_summary(user_id)
     target_capital = float(goal.get("target_balance_usd") or 0)
-    grow_target = max(target_capital - current_balance, 0.0)
+    grow_target_total = max(target_capital - float(goal.get("current_balance_usd") or 0), 0.0)
+    grow_target = max(grow_target_total - tabung_balance, 0.0)
     target_label = goal.get("target_label") or "-"
 
     def _usd(v: float) -> str:
