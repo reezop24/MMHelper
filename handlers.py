@@ -46,7 +46,9 @@ from storage import (
     get_current_balance_usd,
     get_current_profit_usd,
     get_initial_setup_summary,
+    get_mission_progress_summary,
     get_monthly_performance_usd,
+    get_monthly_profit_loss_usd,
     get_project_grow_goal_summary,
     get_project_grow_mission_state,
     get_project_grow_mission_status_text,
@@ -54,6 +56,7 @@ from storage import (
     get_tabung_balance_usd,
     get_total_balance_usd,
     get_weekly_performance_usd,
+    get_weekly_profit_loss_usd,
     reset_all_data,
 )
 from texts import (
@@ -141,12 +144,12 @@ def _build_account_summary_text(user_id: int) -> str:
     total_balance = get_total_balance_usd(user_id)
     tabung_balance = get_tabung_balance_usd(user_id)
     capital = get_capital_usd(user_id)
-    weekly = get_weekly_performance_usd(user_id)
-    monthly = get_monthly_performance_usd(user_id)
+    weekly = get_weekly_profit_loss_usd(user_id)
+    monthly = get_monthly_profit_loss_usd(user_id)
     tabung_start = get_tabung_start_date(user_id)
 
     goal = get_project_grow_goal_summary(user_id)
-    mission_status = get_project_grow_mission_status_text(user_id)
+    mission = get_mission_progress_summary(user_id)
     target_capital = float(goal.get("target_balance_usd") or 0)
     grow_target = max(target_capital - current_balance, 0.0)
     target_label = goal.get("target_label") or "-"
@@ -167,11 +170,11 @@ def _build_account_summary_text(user_id: int) -> str:
         f"- Total Balance: USD {_usd(total_balance)}",
         f"- Tabung Balance: USD {_usd(tabung_balance)}",
         f"- Capital: USD {_usd(capital)}",
-        f"- Weekly Performance: USD {_usd(weekly)}",
-        f"- Monthly Performance: USD {_usd(monthly)}",
+        f"- Weekly P/L: USD {_usd(weekly)}",
+        f"- Monthly P/L: USD {_usd(monthly)}",
         "",
         "*Project Grow*",
-        f"- Mission Status: {mission_status}",
+        f"- Mission Status: {mission['mission_status']}",
     ]
 
     if target_capital > 0:
@@ -184,6 +187,19 @@ def _build_account_summary_text(user_id: int) -> str:
         )
     else:
         lines.append("- Target Capital: belum diset")
+
+    lines.extend(
+        [
+            "",
+            "*Mission Progress*",
+            f"- Mission Mode: {mission['mode_level']}",
+            f"- Mission Status: {mission['mission_status']}",
+            mission["mission_1"],
+            mission["mission_2"],
+            mission["mission_3"],
+            mission["mission_4"],
+        ]
+    )
 
     return "\n".join(lines)
 

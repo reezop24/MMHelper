@@ -541,6 +541,15 @@ def get_monthly_performance_usd(user_id: int) -> float:
     return _sum_trading_net_between(user_id, month_start, month_end)
 
 
+def get_weekly_profit_loss_usd(user_id: int) -> float:
+    # Mingguan: Ahad-Sabtu, dan dipotong ikut sempadan bulan semasa.
+    return get_weekly_performance_usd(user_id)
+
+
+def get_monthly_profit_loss_usd(user_id: int) -> float:
+    return get_monthly_performance_usd(user_id)
+
+
 def has_any_transactions(user_id: int) -> bool:
     rollup = _get_user_rollup(user_id)
     if (
@@ -655,6 +664,168 @@ def get_project_grow_mission_status_text(user_id: int) -> str:
     if can_open_project_grow_mission(user_id):
         return "Ready to Start"
     return "Locked"
+
+
+def _parse_iso_date(value: Any) -> date | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return date.fromisoformat(text)
+    except ValueError:
+        return None
+
+
+def _mission_start_date(user_id: int) -> date | None:
+    state = get_project_grow_mission_state(user_id)
+    started_date = _parse_iso_date(state.get("started_date"))
+    if started_date is not None:
+        return started_date
+
+    started_at = str(state.get("started_at") or "").strip()
+    if started_at:
+        try:
+            dt = datetime.fromisoformat(started_at)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=malaysia_now().tzinfo)
+            else:
+                dt = dt.astimezone(malaysia_now().tzinfo)
+            return dt.date()
+        except ValueError:
+            return None
+    return None
+
+
+def _iter_dates_since(user_id: int, section_name: str, start_date: date, end_date: date) -> Iterator[date]:
+    for record in _iter_section_records_between(user_id, section_name, start_date, end_date):
+        rec_date = _record_date_myt(record)
+        if rec_date is None:
+            continue
+        yield rec_date
+
+
+def _consecutive_days_from_start(start_date: date, end_date: date, day_set: set[date]) -> int:
+    cur = start_date
+    count = 0
+    while cur <= end_date:
+        if cur not in day_set:
+            break
+        count += 1
+        cur += timedelta(days=1)
+    return count
+
+
+def _tabung_records_since(user_id: int, start_date: date) -> list[dict[str, Any]]:
+    sections = _get_user_sections(user_id)
+    tabung_data = sections.get("tabung", {}).get("data", {})
+    records = tabung_data.get("records") if isinstance(tabung_data, dict) else []
+    if not isinstance(records, list):
+        return []
+
+    out: list[dict[str, Any]] = []
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        rec_date = _record_date_myt(record)
+        if rec_date is None:
+            continue
+        if rec_date >= start_date:
+            out.append(record)
+    return out
+
+
+def get_mission_progress_summary(user_id: int) -> dict[str, str]:
+    state = get_project_grow_mission_state(user_id)
+    mission_status = get_project_grow_mission_status_text(user_id)
+
+    if not state["active"]:
+        return {
+            "mode_level": "-",
+            "mission_status": mission_status,
+            "mission_1": "Mission 1 : in progress 0/14",
+            "mission_2": "Mission 2 : in progress 0/14",
+            "mission_3": "Mission 3 : in progress 0/30",
+            "mission_4": "Mission 4 : 0%",
+        }
+
+    start_date = _mission_start_date(user_id) or malaysia_now().date()
+    today = malaysia_now().date()
+    if start_date > today:
+        start_date = today
+
+    mode_level = f"{state['mode'].capitalize()} | Level 1"
+
+    # Mission 1: 14 hari berturut-turut update (guna aktiviti yang direkod dalam bot).
+    update_days: set[date] = set()
+    for section_name in ("deposit_activity", "withdrawal_activity", "trading_activity"):
+        update_days.update(_iter_dates_since(user_id, section_name, start_date, today))
+    mission1_days = _consecutive_days_from_start(start_date, today, update_days)
+    mission1_pass = mission1_days >= 14
+    mission1_status = "_PASS_" if mission1_pass else "in progress"
+    mission1_text = f"Mission 1 : {mission1_status} {min(mission1_days, 14)}/14"
+
+    # Mission 2: 14 hari berturut-turut trading update + minimum 2 transaksi tabung.
+    trading_days = set(_iter_dates_since(user_id, "trading_activity", start_date, today))
+    mission2_days = _consecutive_days_from_start(start_date, today, trading_days)
+    tabung_tx_count = len(_tabung_records_since(user_id, start_date))
+    mission2_pass = mission2_days >= 14 and tabung_tx_count >= 2
+    mission2_status = "_PASS_" if mission2_pass else "in progress"
+    mission2_text = f"Mission 2 : {mission2_status} {min(mission2_days, 14)}/14"
+
+    # Mission 3: jaga had daily max loss selama 30 hari.
+    sections = _get_user_sections(user_id)
+    init_data = sections.get("initial_setup", {}).get("data", {})
+    max_daily_loss_pct = _to_float(init_data.get("max_daily_loss_pct"))
+    initial_capital = _to_float(init_data.get("initial_capital_usd"))
+    max_daily_loss_usd = (initial_capital * max_daily_loss_pct) / 100.0 if max_daily_loss_pct > 0 else 0.0
+
+    daily_net: dict[date, float] = {}
+    for record in _iter_section_records_between(user_id, "trading_activity", start_date, today):
+        rec_date = _record_date_myt(record)
+        if rec_date is None:
+            continue
+        daily_net[rec_date] = daily_net.get(rec_date, 0.0) + _record_net_usd(record)
+
+    mission3_days = 0
+    mission3_failed = False
+    cur = start_date
+    while cur <= today:
+        day_net = daily_net.get(cur, 0.0)
+        if max_daily_loss_usd > 0 and day_net < -abs(max_daily_loss_usd):
+            mission3_failed = True
+            break
+        mission3_days += 1
+        cur += timedelta(days=1)
+
+    mission3_pass = mission3_days >= 30 and not mission3_failed
+    if mission3_pass:
+        mission3_status = "_PASS_"
+    elif mission3_failed:
+        mission3_status = "_FAIL_"
+    else:
+        mission3_status = "in progress"
+    mission3_text = f"Mission 3 : {mission3_status} {min(mission3_days, 30)}/30"
+
+    # Mission 4: capai 100% daripada grow target.
+    goal = get_project_grow_goal_summary(user_id)
+    baseline_balance = _to_float(goal.get("current_balance_usd"))
+    target_balance = _to_float(goal.get("target_balance_usd"))
+    grow_target = max(target_balance - baseline_balance, 0.0)
+    achieved = max(get_current_balance_usd(user_id) - baseline_balance, 0.0)
+    mission4_pct = 0.0 if grow_target <= 0 else min((achieved / grow_target) * 100.0, 100.0)
+    if mission4_pct >= 100 and grow_target > 0:
+        mission4_text = "Mission 4 : _PASS_"
+    else:
+        mission4_text = f"Mission 4 : {mission4_pct:.0f}%"
+
+    return {
+        "mode_level": mode_level,
+        "mission_status": mission_status,
+        "mission_1": mission1_text,
+        "mission_2": mission2_text,
+        "mission_3": mission3_text,
+        "mission_4": mission4_text,
+    }
 
 
 def apply_project_grow_unlock_to_tabung(user_id: int, unlock_amount_usd: float) -> bool:
