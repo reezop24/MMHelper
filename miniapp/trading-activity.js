@@ -18,6 +18,22 @@
     return sign + "USD " + number.toFixed(2);
   }
 
+  function getNumericInputValue(inputEl) {
+    var raw = (inputEl.value || "").trim();
+    if (!raw) return NaN;
+    return Number(raw);
+  }
+
+  function isValidAmount(amount) {
+    return !Number.isNaN(amount) && amount > 0;
+  }
+
+  function setValueTone(el, value) {
+    el.classList.remove("positive", "negative");
+    if (value > 0) el.classList.add("positive");
+    if (value < 0) el.classList.add("negative");
+  }
+
   var name = params.get("name") || "-";
   var initialCapital = Number(params.get("initial_capital_usd") || 0);
   var currentBalance = Number(params.get("current_balance_usd") || 0);
@@ -46,14 +62,68 @@
   introText.textContent = content.tradingIntro || "";
   finalPrompt.textContent = content.tradingFinalPrompt || "";
 
+  var stepMode = document.getElementById("stepMode");
+  var stepAmount = document.getElementById("stepAmount");
+  var stepReview = document.getElementById("stepReview");
+
   var lossBtn = document.getElementById("lossBtn");
   var profitBtn = document.getElementById("profitBtn");
   var dynamicFields = document.getElementById("dynamicFields");
   var amountInput = document.getElementById("tradeAmount");
+  var quickBtns = Array.prototype.slice.call(document.querySelectorAll(".quick-btn"));
+
+  var impactCard = document.getElementById("impactCard");
+  var impactMode = document.getElementById("impactMode");
+  var impactAmount = document.getElementById("impactAmount");
+  var impactWeekly = document.getElementById("impactWeekly");
+  var impactBalance = document.getElementById("impactBalance");
+
   var form = document.getElementById("tradingForm");
+  var submitBtn = document.getElementById("submitBtn");
   var statusEl = document.getElementById("formStatus");
 
   var selectedMode = "";
+
+  function updateStepState(amount) {
+    stepMode.classList.add("active");
+    stepAmount.classList.toggle("active", Boolean(selectedMode));
+    stepReview.classList.toggle("active", Boolean(selectedMode) && isValidAmount(amount));
+  }
+
+  function highlightQuickButton(amount) {
+    quickBtns.forEach(function (btn) {
+      var btnAmount = Number(btn.getAttribute("data-amount") || 0);
+      btn.classList.toggle("active", amount === btnAmount);
+    });
+  }
+
+  function updatePreview() {
+    var amount = getNumericInputValue(amountInput);
+    var hasAmount = isValidAmount(amount);
+
+    updateStepState(amount);
+    submitBtn.disabled = !(selectedMode && hasAmount);
+
+    if (!selectedMode || !hasAmount) {
+      impactCard.classList.add("hidden");
+      return;
+    }
+
+    var net = selectedMode === "profit" ? amount : -amount;
+    var projectedWeekly = weeklyPerformance + net;
+    var projectedBalance = currentBalance + net;
+
+    impactMode.textContent = selectedMode === "profit" ? "PROFIT" : "LOSS";
+    impactAmount.textContent = "USD " + amount.toFixed(2);
+    impactWeekly.textContent = formatPnl(projectedWeekly);
+    impactBalance.textContent = "USD " + projectedBalance.toFixed(2);
+
+    setValueTone(impactAmount, net);
+    setValueTone(impactWeekly, projectedWeekly);
+    setValueTone(impactBalance, projectedBalance - currentBalance);
+
+    impactCard.classList.remove("hidden");
+  }
 
   function setMode(mode) {
     selectedMode = mode;
@@ -66,8 +136,9 @@
     modePrompt.textContent = (content.getTradingModePrompt || function () { return ""; })(mode);
     amountPrompt.textContent = (content.getTradingAmountPrompt || function () { return ""; })(mode);
 
-    amountInput.focus();
     statusEl.textContent = "";
+    amountInput.focus();
+    updatePreview();
   }
 
   lossBtn.addEventListener("click", function () {
@@ -78,17 +149,37 @@
     setMode("profit");
   });
 
+  quickBtns.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var amount = Number(btn.getAttribute("data-amount") || 0);
+      if (!amount) return;
+
+      amountInput.value = amount.toFixed(2);
+      highlightQuickButton(amount);
+      updatePreview();
+      amountInput.focus();
+      statusEl.textContent = "";
+    });
+  });
+
+  amountInput.addEventListener("input", function () {
+    var amount = getNumericInputValue(amountInput);
+    highlightQuickButton(amount);
+    updatePreview();
+    statusEl.textContent = "";
+  });
+
   form.addEventListener("submit", function (event) {
     event.preventDefault();
 
-    var amount = Number((amountInput.value || "").trim());
+    var amount = getNumericInputValue(amountInput);
 
     if (!selectedMode) {
       statusEl.textContent = "Pilih loss atau profit dulu.";
       return;
     }
 
-    if (Number.isNaN(amount) || amount <= 0) {
+    if (!isValidAmount(amount)) {
       statusEl.textContent = "Isi jumlah yang valid dulu.";
       return;
     }
@@ -107,4 +198,6 @@
 
     statusEl.textContent = "Preview mode: buka dari Telegram untuk submit.";
   });
+
+  updateStepState(NaN);
 })();

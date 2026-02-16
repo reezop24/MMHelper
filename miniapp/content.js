@@ -54,13 +54,11 @@ window.MMHELPER_CONTENT = {
   depositFinalPrompt: "Cek semua kalau dah betul , tekan submit",
 
   tradingIntro: [
-    "Untung kau bangga cerita.",
-    "Rugi kau senyap simpan?",
+    "Kita buat cepat tapi tepat.",
+    "Profit ke loss, update terus kat sini.",
     "",
-    "Kat sini tak ada tempat sorok,",
-    "memang kau sorang je tengok",
-    "",
-    "Pilih je apa yang nak kau update"
+    "Lepas pilih mode, kau terus nampak impact kiraan live sebelum submit.",
+    "Senang nak double-check, takde main agak-agak."
   ].join("\n"),
 
   getTradingModePrompt: function (mode) {
