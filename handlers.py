@@ -14,7 +14,6 @@ from menu import (
     SUBMENU_ACCOUNT_BUTTON_DEPOSIT_ACTIVITY,
     SUBMENU_ACCOUNT_BUTTON_TABUNG,
     SUBMENU_ACCOUNT_BUTTON_TRADING_ACTIVITY,
-    SUBMENU_ACCOUNT_BUTTON_WITHDRAWAL_ACTIVITY,
     SUBMENU_MM_BUTTON_BACK_MAIN,
     SUBMENU_MM_BUTTON_CORRECTION,
     SUBMENU_MM_BUTTON_SYSTEM_INFO,
@@ -22,9 +21,13 @@ from menu import (
     main_menu_keyboard,
     mm_helper_setting_keyboard,
 )
-from settings import get_initial_capital_reset_webapp_url
+from settings import (
+    get_initial_capital_reset_webapp_url,
+    get_withdrawal_activity_webapp_url,
+)
 from storage import (
     can_reset_initial_capital,
+    get_current_profit_usd,
     get_initial_setup_summary,
     reset_all_data,
 )
@@ -41,7 +44,6 @@ from texts import (
     SYSTEM_INFO_OPENED_TEXT,
     TABUNG_OPENED_TEXT,
     TRADING_ACTIVITY_OPENED_TEXT,
-    WITHDRAWAL_ACTIVITY_OPENED_TEXT,
 )
 from ui import clear_last_screen, send_screen
 from welcome import start
@@ -56,6 +58,17 @@ def _build_mm_setting_keyboard_for_user(user_id: int):
         can_reset=can_reset_initial_capital(user_id),
     )
     return mm_helper_setting_keyboard(reset_url)
+
+
+def _build_account_activity_keyboard_for_user(user_id: int):
+    summary = get_initial_setup_summary(user_id)
+    withdrawal_url = get_withdrawal_activity_webapp_url(
+        name=summary["name"],
+        initial_capital_usd=summary["initial_capital_usd"],
+        saved_date=summary["saved_date"],
+        current_profit_usd=get_current_profit_usd(user_id),
+    )
+    return account_activity_keyboard(withdrawal_url)
 
 
 async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -88,7 +101,7 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
             context,
             message.chat_id,
             ACCOUNT_ACTIVITY_OPENED_TEXT,
-            reply_markup=account_activity_keyboard(),
+            reply_markup=_build_account_activity_keyboard_for_user(user.id),
             parse_mode="Markdown",
         )
         return
@@ -168,17 +181,7 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
             context,
             message.chat_id,
             DEPOSIT_ACTIVITY_OPENED_TEXT,
-            reply_markup=account_activity_keyboard(),
-            parse_mode="Markdown",
-        )
-        return
-
-    if text == SUBMENU_ACCOUNT_BUTTON_WITHDRAWAL_ACTIVITY:
-        await send_screen(
-            context,
-            message.chat_id,
-            WITHDRAWAL_ACTIVITY_OPENED_TEXT,
-            reply_markup=account_activity_keyboard(),
+            reply_markup=_build_account_activity_keyboard_for_user(user.id),
             parse_mode="Markdown",
         )
         return
@@ -188,7 +191,7 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
             context,
             message.chat_id,
             TRADING_ACTIVITY_OPENED_TEXT,
-            reply_markup=account_activity_keyboard(),
+            reply_markup=_build_account_activity_keyboard_for_user(user.id),
             parse_mode="Markdown",
         )
         return
@@ -198,7 +201,7 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
             context,
             message.chat_id,
             TABUNG_OPENED_TEXT,
-            reply_markup=account_activity_keyboard(),
+            reply_markup=_build_account_activity_keyboard_for_user(user.id),
             parse_mode="Markdown",
         )
         return

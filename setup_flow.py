@@ -9,11 +9,13 @@ from telegram.ext import ContextTypes
 
 from menu import main_menu_keyboard
 from storage import (
+    add_withdrawal_activity,
     apply_initial_capital_reset,
     can_reset_initial_capital,
+    get_current_profit_usd,
     save_user_setup_section,
 )
-from texts import INITIAL_CAPITAL_RESET_SUCCESS_TEXT, SETUP_SAVED_TEXT
+from texts import INITIAL_CAPITAL_RESET_SUCCESS_TEXT, SETUP_SAVED_TEXT, WITHDRAWAL_ACTIVITY_SAVED_TEXT
 from ui import send_screen
 
 
@@ -104,6 +106,40 @@ async def _handle_initial_capital_reset(payload: dict, update: Update, context: 
     )
 
 
+async def _handle_withdrawal_activity(payload: dict, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    user_id = update.effective_user.id
+
+    reason = (payload.get("reason") or "").strip()
+    if not reason:
+        await send_screen(context, message.chat_id, "❌ Pilih reason dulu bro.")
+        return
+
+    try:
+        amount_usd = float(payload.get("amount_usd"))
+    except (TypeError, ValueError):
+        await send_screen(context, message.chat_id, "❌ Jumlah withdraw tak sah.")
+        return
+
+    ok = add_withdrawal_activity(
+        user_id=user_id,
+        reason=reason,
+        amount_usd=amount_usd,
+        current_profit_usd=get_current_profit_usd(user_id),
+    )
+    if not ok:
+        await send_screen(context, message.chat_id, "❌ Gagal simpan withdrawal activity.")
+        return
+
+    await send_screen(
+        context,
+        message.chat_id,
+        WITHDRAWAL_ACTIVITY_SAVED_TEXT,
+        reply_markup=main_menu_keyboard(),
+        parse_mode="Markdown",
+    )
+
+
 async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     if not message or not message.web_app_data:
@@ -122,4 +158,8 @@ async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if payload_type == "initial_capital_reset":
         await _handle_initial_capital_reset(payload, update, context)
+        return
+
+    if payload_type == "withdrawal_activity":
+        await _handle_withdrawal_activity(payload, update, context)
         return

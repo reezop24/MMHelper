@@ -58,6 +58,56 @@ def get_initial_setup_summary(user_id: int) -> dict[str, Any]:
     }
 
 
+def _extract_profit_from_obj(obj: Any) -> float:
+    if not isinstance(obj, dict):
+        return 0.0
+
+    for key in ("current_profit_usd", "net_profit_usd", "total_pnl_usd", "profit_usd"):
+        value = obj.get(key)
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            continue
+    return 0.0
+
+
+def get_current_profit_usd(user_id: int) -> float:
+    db = load_db()
+    user = db.get("users", {}).get(str(user_id), {})
+    sections = user.get("sections", {})
+
+    trading_section = sections.get("trading_activity", {})
+    data = trading_section.get("data")
+
+    if isinstance(data, dict):
+        value = _extract_profit_from_obj(data)
+        if value != 0:
+            return value
+
+    if isinstance(data, list):
+        total = 0.0
+        used = False
+        for item in data:
+            if not isinstance(item, dict):
+                continue
+            for key in ("pnl_usd", "profit_usd", "net_usd"):
+                try:
+                    total += float(item.get(key, 0))
+                    used = True
+                    break
+                except (TypeError, ValueError):
+                    continue
+        if used:
+            return total
+
+    summary = sections.get("account_summary", {}).get("data", {})
+    summary_profit = _extract_profit_from_obj(summary)
+    if summary_profit != 0:
+        return summary_profit
+
+    return 0.0
+
+
 def has_any_transactions(user_id: int) -> bool:
     db = load_db()
     user = db.get("users", {}).get(str(user_id), {})
@@ -119,6 +169,58 @@ def save_user_setup_section(
     }
 
     save_db(db)
+
+
+def add_withdrawal_activity(user_id: int, reason: str, amount_usd: float, current_profit_usd: float) -> bool:
+    if amount_usd <= 0:
+        return False
+
+    db = load_db()
+    user = db.get("users", {}).get(str(user_id))
+    if not user:
+        return False
+
+    now = malaysia_now()
+    saved_at_iso = now.isoformat()
+    saved_date = now.strftime("%Y-%m-%d")
+    saved_time = now.strftime("%H:%M:%S")
+
+    sections = user.setdefault("sections", {})
+    withdrawal_section = sections.setdefault(
+        "withdrawal_activity",
+        {
+            "section": "withdrawal_activity",
+            "user_id": user_id,
+            "telegram_name": user.get("telegram_name") or str(user_id),
+            "saved_at": saved_at_iso,
+            "saved_date": saved_date,
+            "saved_time": saved_time,
+            "timezone": "Asia/Kuala_Lumpur",
+            "data": {"records": []},
+        },
+    )
+
+    records = withdrawal_section.setdefault("data", {}).setdefault("records", [])
+    records.append(
+        {
+            "amount_usd": float(amount_usd),
+            "reason": reason,
+            "current_profit_usd": float(current_profit_usd),
+            "saved_at": saved_at_iso,
+            "saved_date": saved_date,
+            "saved_time": saved_time,
+            "timezone": "Asia/Kuala_Lumpur",
+        }
+    )
+
+    withdrawal_section["saved_at"] = saved_at_iso
+    withdrawal_section["saved_date"] = saved_date
+    withdrawal_section["saved_time"] = saved_time
+    withdrawal_section["timezone"] = "Asia/Kuala_Lumpur"
+
+    user["updated_at"] = saved_at_iso
+    save_db(db)
+    return True
 
 
 def apply_initial_capital_reset(user_id: int, new_initial_capital: float) -> bool:

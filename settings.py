@@ -13,18 +13,20 @@ def get_setup_webapp_url() -> str:
     return url or DEFAULT_SETUP_WEBAPP_URL
 
 
+def _miniapp_base_url() -> str:
+    base = get_setup_webapp_url().rstrip("/")
+    if base.endswith("index.html"):
+        base = base[: -len("index.html")].rstrip("/")
+    return base
+
+
 def get_initial_capital_reset_webapp_url(
     name: str,
     initial_capital: float,
     saved_date: str,
     can_reset: bool,
 ) -> str:
-    base = get_setup_webapp_url().rstrip("/")
-
-    if base.endswith("index.html"):
-        base = base[: -len("index.html")].rstrip("/")
-
-    reset_page = f"{base}/capital-reset.html"
+    reset_page = f"{_miniapp_base_url()}/capital-reset.html"
     query = urlencode(
         {
             "name": name,
@@ -34,3 +36,21 @@ def get_initial_capital_reset_webapp_url(
         }
     )
     return f"{reset_page}?{query}"
+
+
+def get_withdrawal_activity_webapp_url(
+    name: str,
+    initial_capital_usd: float,
+    saved_date: str,
+    current_profit_usd: float,
+) -> str:
+    page = f"{_miniapp_base_url()}/withdrawal-activity.html"
+    query = urlencode(
+        {
+            "name": name,
+            "initial_capital_usd": f"{initial_capital_usd:.2f}",
+            "saved_date": saved_date,
+            "current_profit_usd": f"{current_profit_usd:.2f}",
+        }
+    )
+    return f"{page}?{query}"
