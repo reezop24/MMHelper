@@ -105,7 +105,7 @@ window.MMHELPER_CONTENT = {
   ].join("\n"),
 
   setNewGoalPrompt: "Target Capital (USD) yang kau nak capai",
-  setNewGoalBalanceHintPrefix: "Baki semasa kau sekarang",
+  setNewGoalBalanceHintPrefix: "Current Balance kau sekarang",
   setNewGoalMinTargetPrefix: "Minimum target yang dibenarkan",
   setNewGoalGrowTargetPrefix: "Grow Target kau adalah",
   setNewGoalCurrentTabungStartPrefix: "Tarikh mula tabung",

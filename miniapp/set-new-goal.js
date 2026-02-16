@@ -59,7 +59,7 @@
 
   document.getElementById("introText").textContent = content.setNewGoalIntro || "";
   document.getElementById("goalPrompt").textContent = content.setNewGoalPrompt || "";
-  document.getElementById("balanceHint").textContent = (content.setNewGoalBalanceHintPrefix || "Baki semasa") + ": USD " + formatUsd(currentBalance);
+  document.getElementById("balanceHint").textContent = (content.setNewGoalBalanceHintPrefix || "Current Balance") + ": USD " + formatUsd(currentBalance);
   document.getElementById("minTargetHint").textContent = (content.setNewGoalMinTargetPrefix || "Minimum target") + ": USD " + formatUsd(minTarget);
   document.getElementById("targetPrompt").textContent = content.setNewGoalTargetPrompt || "";
   document.getElementById("unlockPrompt").textContent = content.setNewGoalUnlockPrompt || "";

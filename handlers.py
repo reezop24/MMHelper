@@ -162,7 +162,7 @@ def _build_account_summary_text(user_id: int) -> str:
         "*Account Summary*",
         "",
         "*Account*",
-        f"- Nama: {summary['name']}",
+        f"- Name: {summary['name']}",
         f"- Tarikh mula akaun: {summary['saved_date']}",
         f"- Tarikh mula tabung: {tabung_start}",
         f"- Initial Balance: USD {_usd(summary['initial_capital_usd'])}",
