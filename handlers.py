@@ -279,8 +279,8 @@ def _build_project_grow_keyboard_for_user(user_id: int):
     current_balance = get_current_balance_usd(user_id)
     mission_status = get_project_grow_mission_status_text(user_id)
     tabung_start_date = get_tabung_start_date(user_id)
-    grow_target_usd = tabung_progress["grow_target_usd"]
     tabung_progress = get_tabung_progress_summary(user_id)
+    grow_target_usd = tabung_progress["grow_target_usd"]
     mission_url = get_project_grow_mission_webapp_url(
         name=summary["name"],
         current_balance_usd=current_balance,
