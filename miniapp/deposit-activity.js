@@ -8,15 +8,35 @@
   var content = window.MMHELPER_CONTENT || {};
   var params = new URLSearchParams(window.location.search);
 
+  function formatUsd(value) {
+    return Number(value || 0).toFixed(2);
+  }
+
+  function formatPnl(value) {
+    var number = Number(value || 0);
+    var sign = number > 0 ? "+" : "";
+    return sign + "USD " + number.toFixed(2);
+  }
+
   var name = params.get("name") || "-";
   var initialCapital = Number(params.get("initial_capital_usd") || 0);
   var currentBalance = Number(params.get("current_balance_usd") || 0);
   var savedDate = params.get("saved_date") || "-";
   var currentProfit = Number(params.get("current_profit_usd") || 0);
+  var totalBalance = Number(params.get("total_balance_usd") || 0);
+  var tabungBalance = Number(params.get("tabung_balance_usd") || 0);
+  var capital = Number(params.get("capital_usd") || 0);
+  var weeklyPerformance = Number(params.get("weekly_performance_usd") || 0);
+  var monthlyPerformance = Number(params.get("monthly_performance_usd") || 0);
 
   document.getElementById("summaryName").textContent = name;
-  document.getElementById("summaryCapital").textContent = initialCapital.toFixed(2);
-  document.getElementById("summaryBalance").textContent = currentBalance.toFixed(2);
+  document.getElementById("summaryCapital").textContent = formatUsd(initialCapital);
+  document.getElementById("summaryBalance").textContent = formatUsd(currentBalance);
+  document.getElementById("summaryTotalBalance").textContent = formatUsd(totalBalance);
+  document.getElementById("summaryTabungBalance").textContent = formatUsd(tabungBalance);
+  document.getElementById("summaryCapitalTotal").textContent = formatUsd(capital);
+  document.getElementById("summaryWeeklyPerformance").textContent = formatPnl(weeklyPerformance);
+  document.getElementById("summaryMonthlyPerformance").textContent = formatPnl(monthlyPerformance);
   document.getElementById("summaryDate").textContent = savedDate;
 
   var introText = document.getElementById("introText");

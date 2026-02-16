@@ -40,22 +40,58 @@ def get_initial_capital_reset_webapp_url(
     return f"{reset_page}?{query}"
 
 
-def get_withdrawal_activity_webapp_url(
+def _build_activity_query(
     name: str,
     initial_capital_usd: float,
     current_balance_usd: float,
     saved_date: str,
     current_profit_usd: float,
+    total_balance_usd: float,
+    tabung_balance_usd: float,
+    capital_usd: float,
+    weekly_performance_usd: float,
+    monthly_performance_usd: float,
 ) -> str:
-    page = f"{_miniapp_base_url()}/withdrawal-activity.html"
-    query = urlencode(
+    return urlencode(
         {
             "name": name,
             "initial_capital_usd": f"{initial_capital_usd:.2f}",
             "current_balance_usd": f"{current_balance_usd:.2f}",
             "saved_date": saved_date,
             "current_profit_usd": f"{current_profit_usd:.2f}",
+            "total_balance_usd": f"{total_balance_usd:.2f}",
+            "tabung_balance_usd": f"{tabung_balance_usd:.2f}",
+            "capital_usd": f"{capital_usd:.2f}",
+            "weekly_performance_usd": f"{weekly_performance_usd:.2f}",
+            "monthly_performance_usd": f"{monthly_performance_usd:.2f}",
         }
+    )
+
+
+def get_withdrawal_activity_webapp_url(
+    name: str,
+    initial_capital_usd: float,
+    current_balance_usd: float,
+    saved_date: str,
+    current_profit_usd: float,
+    total_balance_usd: float,
+    tabung_balance_usd: float,
+    capital_usd: float,
+    weekly_performance_usd: float,
+    monthly_performance_usd: float,
+) -> str:
+    page = f"{_miniapp_base_url()}/withdrawal-activity.html"
+    query = _build_activity_query(
+        name=name,
+        initial_capital_usd=initial_capital_usd,
+        current_balance_usd=current_balance_usd,
+        saved_date=saved_date,
+        current_profit_usd=current_profit_usd,
+        total_balance_usd=total_balance_usd,
+        tabung_balance_usd=tabung_balance_usd,
+        capital_usd=capital_usd,
+        weekly_performance_usd=weekly_performance_usd,
+        monthly_performance_usd=monthly_performance_usd,
     )
     return f"{page}?{query}"
 
@@ -66,16 +102,24 @@ def get_deposit_activity_webapp_url(
     current_balance_usd: float,
     saved_date: str,
     current_profit_usd: float,
+    total_balance_usd: float,
+    tabung_balance_usd: float,
+    capital_usd: float,
+    weekly_performance_usd: float,
+    monthly_performance_usd: float,
 ) -> str:
     page = f"{_miniapp_base_url()}/deposit-activity.html"
-    query = urlencode(
-        {
-            "name": name,
-            "initial_capital_usd": f"{initial_capital_usd:.2f}",
-            "current_balance_usd": f"{current_balance_usd:.2f}",
-            "saved_date": saved_date,
-            "current_profit_usd": f"{current_profit_usd:.2f}",
-        }
+    query = _build_activity_query(
+        name=name,
+        initial_capital_usd=initial_capital_usd,
+        current_balance_usd=current_balance_usd,
+        saved_date=saved_date,
+        current_profit_usd=current_profit_usd,
+        total_balance_usd=total_balance_usd,
+        tabung_balance_usd=tabung_balance_usd,
+        capital_usd=capital_usd,
+        weekly_performance_usd=weekly_performance_usd,
+        monthly_performance_usd=monthly_performance_usd,
     )
     return f"{page}?{query}"
 
@@ -86,15 +130,23 @@ def get_trading_activity_webapp_url(
     current_balance_usd: float,
     saved_date: str,
     current_profit_usd: float,
+    total_balance_usd: float,
+    tabung_balance_usd: float,
+    capital_usd: float,
+    weekly_performance_usd: float,
+    monthly_performance_usd: float,
 ) -> str:
     page = f"{_miniapp_base_url()}/trading-activity.html"
-    query = urlencode(
-        {
-            "name": name,
-            "initial_capital_usd": f"{initial_capital_usd:.2f}",
-            "current_balance_usd": f"{current_balance_usd:.2f}",
-            "saved_date": saved_date,
-            "current_profit_usd": f"{current_profit_usd:.2f}",
-        }
+    query = _build_activity_query(
+        name=name,
+        initial_capital_usd=initial_capital_usd,
+        current_balance_usd=current_balance_usd,
+        saved_date=saved_date,
+        current_profit_usd=current_profit_usd,
+        total_balance_usd=total_balance_usd,
+        tabung_balance_usd=tabung_balance_usd,
+        capital_usd=capital_usd,
+        weekly_performance_usd=weekly_performance_usd,
+        monthly_performance_usd=monthly_performance_usd,
     )
     return f"{page}?{query}"

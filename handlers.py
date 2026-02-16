@@ -27,9 +27,14 @@ from settings import (
 )
 from storage import (
     can_reset_initial_capital,
+    get_capital_usd,
     get_current_balance_usd,
     get_current_profit_usd,
     get_initial_setup_summary,
+    get_monthly_performance_usd,
+    get_tabung_balance_usd,
+    get_total_balance_usd,
+    get_weekly_performance_usd,
     reset_all_data,
 )
 from texts import (
@@ -64,30 +69,28 @@ def _build_account_activity_keyboard_for_user(user_id: int):
     summary = get_initial_setup_summary(user_id)
     current_balance = get_current_balance_usd(user_id)
     current_profit = get_current_profit_usd(user_id)
+    total_balance = get_total_balance_usd(user_id)
+    tabung_balance = get_tabung_balance_usd(user_id)
+    capital = get_capital_usd(user_id)
+    weekly_performance = get_weekly_performance_usd(user_id)
+    monthly_performance = get_monthly_performance_usd(user_id)
 
-    deposit_url = get_deposit_activity_webapp_url(
-        name=summary["name"],
-        initial_capital_usd=summary["initial_capital_usd"],
-        current_balance_usd=current_balance,
-        saved_date=summary["saved_date"],
-        current_profit_usd=current_profit,
-    )
+    common_kwargs = {
+        "name": summary["name"],
+        "initial_capital_usd": summary["initial_capital_usd"],
+        "current_balance_usd": current_balance,
+        "saved_date": summary["saved_date"],
+        "current_profit_usd": current_profit,
+        "total_balance_usd": total_balance,
+        "tabung_balance_usd": tabung_balance,
+        "capital_usd": capital,
+        "weekly_performance_usd": weekly_performance,
+        "monthly_performance_usd": monthly_performance,
+    }
 
-    withdrawal_url = get_withdrawal_activity_webapp_url(
-        name=summary["name"],
-        initial_capital_usd=summary["initial_capital_usd"],
-        current_balance_usd=current_balance,
-        saved_date=summary["saved_date"],
-        current_profit_usd=current_profit,
-    )
-
-    trading_url = get_trading_activity_webapp_url(
-        name=summary["name"],
-        initial_capital_usd=summary["initial_capital_usd"],
-        current_balance_usd=current_balance,
-        saved_date=summary["saved_date"],
-        current_profit_usd=current_profit,
-    )
+    deposit_url = get_deposit_activity_webapp_url(**common_kwargs)
+    withdrawal_url = get_withdrawal_activity_webapp_url(**common_kwargs)
+    trading_url = get_trading_activity_webapp_url(**common_kwargs)
 
     return account_activity_keyboard(
         deposit_activity_url=deposit_url,

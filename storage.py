@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -71,6 +72,95 @@ def _extract_profit_from_obj(obj: Any) -> float:
     return 0.0
 
 
+def _sum_records(records: Any, field: str) -> float:
+    total = 0.0
+    if not isinstance(records, list):
+        return total
+    for item in records:
+        if not isinstance(item, dict):
+            continue
+        try:
+            total += float(item.get(field, 0))
+        except (TypeError, ValueError):
+            continue
+    return total
+
+
+def _get_user_sections(user_id: int) -> dict[str, Any]:
+    db = load_db()
+    user = db.get("users", {}).get(str(user_id), {})
+    return user.get("sections", {})
+
+
+def _get_trading_records(user_id: int) -> list[dict[str, Any]]:
+    sections = _get_user_sections(user_id)
+    trading_data = sections.get("trading_activity", {}).get("data")
+
+    if isinstance(trading_data, dict):
+        records = trading_data.get("records", [])
+        if isinstance(records, list):
+            return [r for r in records if isinstance(r, dict)]
+
+    if isinstance(trading_data, list):
+        return [r for r in trading_data if isinstance(r, dict)]
+
+    return []
+
+
+def _record_date_myt(record: dict[str, Any]) -> date | None:
+    tzinfo = malaysia_now().tzinfo
+
+    saved_at = record.get("saved_at")
+    if isinstance(saved_at, str):
+        try:
+            dt = datetime.fromisoformat(saved_at)
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=tzinfo)
+            else:
+                dt = dt.astimezone(tzinfo)
+            return dt.date()
+        except ValueError:
+            pass
+
+    saved_date = record.get("saved_date")
+    if isinstance(saved_date, str):
+        try:
+            return date.fromisoformat(saved_date)
+        except ValueError:
+            return None
+
+    return None
+
+
+def _record_net_usd(record: dict[str, Any]) -> float:
+    for key in ("net_usd", "pnl_usd", "profit_usd"):
+        try:
+            return float(record.get(key, 0))
+        except (TypeError, ValueError):
+            continue
+
+    mode = (record.get("mode") or "").lower()
+    try:
+        amount = float(record.get("amount_usd", 0))
+    except (TypeError, ValueError):
+        return 0.0
+
+    if mode == "loss":
+        return -abs(amount)
+    return abs(amount)
+
+
+def _sum_trading_net_between(user_id: int, start_date: date, end_date: date) -> float:
+    total = 0.0
+    for record in _get_trading_records(user_id):
+        rec_date = _record_date_myt(record)
+        if rec_date is None:
+            continue
+        if start_date <= rec_date <= end_date:
+            total += _record_net_usd(record)
+    return total
+
+
 def get_current_profit_usd(user_id: int) -> float:
     db = load_db()
     user = db.get("users", {}).get(str(user_id), {})
@@ -108,43 +198,98 @@ def get_current_profit_usd(user_id: int) -> float:
     return 0.0
 
 
-def _sum_records(records: Any, field: str) -> float:
-    total = 0.0
-    if not isinstance(records, list):
-        return total
-    for item in records:
-        if not isinstance(item, dict):
-            continue
-        try:
-            total += float(item.get(field, 0))
-        except (TypeError, ValueError):
-            continue
-    return total
-
-
 def get_total_withdrawal_usd(user_id: int) -> float:
-    db = load_db()
-    user = db.get("users", {}).get(str(user_id), {})
-    sections = user.get("sections", {})
+    sections = _get_user_sections(user_id)
     records = sections.get("withdrawal_activity", {}).get("data", {}).get("records", [])
     return _sum_records(records, "amount_usd")
 
 
 def get_total_deposit_usd(user_id: int) -> float:
-    db = load_db()
-    user = db.get("users", {}).get(str(user_id), {})
-    sections = user.get("sections", {})
+    sections = _get_user_sections(user_id)
     records = sections.get("deposit_activity", {}).get("data", {}).get("records", [])
     return _sum_records(records, "amount_usd")
 
 
-def get_current_balance_usd(user_id: int) -> float:
+def get_total_balance_usd(user_id: int) -> float:
     summary = get_initial_setup_summary(user_id)
-    initial_capital = float(summary.get("initial_capital_usd") or 0)
-    current_profit = get_current_profit_usd(user_id)
+    initial_balance = float(summary.get("initial_capital_usd") or 0)
     total_withdrawn = get_total_withdrawal_usd(user_id)
     total_deposited = get_total_deposit_usd(user_id)
-    return initial_capital + current_profit + total_deposited - total_withdrawn
+    return initial_balance + total_deposited - total_withdrawn
+
+
+def get_tabung_balance_usd(user_id: int) -> float:
+    sections = _get_user_sections(user_id)
+    tabung_data = sections.get("tabung", {}).get("data")
+
+    if isinstance(tabung_data, dict):
+        for key in ("balance_usd", "tabung_balance_usd", "current_balance_usd", "amount_usd"):
+            try:
+                return float(tabung_data.get(key, 0))
+            except (TypeError, ValueError):
+                continue
+
+        records = tabung_data.get("records")
+        if isinstance(records, list):
+            total = 0.0
+            for item in records:
+                if not isinstance(item, dict):
+                    continue
+                for key in ("net_usd", "amount_usd"):
+                    try:
+                        total += float(item.get(key, 0))
+                        break
+                    except (TypeError, ValueError):
+                        continue
+            return total
+
+    if isinstance(tabung_data, list):
+        return _sum_records(tabung_data, "amount_usd")
+
+    return 0.0
+
+
+def get_capital_usd(user_id: int) -> float:
+    return get_total_balance_usd(user_id) + get_tabung_balance_usd(user_id)
+
+
+def get_current_balance_usd(user_id: int) -> float:
+    total_balance = get_total_balance_usd(user_id)
+    current_profit = get_current_profit_usd(user_id)
+    return total_balance + current_profit
+
+
+def _month_range(reference_date: date) -> tuple[date, date]:
+    first_day = reference_date.replace(day=1)
+    next_month = (first_day.replace(day=28) + timedelta(days=4)).replace(day=1)
+    last_day = next_month - timedelta(days=1)
+    return first_day, last_day
+
+
+def _bounded_current_week(reference_date: date) -> tuple[date, date]:
+    sunday_offset = (reference_date.weekday() + 1) % 7
+    week_start = reference_date - timedelta(days=sunday_offset)
+    week_end = week_start + timedelta(days=6)
+
+    month_start, month_end = _month_range(reference_date)
+    if week_start < month_start:
+        week_start = month_start
+    if week_end > month_end:
+        week_end = month_end
+
+    return week_start, week_end
+
+
+def get_weekly_performance_usd(user_id: int) -> float:
+    today = malaysia_now().date()
+    start_date, end_date = _bounded_current_week(today)
+    return _sum_trading_net_between(user_id, start_date, end_date)
+
+
+def get_monthly_performance_usd(user_id: int) -> float:
+    today = malaysia_now().date()
+    month_start, month_end = _month_range(today)
+    return _sum_trading_net_between(user_id, month_start, month_end)
 
 
 def has_any_transactions(user_id: int) -> bool:
