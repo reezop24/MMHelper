@@ -5,9 +5,6 @@
     tg.expand();
   }
 
-  var CONTRACT_SIZE = 100;
-  var PIP_SIZE = 0.01;
-
   var params = new URLSearchParams(window.location.search);
   var name = params.get("name") || "-";
   var savedDate = params.get("saved_date") || "-";
@@ -32,18 +29,18 @@
   var leverageInput = document.getElementById("leverageInput");
   var priceInput = document.getElementById("priceInput");
 
-  var lineLeverage = document.getElementById("lineLeverage");
-  var linePrice = document.getElementById("linePrice");
+  var lineCurrentPriceLabel = document.getElementById("lineCurrentPriceLabel");
+  var lineLeverageLabel = document.getElementById("lineLeverageLabel");
   var lineMargin = document.getElementById("lineMargin");
-  var lineModal = document.getElementById("lineModal");
-  var lineRisk = document.getElementById("lineRisk");
-  var lineModal2 = document.getElementById("lineModal2");
-  var lineRisk2 = document.getElementById("lineRisk2");
+  var lineRiskXModal = document.getElementById("lineRiskXModal");
   var lineModalA = document.getElementById("lineModalA");
-  var lineModalA2 = document.getElementById("lineModalA2");
   var lineMargin2 = document.getElementById("lineMargin2");
-  var lineLotUnits = document.getElementById("lineLotUnits");
-  var lineLotFinal = document.getElementById("lineLotFinal");
+  var lineLotA = document.getElementById("lineLotA");
+  var lineLotB = document.getElementById("lineLotB");
+  var lineZonePips = document.getElementById("lineZonePips");
+  var lineZoneDivLotB = document.getElementById("lineZoneDivLotB");
+  var lineModalAFinal = document.getElementById("lineModalAFinal");
+  var lineLotC = document.getElementById("lineLotC");
 
   function toNum(value) {
     var num = Number((value || "").trim());
@@ -78,17 +75,17 @@
         price: price,
         marginPer001: 0,
         riskAmountUsd: 0,
-        lotUnits001: 0,
-        lotFinal: 0,
-        lossIfSlUsd: 0
+        lotA: 0,
+        lotB: 0,
+        lotC: 0
       };
     }
 
     var marginPer001 = price / leverage;
     var riskAmountUsd = balance * (riskPct / 100);
-    var lotUnits001 = marginPer001 > 0 ? riskAmountUsd / marginPer001 : 0;
-    var lotFinal = lotUnits001 * 0.01;
-    var lossIfSlUsd = CONTRACT_SIZE * lotFinal * (zonePips * PIP_SIZE);
+    var lotA = marginPer001 > 0 ? riskAmountUsd / marginPer001 : 0;
+    var lotB = lotA * 100;
+    var lotC = lotB > 0 ? zonePips / lotB : 0;
 
     return {
       valid: true,
@@ -99,29 +96,30 @@
       price: price,
       marginPer001: marginPer001,
       riskAmountUsd: riskAmountUsd,
-      lotUnits001: lotUnits001,
-      lotFinal: lotFinal,
-      lossIfSlUsd: lossIfSlUsd
+      lotA: lotA,
+      lotB: lotB,
+      lotC: lotC
     };
   }
 
   function render() {
     var calc = getCalc();
-    lineLeverage.textContent = Number.isFinite(calc.leverage) ? String(Math.round(calc.leverage)) : "0";
-    linePrice.textContent = Number.isFinite(calc.price) ? calc.price.toFixed(2) : "0.00";
+    lineCurrentPriceLabel.textContent = Number.isFinite(calc.price) ? "$" + calc.price.toFixed(2) : "current price";
+    lineLeverageLabel.textContent = Number.isFinite(calc.leverage) ? String(Math.round(calc.leverage)) : "leverage";
     lineMargin.textContent = calc.marginPer001.toFixed(4);
-
-    lineModal.textContent = Number.isFinite(calc.balance) ? calc.balance.toFixed(2) : "0.00";
-    lineRisk.textContent = Number.isFinite(calc.riskPct) ? calc.riskPct.toFixed(2) : "0.00";
-
-    lineModal2.textContent = lineModal.textContent;
-    lineRisk2.textContent = lineRisk.textContent;
+    lineRiskXModal.textContent = Number.isFinite(calc.riskPct) && Number.isFinite(calc.balance)
+      ? calc.riskPct.toFixed(2) + "% x USD " + calc.balance.toFixed(2) + " = USD " + calc.riskAmountUsd.toFixed(2)
+      : "RIsk X modal = Modal A";
     lineModalA.textContent = calc.riskAmountUsd.toFixed(2);
-    lineModalA2.textContent = calc.riskAmountUsd.toFixed(2);
-
     lineMargin2.textContent = calc.marginPer001.toFixed(4);
-    lineLotUnits.textContent = calc.lotUnits001.toFixed(2);
-    lineLotFinal.textContent = calc.lotFinal.toFixed(2);
+    lineLotA.textContent = "USD " + calc.riskAmountUsd.toFixed(2) + " ÷ " + calc.marginPer001.toFixed(4) + " = " + calc.lotA.toFixed(2);
+    lineLotB.textContent = calc.lotA.toFixed(2) + " x 100 = " + calc.lotB.toFixed(2);
+    lineZonePips.textContent = Number.isFinite(calc.zonePips) ? calc.zonePips.toFixed(1) : "zon yang user pilih";
+    lineZoneDivLotB.textContent = Number.isFinite(calc.zonePips)
+      ? calc.zonePips.toFixed(1) + " ÷ " + calc.lotB.toFixed(2) + " = " + calc.lotC.toFixed(4)
+      : "zon yang user pilih ÷ Lot B = lot C";
+    lineModalAFinal.textContent = "USD " + calc.riskAmountUsd.toFixed(2);
+    lineLotC.textContent = calc.lotC.toFixed(4);
 
     submitBtn.disabled = !calc.valid;
   }
@@ -156,9 +154,9 @@
       gold_price: calc.price,
       margin_per_001: calc.marginPer001,
       modal_a_usd: calc.riskAmountUsd,
-      lot_units_001: calc.lotUnits001,
-      lot_size: calc.lotFinal,
-      loss_if_sl_usd: calc.lossIfSlUsd
+      lot_a: calc.lotA,
+      lot_b: calc.lotB,
+      lot_c: calc.lotC
     };
 
     if (tg) {

@@ -755,9 +755,9 @@ async def _handle_risk_calculator_submit(payload: dict, update: Update, context:
         gold_price = float(payload.get("gold_price"))
         margin_per_001 = float(payload.get("margin_per_001"))
         modal_a_usd = float(payload.get("modal_a_usd"))
-        lot_units_001 = float(payload.get("lot_units_001"))
-        lot_size = float(payload.get("lot_size"))
-        loss_if_sl_usd = float(payload.get("loss_if_sl_usd"))
+        lot_a = float(payload.get("lot_a"))
+        lot_b = float(payload.get("lot_b"))
+        lot_c = float(payload.get("lot_c"))
     except (TypeError, ValueError):
         await send_screen(
             context,
@@ -767,7 +767,7 @@ async def _handle_risk_calculator_submit(payload: dict, update: Update, context:
         )
         return
 
-    if min(balance_usd, risk_pct, zone_pips, leverage, gold_price, margin_per_001, modal_a_usd, lot_units_001, lot_size, loss_if_sl_usd) <= 0:
+    if min(balance_usd, risk_pct, zone_pips, leverage, gold_price, margin_per_001, modal_a_usd, lot_a, lot_b, lot_c) <= 0:
         await send_screen(
             context,
             message.chat_id,
@@ -778,13 +778,15 @@ async def _handle_risk_calculator_submit(payload: dict, update: Update, context:
 
     summary_text = (
         "*Risk Calculator Result*\n\n"
-        "Jom kita kira\n"
-        f"Harga XAUUSD sekarang ${gold_price:.2f} , bahagi dengan leverage kau {int(leverage)} = *{margin_per_001:.4f}*\n"
-        "_ini margin kau untuk setiap 0.01 lot_\n\n"
-        f"Sekarang modal kau *USD {balance_usd:.2f}*, risk kau pulak *{risk_pct:.2f}%*.\n"
-        f"Maknanya kau cuma ambil risiko *USD {balance_usd:.2f} x {risk_pct:.2f}% = USD {modal_a_usd:.2f}* untuk setup ni.\n\n"
-        f"Jadi *USD {modal_a_usd:.2f} ÷ {margin_per_001:.4f} = {lot_units_001:.2f}* unit 0.01 lot.\n"
-        f"*Lot size boleh buka: {lot_size:.2f} lot*"
+        "Jom kita kira, mula mula cari margin dulu. "
+        f"\"${gold_price:.2f}\" (Harga XAUUSD sekarang) ÷ \"{int(leverage)}\" (leverage kau) = \"{margin_per_001:.4f}\" "
+        "<--- ini margin yang diperlukan untuk buka lot 0.01\n\n"
+        f"Sekarang kau ambil risiko (risk percentage) dari (modal user) bersamaan \"{risk_pct:.2f}% x USD {balance_usd:.2f} = USD {modal_a_usd:.2f}\"\n\n"
+        f"Jadi dengan modal bersih \"USD {modal_a_usd:.2f}\" dibahagikan dengan \"{margin_per_001:.4f}\" (margin kau) , "
+        f"kau boleh buka \"USD {modal_a_usd:.2f} ÷ {margin_per_001:.4f} = {lot_a:.2f}\" kemudian darab dengan 100 maka kau boleh buka \"{lot_a:.2f} x 100 = {lot_b:.2f}\"\n\n"
+        f"Tapi tu baru boleh buka , bukan boleh floating.. zon kau \"{zone_pips:.1f}\" pips\n\n"
+        f"Jadi \"{zone_pips:.1f} ÷ {lot_b:.2f} = {lot_c:.4f}\"\n\n"
+        f"Jadi lot yang kau boleh buka dengan risiko sebenar \"USD {modal_a_usd:.2f}\" adalah \"{lot_c:.4f}\" lot"
     )
     await send_screen(
         context,

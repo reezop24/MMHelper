@@ -178,13 +178,12 @@
 
       <div class="result-card">
         <p class="result-title">Live Result</p>
-        <p class="result-line"><strong>Jom kita kira</strong></p>
-        <p class="result-line">Harga XAUUSD sekarang <span class="result-value">$<span id="linePrice">0.00</span></span> , bahagi dengan leverage kau <span id="lineLeverage" class="result-value">0</span> = <span id="lineMargin" class="result-value">0.0000</span></p>
-        <p class="result-line result-note">ini margin kau untuk setiap 0.01 lot</p>
-        <p class="result-line">sekarang modal kau <span class="result-value">USD <span id="lineModal">0.00</span></span>, risk kau pulak <span class="result-value"><span id="lineRisk">0.00</span>%</span></p>
-        <p class="result-line">maknanya kau cuma ambil risiko <span class="result-value">USD <span id="lineModal2">0.00</span> x <span id="lineRisk2">0.00</span>% = USD <span id="lineModalA">0.00</span></span> untuk setup ni</p>
-        <p class="result-line">jadi <span class="result-value">USD <span id="lineModalA2">0.00</span> ÷ <span id="lineMargin2">0.0000</span> = <span id="lineLotUnits">0.00</span></span> unit 0.01 lot</p>
-        <p class="result-line"><strong>Lot size boleh buka: <span class="result-value"><span id="lineLotFinal">0.00</span> lot</span></strong></p>
+        <p class="result-line">Jom kita kira, mula mula cari margin dulu. "<span id="lineCurrentPriceLabel" class="result-value">current price</span>" (Harga XAUUSD sekarang) ÷ "<span id="lineLeverageLabel" class="result-value">leverage</span>" (leverage kau) = "<span id="lineMargin" class="result-value">margin</span>" <span class="result-note">&lt;--- ini margin yang diperlukan untuk buka lot 0.01</span></p>
+        <p class="result-line">Sekarang kau ambil risiko (risk percentage) dari (modal user) bersamaan "<span id="lineRiskXModal" class="result-value">RIsk X modal = Modal A</span>"</p>
+        <p class="result-line">Jadi dengan modal bersih "<span id="lineModalA" class="result-value">Modal A</span>" dibahagikan dengan "<span id="lineMargin2" class="result-value">margin</span>" (margin kau) , kau boleh buka "<span id="lineLotA" class="result-value">Modal A ÷ Margin = Lot A</span>" kemudian darab dengan 100 maka kau boleh buka "<span id="lineLotB" class="result-value">lot A x 100 = Lot B</span>"</p>
+        <p class="result-line">Tapi tu baru boleh buka , bukan boleh floating.. zon kau "<span id="lineZonePips" class="result-value">zon yang user pilih</span>" pips</p>
+        <p class="result-line">Jadi "<span id="lineZoneDivLotB" class="result-value">zon yang user pilih ÷ Lot B = lot C</span>"</p>
+        <p class="result-line">Jadi lot yang kau boleh buka dengan risiko sebenar "<span id="lineModalAFinal" class="result-value">modal A</span>" adalah "<span id="lineLotC" class="result-value">lot C</span>" lot</p>
       </div>
 
       <button id="submitBtn" type="submit" class="submit-btn" disabled>✅ Simpan Result</button>
