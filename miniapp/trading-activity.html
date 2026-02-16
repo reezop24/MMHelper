@@ -38,38 +38,34 @@
       align-items: center;
       gap: 0;
       margin: 0 0 14px;
-      overflow: hidden;
-      border-radius: 10px;
+      overflow: visible;
     }
 
     .step-pill {
       flex: 1;
       border: 1px solid #2b4c84;
       background: rgba(9, 30, 63, 0.78);
-      border-radius: 0;
       text-align: center;
-      padding: 8px 14px;
+      padding: 9px 14px;
       font-size: 12px;
       color: #b8cdf1;
       position: relative;
+      clip-path: polygon(0 0, calc(100% - 13px) 0, 100% 50%, calc(100% - 13px) 100%, 0 100%);
     }
 
-    .step-pill:not(:last-child) {
-      margin-right: 2px;
+    .step-pill + .step-pill {
+      margin-left: -10px;
     }
 
-    .step-pill:not(:last-child)::after {
-      content: "";
-      position: absolute;
-      top: -1px;
-      right: -12px;
-      width: 0;
-      height: 0;
-      border-top: 17px solid transparent;
-      border-bottom: 17px solid transparent;
-      border-left: 12px solid rgba(9, 30, 63, 0.9);
-      z-index: 1;
-      pointer-events: none;
+    #stepMode {
+      clip-path: polygon(0 0, calc(100% - 13px) 0, 100% 50%, calc(100% - 13px) 100%, 0 100%);
+      border-top-left-radius: 10px;
+      border-bottom-left-radius: 10px;
+    }
+
+    #stepAmount,
+    #stepReview {
+      clip-path: polygon(12px 0, calc(100% - 13px) 0, 100% 50%, calc(100% - 13px) 100%, 12px 100%, 0 50%);
     }
 
     .step-pill.active {
@@ -78,10 +74,7 @@
       color: #ffffff;
       font-weight: 700;
       box-shadow: 0 0 0 1px rgba(127, 179, 255, 0.25) inset;
-    }
-
-    .step-pill.active:not(:last-child)::after {
-      border-left-color: rgba(23, 59, 114, 0.95);
+      z-index: 2;
     }
 
     .mode-grid {
@@ -217,11 +210,11 @@
       }
 
       .flow-steps {
-        border-radius: 9px;
+        overflow-x: auto;
       }
 
       .step-pill {
-        min-width: 0;
+        min-width: 118px;
         padding: 8px 6px;
         font-size: 11px;
       }
