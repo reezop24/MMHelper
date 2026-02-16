@@ -7,8 +7,14 @@ import json
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from menu import main_menu_keyboard, project_grow_keyboard
-from settings import get_project_grow_mission_webapp_url, get_set_new_goal_webapp_url
+from menu import account_activity_keyboard, main_menu_keyboard, project_grow_keyboard
+from settings import (
+    get_deposit_activity_webapp_url,
+    get_project_grow_mission_webapp_url,
+    get_set_new_goal_webapp_url,
+    get_trading_activity_webapp_url,
+    get_withdrawal_activity_webapp_url,
+)
 from storage import (
     add_deposit_activity,
     add_trading_activity_update,
@@ -26,12 +32,16 @@ from storage import (
     get_project_grow_mission_status_text,
     get_tabung_balance_usd,
     get_tabung_start_date,
+    get_total_balance_usd,
+    get_weekly_performance_usd,
+    get_monthly_performance_usd,
     reset_project_grow_goal,
     reset_project_grow_mission,
     save_user_setup_section,
     start_project_grow_mission,
 )
 from texts import (
+    ACCOUNT_ACTIVITY_OPENED_TEXT,
     DEPOSIT_ACTIVITY_SAVED_TEXT,
     INITIAL_CAPITAL_RESET_SUCCESS_TEXT,
     PROJECT_GROW_OPENED_TEXT,
@@ -89,6 +99,41 @@ def _build_project_grow_keyboard_for_user(user_id: int):
         set_new_goal_url=set_new_goal_url,
         mission_url=mission_url,
         can_open_mission=can_open_project_grow_mission(user_id),
+    )
+
+
+def _build_account_activity_keyboard_for_user(user_id: int):
+    summary = get_initial_setup_summary(user_id)
+    current_balance = get_current_balance_usd(user_id)
+    current_profit = get_current_profit_usd(user_id)
+    total_balance = get_total_balance_usd(user_id)
+    tabung_balance = get_tabung_balance_usd(user_id)
+    capital = get_capital_usd(user_id)
+    weekly_performance = get_weekly_performance_usd(user_id)
+    monthly_performance = get_monthly_performance_usd(user_id)
+
+    common_kwargs = {
+        "name": summary["name"],
+        "initial_capital_usd": summary["initial_capital_usd"],
+        "current_balance_usd": current_balance,
+        "saved_date": summary["saved_date"],
+        "tabung_start_date": get_tabung_start_date(user_id),
+        "current_profit_usd": current_profit,
+        "total_balance_usd": total_balance,
+        "tabung_balance_usd": tabung_balance,
+        "capital_usd": capital,
+        "weekly_performance_usd": weekly_performance,
+        "monthly_performance_usd": monthly_performance,
+    }
+
+    deposit_url = get_deposit_activity_webapp_url(**common_kwargs)
+    withdrawal_url = get_withdrawal_activity_webapp_url(**common_kwargs)
+    trading_url = get_trading_activity_webapp_url(**common_kwargs)
+
+    return account_activity_keyboard(
+        deposit_activity_url=deposit_url,
+        withdrawal_activity_url=withdrawal_url,
+        trading_activity_url=trading_url,
     )
 
 
@@ -449,6 +494,21 @@ async def _handle_project_grow_back_to_menu(update: Update, context: ContextType
     )
 
 
+async def _handle_account_activity_back_to_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    user = update.effective_user
+    if not user:
+        return
+
+    await send_screen(
+        context,
+        message.chat_id,
+        ACCOUNT_ACTIVITY_OPENED_TEXT,
+        reply_markup=_build_account_activity_keyboard_for_user(user.id),
+        parse_mode="Markdown",
+    )
+
+
 async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     if not message or not message.web_app_data:
@@ -499,6 +559,10 @@ async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if payload_type == "project_grow_back_to_menu":
         await _handle_project_grow_back_to_menu(update, context)
+        return
+
+    if payload_type == "account_activity_back_to_menu":
+        await _handle_account_activity_back_to_menu(update, context)
         return
 
     await send_screen(

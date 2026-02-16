@@ -48,6 +48,27 @@
       font-size: 15px;
     }
 
+    .form-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .back-btn {
+      margin: 0;
+      width: auto;
+      min-width: 180px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid #496ea9;
+      background: rgba(12, 34, 71, 0.9);
+      color: #e7f0ff;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
     @media (max-width: 640px) {
       .summary {
         gap: 6px;
@@ -57,6 +78,11 @@
       .summary-item {
         font-size: 12.5px;
         line-height: 1.25;
+      }
+
+      .form-actions {
+        flex-direction: column;
+        align-items: stretch;
       }
     }
   </style>
@@ -78,6 +104,7 @@
       <div class="summary-item"><strong>Weekly Performance:</strong> <span id="summaryWeeklyPerformance">USD 0.00</span></div>
       <div class="summary-item"><strong>Monthly Performance:</strong> <span id="summaryMonthlyPerformance">USD 0.00</span></div>
       <div class="summary-item"><strong>Tarikh mula:</strong> <span id="summaryDate">-</span></div>
+      <div class="summary-item"><strong>Tarikh mula tabung:</strong> <span id="summaryTabungStartDate">-</span></div>
     </section>
 
     <form id="withdrawalForm" class="card">
@@ -109,6 +136,9 @@
 
       <p id="finalPrompt" class="prompt"></p>
       <button id="submitBtn" type="submit">✅ Submit</button>
+      <div class="form-actions">
+        <button id="backToAccountBtn" type="button" class="back-btn">⬅️ Back to Account Activity</button>
+      </div>
       <p id="formStatus" class="status" aria-live="polite"></p>
     </form>
   </main>

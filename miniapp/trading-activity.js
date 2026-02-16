@@ -38,6 +38,7 @@
   var initialCapital = Number(params.get("initial_capital_usd") || 0);
   var currentBalance = Number(params.get("current_balance_usd") || 0);
   var savedDate = params.get("saved_date") || "-";
+  var tabungStartDate = params.get("tabung_start_date") || "-";
   var totalBalance = Number(params.get("total_balance_usd") || 0);
   var tabungBalance = Number(params.get("tabung_balance_usd") || 0);
   var capital = Number(params.get("capital_usd") || 0);
@@ -53,6 +54,7 @@
   document.getElementById("summaryWeeklyPerformance").textContent = formatPnl(weeklyPerformance);
   document.getElementById("summaryMonthlyPerformance").textContent = formatPnl(monthlyPerformance);
   document.getElementById("summaryDate").textContent = savedDate;
+  document.getElementById("summaryTabungStartDate").textContent = tabungStartDate;
 
   var introText = document.getElementById("introText");
   var modePrompt = document.getElementById("modePrompt");
@@ -81,8 +83,22 @@
   var form = document.getElementById("tradingForm");
   var submitBtn = document.getElementById("submitBtn");
   var statusEl = document.getElementById("formStatus");
+  var backToAccountBtn = document.getElementById("backToAccountBtn");
 
   var selectedMode = "";
+
+  backToAccountBtn.textContent = content.accountActivityBackBtn || "⬅️ Back to Account Activity";
+  backToAccountBtn.addEventListener("click", function () {
+    var payload = { type: "account_activity_back_to_menu" };
+
+    if (tg) {
+      tg.sendData(JSON.stringify(payload));
+      tg.close();
+      return;
+    }
+
+    statusEl.textContent = "Preview mode: buka dari Telegram untuk kembali ke Account Activity.";
+  });
 
   function updateStepState(amount) {
     stepMode.classList.add("active");

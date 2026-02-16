@@ -11,6 +11,7 @@ from menu import (
     MAIN_MENU_BUTTON_PROJECT_GROW,
     MAIN_MENU_BUTTON_RISK,
     MAIN_MENU_BUTTON_STATISTIC,
+    SUBMENU_ACCOUNT_BUTTON_SUMMARY,
     SUBMENU_ACCOUNT_BUTTON_TABUNG,
     SUBMENU_MM_BUTTON_BACK_MAIN,
     SUBMENU_MM_BUTTON_CORRECTION,
@@ -97,6 +98,7 @@ def _build_account_activity_keyboard_for_user(user_id: int):
         "initial_capital_usd": summary["initial_capital_usd"],
         "current_balance_usd": current_balance,
         "saved_date": summary["saved_date"],
+        "tabung_start_date": get_tabung_start_date(user_id),
         "current_profit_usd": current_profit,
         "total_balance_usd": total_balance,
         "tabung_balance_usd": tabung_balance,
@@ -114,6 +116,60 @@ def _build_account_activity_keyboard_for_user(user_id: int):
         withdrawal_activity_url=withdrawal_url,
         trading_activity_url=trading_url,
     )
+
+
+def _build_account_summary_text(user_id: int) -> str:
+    summary = get_initial_setup_summary(user_id)
+    current_balance = get_current_balance_usd(user_id)
+    current_profit = get_current_profit_usd(user_id)
+    total_balance = get_total_balance_usd(user_id)
+    tabung_balance = get_tabung_balance_usd(user_id)
+    capital = get_capital_usd(user_id)
+    weekly = get_weekly_performance_usd(user_id)
+    monthly = get_monthly_performance_usd(user_id)
+    tabung_start = get_tabung_start_date(user_id)
+
+    goal = get_project_grow_goal_summary(user_id)
+    mission_status = get_project_grow_mission_status_text(user_id)
+    target_capital = float(goal.get("target_balance_usd") or 0)
+    grow_target = max(target_capital - current_balance, 0.0)
+    target_label = goal.get("target_label") or "-"
+
+    def _usd(v: float) -> str:
+        return f"{v:.2f}"
+
+    lines = [
+        "*Account Summary*",
+        "",
+        "*Account*",
+        f"- Nama: {summary['name']}",
+        f"- Tarikh mula akaun: {summary['saved_date']}",
+        f"- Tarikh mula tabung: {tabung_start}",
+        f"- Initial Balance: USD {_usd(summary['initial_capital_usd'])}",
+        f"- Current Balance: USD {_usd(current_balance)}",
+        f"- Current Profit: USD {_usd(current_profit)}",
+        f"- Total Balance: USD {_usd(total_balance)}",
+        f"- Tabung Balance: USD {_usd(tabung_balance)}",
+        f"- Capital: USD {_usd(capital)}",
+        f"- Weekly Performance: USD {_usd(weekly)}",
+        f"- Monthly Performance: USD {_usd(monthly)}",
+        "",
+        "*Project Grow*",
+        f"- Mission Status: {mission_status}",
+    ]
+
+    if target_capital > 0:
+        lines.extend(
+            [
+                f"- Target Capital: USD {_usd(target_capital)}",
+                f"- Grow Target: USD {_usd(grow_target)}",
+                f"- Tempoh Target: {target_label}",
+            ]
+        )
+    else:
+        lines.append("- Target Capital: belum diset")
+
+    return "\n".join(lines)
 
 
 def _build_project_grow_keyboard_for_user(user_id: int):
@@ -274,6 +330,16 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
         return
 
+    if text == SUBMENU_ACCOUNT_BUTTON_SUMMARY:
+        await send_screen(
+            context,
+            message.chat_id,
+            _build_account_summary_text(user.id),
+            reply_markup=_build_account_activity_keyboard_for_user(user.id),
+            parse_mode="Markdown",
+        )
+        return
+
     if text == SUBMENU_PROJECT_BUTTON_SET_NEW_GOAL:
         await send_screen(
             context,
@@ -298,7 +364,7 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
         await send_screen(
             context,
             message.chat_id,
-            "Mission masih locked. Syarat: kena ada Set New Goal dan balance tabung minimum USD 10.",
+            "Mission masih locked. Set New Goal dulu, lepas tu pastikan balance tabung minimum USD 10.",
             reply_markup=_build_project_grow_keyboard_for_user(user.id),
         )
         return

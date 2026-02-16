@@ -52,6 +52,7 @@ window.MMHELPER_CONTENT = {
   depositReasonPrompt: "pilih sebab apa kau deposit . aku simpan dalam rekod",
   depositAmountPrompt: "Masukkan jumlah yang kau deposit. check betul-betul sebab tak boleh ubah",
   depositFinalPrompt: "Cek semua kalau dah betul , tekan submit",
+  accountActivityBackBtn: "⬅️ Back to Account Activity",
 
   tradingIntro: [
     "Kita buat cepat tapi tepat.",
@@ -121,7 +122,7 @@ window.MMHELPER_CONTENT = {
   setNewGoalConfiguredTitle: "Target Capital dah diset ✅",
   setNewGoalConfiguredHint: "Kalau nak tukar setup, reset dulu kemudian set semula.",
 
-  missionLockedText: "Mission boleh dibuka bila goal dah set dan balance tabung minimum USD 10.",
+  missionLockedText: "Mission belum boleh dibuka. Set New Goal dulu, kemudian pastikan balance tabung minimum USD 10.",
   missionBeforeStartIntro: [
     "Project Grow datang sekali dengan Mission.",
     "Kau kena maintain prestasi dan disiplin untuk complete mission satu per satu.",

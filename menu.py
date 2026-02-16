@@ -19,6 +19,7 @@ SUBMENU_ACCOUNT_BUTTON_DEPOSIT_ACTIVITY = "💵 Update Deposit Activitiy"
 SUBMENU_ACCOUNT_BUTTON_WITHDRAWAL_ACTIVITY = "💸 Update Withdrawal Activity"
 SUBMENU_ACCOUNT_BUTTON_TRADING_ACTIVITY = "📉 Update Trading Activity"
 SUBMENU_ACCOUNT_BUTTON_TABUNG = "🏦 Update Tabung"
+SUBMENU_ACCOUNT_BUTTON_SUMMARY = "🧾 Account Summary"
 
 SUBMENU_PROJECT_BUTTON_SET_NEW_GOAL = "🎯 Set New Goal"
 SUBMENU_PROJECT_BUTTON_MISSION = "🧭 Mission"
@@ -58,6 +59,7 @@ def account_activity_keyboard(
     trading_activity_url: str,
 ) -> ReplyKeyboardMarkup:
     rows = [
+        [SUBMENU_ACCOUNT_BUTTON_SUMMARY],
         [
             KeyboardButton(
                 SUBMENU_ACCOUNT_BUTTON_DEPOSIT_ACTIVITY,
