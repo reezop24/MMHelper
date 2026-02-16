@@ -108,5 +108,45 @@ window.MMHELPER_CONTENT = {
   setNewGoalMinTargetPrefix: "Minimum target yang dibenarkan",
   setNewGoalTargetPrompt: "Target masa untuk capai sasaran",
   setNewGoalUnlockPrompt: "Unlock Mission & Tabung (minimum USD 10)",
-  setNewGoalFinalPrompt: "Bila dah yakin, submit. Lepas ni kita sambung flow mission."
+  setNewGoalFinalPrompt: "Bila dah yakin, submit. Lepas ni kita sambung flow mission.",
+
+  missionLockedText: "Mission boleh dibuka bila goal dah set dan balance tabung minimum USD 10.",
+  missionBeforeStartIntro: [
+    "Project Grow datang sekali dengan Mission.",
+    "Kau kena maintain prestasi dan disiplin untuk complete mission satu per satu.",
+    "",
+    "Pilih mode dulu, lepas tu start mission."
+  ].join("\\n"),
+  missionRunningIntro: "Mission tengah berjalan. Fokus maintain consistency sampai complete.",
+
+  missionNormalLabel: "Normal Mode",
+  missionAdvancedLabel: "Advanced Mode",
+  missionStartNormalBtn: "🚀 Start Mission (Normal)",
+  missionStartAdvancedBtn: "🚀 Start Mission (Advanced)",
+  missionRunningBadge: "Mission Active",
+
+  missionLevel1Title: "Level 1",
+  missionLevel2Title: "Level 2 (Akan Datang)",
+  missionLevel3Title: "Level 3 (Akan Datang)",
+
+  missionLevel1Items: [
+    {
+      title: "Mission 1 : Honest Log",
+      desc: "User wajib kemaskini aktiviti dalam MM Helper selama 14 hari berturut termasuk hari tiada trade. Kalau ada hari tak update, kira gagal."
+    },
+    {
+      title: "Mission 2 : Honest Grow",
+      desc: "User wajib kemaskini aktiviti trading setiap hari minimum 14 hari berturut termasuk hari tiada trade dan wajib ada transaksi tabung minimum 2 kali dalam tempoh ni."
+    },
+    {
+      title: "Mission 3 : Respect Max Loss",
+      desc: "Tak langgar daily max loss limit selama 30 hari berturut. Daily max loss ikut nilai yang user isi masa Initial Setup."
+    },
+    {
+      title: "Mission 4 : Double UP",
+      desc: "Capai ROI 100% dari grow target yang user pilih masa Set New Goal."
+    }
+  ],
+
+  missionLevelComingSoonText: "Bahagian ni kita lock dulu. Nanti kita buka lepas Level 1 settle."
 };

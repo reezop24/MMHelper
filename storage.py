@@ -325,6 +325,154 @@ def can_reset_initial_capital(user_id: int) -> bool:
     return not has_any_transactions(user_id)
 
 
+def has_project_grow_goal(user_id: int) -> bool:
+    sections = _get_user_sections(user_id)
+    goal_data = sections.get("project_grow_goal", {}).get("data", {})
+    try:
+        return float(goal_data.get("target_balance_usd") or 0) > 0
+    except (TypeError, ValueError):
+        return False
+
+
+def get_project_grow_goal_summary(user_id: int) -> dict[str, Any]:
+    sections = _get_user_sections(user_id)
+    goal_data = sections.get("project_grow_goal", {}).get("data", {})
+
+    def _to_float(value: Any) -> float:
+        try:
+            return float(value or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    return {
+        "target_balance_usd": _to_float(goal_data.get("target_balance_usd")),
+        "unlock_amount_usd": _to_float(goal_data.get("unlock_amount_usd")),
+        "minimum_target_usd": _to_float(goal_data.get("minimum_target_usd")),
+        "current_balance_usd": _to_float(goal_data.get("current_balance_usd")),
+        "target_days": int(goal_data.get("target_days") or 0) if str(goal_data.get("target_days") or "").isdigit() else 0,
+        "target_label": str(goal_data.get("target_label") or ""),
+    }
+
+
+def can_open_project_grow_mission(user_id: int) -> bool:
+    return has_project_grow_goal(user_id) and get_tabung_balance_usd(user_id) >= 10
+
+
+def get_project_grow_mission_state(user_id: int) -> dict[str, Any]:
+    sections = _get_user_sections(user_id)
+    mission_data = sections.get("project_grow_mission", {}).get("data", {})
+    mode = str(mission_data.get("mode") or "")
+    active = bool(mission_data.get("active")) and mode in {"normal", "advanced"}
+
+    return {
+        "active": active,
+        "mode": mode if active else "",
+        "started_at": str(mission_data.get("started_at") or ""),
+        "started_date": str(mission_data.get("started_date") or ""),
+    }
+
+
+def apply_project_grow_unlock_to_tabung(user_id: int, unlock_amount_usd: float) -> bool:
+    if unlock_amount_usd < 10:
+        return False
+
+    db = load_db()
+    user = db.get("users", {}).get(str(user_id))
+    if not user:
+        return False
+
+    now = malaysia_now()
+    saved_at_iso = now.isoformat()
+    saved_date = now.strftime("%Y-%m-%d")
+    saved_time = now.strftime("%H:%M:%S")
+
+    sections = user.setdefault("sections", {})
+    tabung_section = sections.setdefault(
+        "tabung",
+        {
+            "section": "tabung",
+            "user_id": user_id,
+            "telegram_name": user.get("telegram_name") or str(user_id),
+            "saved_at": saved_at_iso,
+            "saved_date": saved_date,
+            "saved_time": saved_time,
+            "timezone": "Asia/Kuala_Lumpur",
+            "data": {"balance_usd": 0.0, "records": []},
+        },
+    )
+
+    tabung_data = tabung_section.setdefault("data", {})
+    records = tabung_data.setdefault("records", [])
+    current_balance = 0.0
+    for key in ("balance_usd", "tabung_balance_usd", "current_balance_usd", "amount_usd"):
+        try:
+            current_balance = float(tabung_data.get(key, 0))
+            break
+        except (TypeError, ValueError):
+            continue
+    new_balance = max(current_balance, float(unlock_amount_usd))
+
+    tabung_data["balance_usd"] = new_balance
+    records.append(
+        {
+            "mode": "project_grow_unlock",
+            "amount_usd": float(unlock_amount_usd),
+            "balance_after_usd": new_balance,
+            "saved_at": saved_at_iso,
+            "saved_date": saved_date,
+            "saved_time": saved_time,
+            "timezone": "Asia/Kuala_Lumpur",
+        }
+    )
+
+    tabung_section["saved_at"] = saved_at_iso
+    tabung_section["saved_date"] = saved_date
+    tabung_section["saved_time"] = saved_time
+    tabung_section["timezone"] = "Asia/Kuala_Lumpur"
+    user["updated_at"] = saved_at_iso
+    save_db(db)
+    return True
+
+
+def start_project_grow_mission(user_id: int, mode: str) -> bool:
+    mode = (mode or "").strip().lower()
+    if mode not in {"normal", "advanced"}:
+        return False
+    if not can_open_project_grow_mission(user_id):
+        return False
+
+    db = load_db()
+    user = db.get("users", {}).get(str(user_id))
+    if not user:
+        return False
+
+    now = malaysia_now()
+    saved_at_iso = now.isoformat()
+    saved_date = now.strftime("%Y-%m-%d")
+    saved_time = now.strftime("%H:%M:%S")
+
+    sections = user.setdefault("sections", {})
+    sections["project_grow_mission"] = {
+        "section": "project_grow_mission",
+        "user_id": user_id,
+        "telegram_name": user.get("telegram_name") or str(user_id),
+        "saved_at": saved_at_iso,
+        "saved_date": saved_date,
+        "saved_time": saved_time,
+        "timezone": "Asia/Kuala_Lumpur",
+        "data": {
+            "active": True,
+            "mode": mode,
+            "started_at": saved_at_iso,
+            "started_date": saved_date,
+        },
+    }
+
+    user["updated_at"] = saved_at_iso
+    save_db(db)
+    return True
+
+
 def reset_all_data() -> None:
     save_db(_default_db())
 

@@ -22,6 +22,7 @@ SUBMENU_ACCOUNT_BUTTON_TABUNG = "🏦 Update Tabung"
 
 SUBMENU_PROJECT_BUTTON_SET_NEW_GOAL = "🎯 Set New Goal"
 SUBMENU_PROJECT_BUTTON_MISSION = "🧭 Mission"
+SUBMENU_PROJECT_BUTTON_MISSION_LOCKED = "🔒 Mission"
 SUBMENU_PROJECT_BUTTON_TABUNG_PROGRESS = "🏦 Tabung Progress"
 SUBMENU_PROJECT_BUTTON_ACHIEVEMENT = "🏆 Achievement"
 
@@ -81,14 +82,27 @@ def account_activity_keyboard(
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
 
-def project_grow_keyboard(set_new_goal_url: str) -> ReplyKeyboardMarkup:
+def project_grow_keyboard(
+    set_new_goal_url: str,
+    mission_url: str,
+    can_open_mission: bool,
+) -> ReplyKeyboardMarkup:
+    mission_button: KeyboardButton | str
+    if can_open_mission:
+        mission_button = KeyboardButton(
+            SUBMENU_PROJECT_BUTTON_MISSION,
+            web_app=WebAppInfo(url=mission_url),
+        )
+    else:
+        mission_button = SUBMENU_PROJECT_BUTTON_MISSION_LOCKED
+
     rows = [
         [
             KeyboardButton(
                 SUBMENU_PROJECT_BUTTON_SET_NEW_GOAL,
                 web_app=WebAppInfo(url=set_new_goal_url),
             ),
-            SUBMENU_PROJECT_BUTTON_MISSION,
+            mission_button,
         ],
         [SUBMENU_PROJECT_BUTTON_TABUNG_PROGRESS, SUBMENU_PROJECT_BUTTON_ACHIEVEMENT],
         [SUBMENU_MM_BUTTON_BACK_MAIN],

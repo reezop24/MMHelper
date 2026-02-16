@@ -12,15 +12,19 @@ from storage import (
     add_deposit_activity,
     add_trading_activity_update,
     add_withdrawal_activity,
+    apply_project_grow_unlock_to_tabung,
     apply_initial_capital_reset,
+    can_open_project_grow_mission,
     can_reset_initial_capital,
     get_current_balance_usd,
     get_current_profit_usd,
     save_user_setup_section,
+    start_project_grow_mission,
 )
 from texts import (
     DEPOSIT_ACTIVITY_SAVED_TEXT,
     INITIAL_CAPITAL_RESET_SUCCESS_TEXT,
+    MISSION_STARTED_TEXT,
     SET_NEW_GOAL_SAVED_TEXT,
     SETUP_SAVED_TEXT,
     TRADING_ACTIVITY_SAVED_TEXT,
@@ -233,7 +237,7 @@ async def _handle_set_new_goal(payload: dict, update: Update, context: ContextTy
     target_days_raw = str(payload.get("target_days") or "").strip()
     target_label = (payload.get("target_label") or "").strip()
 
-    if target_days_raw not in {"14", "30"}:
+    if target_days_raw not in {"30", "90", "180"}:
         await send_screen(context, message.chat_id, "❌ Tempoh target tak sah.")
         return
 
@@ -259,7 +263,12 @@ async def _handle_set_new_goal(payload: dict, update: Update, context: ContextTy
 
     target_days = int(target_days_raw)
     if not target_label:
-        target_label = f"{target_days} hari"
+        if target_days == 90:
+            target_label = "3 bulan"
+        elif target_days == 180:
+            target_label = "6 bulan"
+        else:
+            target_label = "30 hari"
 
     telegram_name = (user.full_name or "").strip() or str(user.id)
     save_user_setup_section(
@@ -275,11 +284,42 @@ async def _handle_set_new_goal(payload: dict, update: Update, context: ContextTy
             "target_label": target_label,
         },
     )
+    apply_project_grow_unlock_to_tabung(user.id, unlock_amount_usd)
 
     await send_screen(
         context,
         message.chat_id,
         SET_NEW_GOAL_SAVED_TEXT,
+        reply_markup=main_menu_keyboard(),
+        parse_mode="Markdown",
+    )
+
+
+async def _handle_project_grow_mission_start(payload: dict, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    user = update.effective_user
+    if not user:
+        return
+
+    if not can_open_project_grow_mission(user.id):
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Mission tak boleh start lagi. Pastikan goal dah set dan tabung minimum USD 10.",
+            reply_markup=main_menu_keyboard(),
+        )
+        return
+
+    mode = (payload.get("mode") or "").strip().lower()
+    ok = start_project_grow_mission(user.id, mode)
+    if not ok:
+        await send_screen(context, message.chat_id, "❌ Mission gagal diaktifkan. Cuba lagi.")
+        return
+
+    await send_screen(
+        context,
+        message.chat_id,
+        MISSION_STARTED_TEXT,
         reply_markup=main_menu_keyboard(),
         parse_mode="Markdown",
     )
@@ -319,6 +359,10 @@ async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if payload_type == "set_new_goal":
         await _handle_set_new_goal(payload, update, context)
+        return
+
+    if payload_type == "project_grow_mission_start":
+        await _handle_project_grow_mission_start(payload, update, context)
         return
 
     await send_screen(

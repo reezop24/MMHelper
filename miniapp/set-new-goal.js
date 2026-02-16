@@ -55,8 +55,8 @@
       return;
     }
 
-    if (targetDays !== "14" && targetDays !== "30") {
-      statusEl.textContent = "Pilih tempoh 14 hari atau 30 hari.";
+    if (targetDays !== "30" && targetDays !== "90" && targetDays !== "180") {
+      statusEl.textContent = "Pilih tempoh 30 hari, 3 bulan, atau 6 bulan.";
       return;
     }
 
@@ -65,7 +65,13 @@
       return;
     }
 
-    targetLabel = targetDays + " hari";
+    if (targetDays === "30") {
+      targetLabel = "30 hari";
+    } else if (targetDays === "90") {
+      targetLabel = "3 bulan";
+    } else {
+      targetLabel = "6 bulan";
+    }
 
     var payload = {
       type: "set_new_goal",

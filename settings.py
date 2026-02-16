@@ -168,3 +168,35 @@ def get_set_new_goal_webapp_url(
         }
     )
     return f"{page}?{query}"
+
+
+def get_project_grow_mission_webapp_url(
+    name: str,
+    current_balance_usd: float,
+    capital_usd: float,
+    saved_date: str,
+    target_balance_usd: float,
+    target_days: int,
+    target_label: str,
+    tabung_balance_usd: float,
+    mission_active: bool,
+    mission_mode: str,
+    mission_started_date: str,
+) -> str:
+    page = f"{_miniapp_base_url()}/mission.html"
+    query = urlencode(
+        {
+            "name": name,
+            "current_balance_usd": f"{current_balance_usd:.2f}",
+            "capital_usd": f"{capital_usd:.2f}",
+            "saved_date": saved_date,
+            "target_balance_usd": f"{target_balance_usd:.2f}",
+            "target_days": str(target_days),
+            "target_label": target_label,
+            "tabung_balance_usd": f"{tabung_balance_usd:.2f}",
+            "mission_active": "1" if mission_active else "0",
+            "mission_mode": mission_mode,
+            "mission_started_date": mission_started_date,
+        }
+    )
+    return f"{page}?{query}"

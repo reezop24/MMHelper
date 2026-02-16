@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mission</title>
+  <link rel="stylesheet" href="global.css" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 16px;
+      background: rgba(6, 20, 47, 0.55);
+      border: 1px solid var(--border-input);
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .summary-item {
+      font-size: 14px;
+      color: #dce8ff;
+    }
+
+    .summary-item strong {
+      color: #fff;
+    }
+
+    .card-soft {
+      background: rgba(6, 20, 47, 0.55);
+      border: 1px solid var(--border-input);
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 14px;
+    }
+
+    .long-copy {
+      white-space: pre-line;
+      line-height: 1.45;
+      margin: 0;
+      color: #eaf2ff;
+    }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .tab-btn {
+      margin: 0;
+      border: 1px solid #2f5493;
+      border-radius: 10px;
+      padding: 10px;
+      background: rgba(8, 26, 56, 0.85);
+      color: #d3e5ff;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .tab-btn.active {
+      border-color: #8ec0ff;
+      box-shadow: 0 0 0 1px rgba(142, 192, 255, 0.3) inset;
+      color: #fff;
+    }
+
+    .level-toggle {
+      margin: 0;
+      width: 100%;
+      text-align: left;
+      border: 1px solid #345d9d;
+      border-radius: 10px;
+      padding: 11px;
+      background: rgba(10, 31, 65, 0.8);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .level-toggle + .level-toggle {
+      margin-top: 8px;
+    }
+
+    .level-panel {
+      margin-top: 8px;
+      border: 1px solid rgba(83, 127, 193, 0.4);
+      border-radius: 10px;
+      padding: 10px;
+      background: rgba(6, 19, 41, 0.75);
+    }
+
+    .mission-item {
+      border: 1px solid rgba(98, 145, 212, 0.35);
+      border-radius: 10px;
+      padding: 10px;
+      background: rgba(9, 28, 58, 0.72);
+    }
+
+    .mission-item + .mission-item {
+      margin-top: 8px;
+    }
+
+    .mission-item-title {
+      margin: 0 0 6px;
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .mission-item-desc {
+      margin: 0;
+      color: #d3e2ff;
+      line-height: 1.38;
+      font-size: 13px;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 6px 10px;
+      background: rgba(20, 83, 47, 0.4);
+      border: 1px solid rgba(110, 232, 164, 0.4);
+      color: #b9ffd9;
+      font-weight: 700;
+      font-size: 12px;
+      margin-bottom: 10px;
+    }
+
+    .meta {
+      margin: 4px 0;
+      color: #d3e4ff;
+      font-size: 13px;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    @media (max-width: 640px) {
+      .summary,
+      .tabs {
+        grid-template-columns: 1fr;
+      }
+
+      .summary {
+        gap: 6px;
+        padding: 10px;
+      }
+
+      .summary-item {
+        font-size: 12.5px;
+        line-height: 1.25;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <img class="logo" src="logo.png" alt="MM HELPER Logo" />
+      <h1>Mission</h1>
+    </header>
+
+    <section class="summary">
+      <div class="summary-item"><strong>Nama:</strong> <span id="summaryName">-</span></div>
+      <div class="summary-item"><strong>Current Balance:</strong> USD <span id="summaryBalance">0.00</span></div>
+      <div class="summary-item"><strong>Capital:</strong> USD <span id="summaryCapital">0.00</span></div>
+      <div class="summary-item"><strong>Tarikh mula:</strong> <span id="summaryDate">-</span></div>
+    </section>
+
+    <section id="lockedCard" class="card hidden">
+      <p id="lockedText" class="long-copy"></p>
+    </section>
+
+    <section id="beforeStartLayer" class="card hidden">
+      <div class="card-soft">
+        <p id="beforeIntro" class="long-copy"></p>
+      </div>
+
+      <div class="tabs">
+        <button id="normalModeBtn" type="button" class="tab-btn active">Normal Mode</button>
+        <button id="advancedModeBtn" type="button" class="tab-btn">Advanced Mode</button>
+      </div>
+
+      <div id="normalModePanel">
+        <button id="level1Toggle" type="button" class="level-toggle">Level 1</button>
+        <div id="level1Panel" class="level-panel"></div>
+
+        <button id="level2Toggle" type="button" class="level-toggle">Level 2 (Akan Datang)</button>
+        <div id="level2Panel" class="level-panel hidden"></div>
+
+        <button id="level3Toggle" type="button" class="level-toggle">Level 3 (Akan Datang)</button>
+        <div id="level3Panel" class="level-panel hidden"></div>
+      </div>
+
+      <div id="advancedModePanel" class="card-soft hidden">
+        <p id="advancedComingSoon" class="long-copy"></p>
+      </div>
+
+      <button id="startMissionBtn" type="button">🚀 Start Mission (Normal)</button>
+      <p id="beforeStatus" class="status" aria-live="polite"></p>
+    </section>
+
+    <section id="runningLayer" class="card hidden">
+      <span id="runningBadge" class="status-badge">Mission Active</span>
+      <p id="runningIntro" class="long-copy"></p>
+      <p class="meta"><strong>Mode:</strong> <span id="runningMode">-</span></p>
+      <p class="meta"><strong>Start Date:</strong> <span id="runningStartDate">-</span></p>
+      <p class="meta"><strong>Target Grow:</strong> USD <span id="runningTargetBalance">0.00</span></p>
+      <p class="meta"><strong>Target Tempoh:</strong> <span id="runningTargetLabel">-</span></p>
+      <p class="meta"><strong>Tabung Balance:</strong> USD <span id="runningTabungBalance">0.00</span></p>
+    </section>
+  </main>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="content.js"></script>
+  <script src="mission.js"></script>
+</body>
+</html>
