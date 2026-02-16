@@ -5,15 +5,20 @@
     tg.expand();
   }
 
-  var CONTRACT_SIZE = 100; // XAUUSD standard contract
-  var PIP_SIZE = 0.01; // Gold pip size
+  var CONTRACT_SIZE = 100;
+  var PIP_SIZE = 0.01;
 
   var params = new URLSearchParams(window.location.search);
   var name = params.get("name") || "-";
   var savedDate = params.get("saved_date") || "-";
+  var currentBalance = Number(params.get("current_balance_usd") || 0);
 
   document.getElementById("summaryName").textContent = name;
   document.getElementById("summaryDate").textContent = savedDate;
+  document.getElementById("summaryBalance").textContent = currentBalance.toFixed(2);
+
+  var introText = document.getElementById("introText");
+  introText.textContent = "Risk calculator ni bantu kau dapatkan jawapan berapa lot size kau boleh buka dengan modal tertentu dan risk size tertentu, contoh current balance kau sekarang ada USD " + currentBalance.toFixed(2) + " berapa lot kau boleh buka ikut risk yang kau tetapkan.. ko isi je semua box tu";
 
   var topBackBtn = document.getElementById("topBackBtn");
   var backBtn = document.getElementById("backToMainBtn");
@@ -22,22 +27,29 @@
   var submitBtn = document.getElementById("submitBtn");
 
   var balanceInput = document.getElementById("balanceInput");
+  var riskPctInput = document.getElementById("riskPctInput");
+  var zonePipsInput = document.getElementById("zonePipsInput");
   var leverageInput = document.getElementById("leverageInput");
   var priceInput = document.getElementById("priceInput");
-  var slPipsInput = document.getElementById("slPipsInput");
 
-  var maxLotEl = document.getElementById("maxLotValue");
-  var marginUsedEl = document.getElementById("marginUsedValue");
-  var priceMoveEl = document.getElementById("priceMoveValue");
-  var lossIfSlEl = document.getElementById("lossIfSlValue");
+  var lineLeverage = document.getElementById("lineLeverage");
+  var linePrice = document.getElementById("linePrice");
+  var lineMargin = document.getElementById("lineMargin");
+  var lineModal = document.getElementById("lineModal");
+  var lineRisk = document.getElementById("lineRisk");
+  var lineModal2 = document.getElementById("lineModal2");
+  var lineRisk2 = document.getElementById("lineRisk2");
+  var lineModalA = document.getElementById("lineModalA");
+  var lineModalA2 = document.getElementById("lineModalA2");
+  var lineMargin2 = document.getElementById("lineMargin2");
+  var lineLotUnits = document.getElementById("lineLotUnits");
+  var lineLotFinal = document.getElementById("lineLotFinal");
+  var linePips = document.getElementById("linePips");
+  var lineLoss = document.getElementById("lineLoss");
 
   function toNum(value) {
     var num = Number((value || "").trim());
     return Number.isFinite(num) ? num : NaN;
-  }
-
-  function formatUsd(value) {
-    return "USD " + Number(value || 0).toFixed(2);
   }
 
   function goBackMain() {
@@ -52,53 +64,74 @@
 
   function getCalc() {
     var balance = toNum(balanceInput.value);
+    var riskPct = toNum(riskPctInput.value);
+    var zonePips = toNum(zonePipsInput.value);
     var leverage = toNum(leverageInput.value);
     var price = toNum(priceInput.value);
-    var slPips = toNum(slPipsInput.value);
 
-    var valid = balance > 0 && leverage > 0 && price > 0 && slPips > 0;
+    var valid = balance > 0 && riskPct > 0 && zonePips > 0 && leverage > 0 && price > 0;
     if (!valid) {
       return {
         valid: false,
         balance: balance,
+        riskPct: riskPct,
+        zonePips: zonePips,
         leverage: leverage,
         price: price,
-        slPips: slPips,
-        maxLotMargin: 0,
-        marginUsedUsd: 0,
-        priceMoveUsd: 0,
+        marginPer001: 0,
+        riskAmountUsd: 0,
+        lotUnits001: 0,
+        lotFinal: 0,
         lossIfSlUsd: 0
       };
     }
 
-    var maxLotMargin = (balance * leverage) / (CONTRACT_SIZE * price);
-    var marginUsedUsd = (CONTRACT_SIZE * maxLotMargin * price) / leverage;
-    var priceMoveUsd = slPips * PIP_SIZE;
-    var lossIfSlUsd = CONTRACT_SIZE * maxLotMargin * priceMoveUsd;
+    var marginPer001 = price / leverage;
+    var riskAmountUsd = balance * (riskPct / 100);
+    var lotUnits001 = marginPer001 > 0 ? riskAmountUsd / marginPer001 : 0;
+    var lotFinal = lotUnits001 * 0.01;
+    var lossIfSlUsd = CONTRACT_SIZE * lotFinal * (zonePips * PIP_SIZE);
 
     return {
       valid: true,
       balance: balance,
+      riskPct: riskPct,
+      zonePips: zonePips,
       leverage: leverage,
       price: price,
-      slPips: slPips,
-      maxLotMargin: maxLotMargin,
-      marginUsedUsd: marginUsedUsd,
-      priceMoveUsd: priceMoveUsd,
+      marginPer001: marginPer001,
+      riskAmountUsd: riskAmountUsd,
+      lotUnits001: lotUnits001,
+      lotFinal: lotFinal,
       lossIfSlUsd: lossIfSlUsd
     };
   }
 
   function render() {
     var calc = getCalc();
-    maxLotEl.textContent = calc.maxLotMargin.toFixed(2) + " lot";
-    marginUsedEl.textContent = formatUsd(calc.marginUsedUsd);
-    priceMoveEl.textContent = formatUsd(calc.priceMoveUsd);
-    lossIfSlEl.textContent = formatUsd(calc.lossIfSlUsd);
+    lineLeverage.textContent = Number.isFinite(calc.leverage) ? String(Math.round(calc.leverage)) : "0";
+    linePrice.textContent = Number.isFinite(calc.price) ? calc.price.toFixed(2) : "0.00";
+    lineMargin.textContent = calc.marginPer001.toFixed(4);
+
+    lineModal.textContent = Number.isFinite(calc.balance) ? calc.balance.toFixed(2) : "0.00";
+    lineRisk.textContent = Number.isFinite(calc.riskPct) ? calc.riskPct.toFixed(2) : "0.00";
+
+    lineModal2.textContent = lineModal.textContent;
+    lineRisk2.textContent = lineRisk.textContent;
+    lineModalA.textContent = calc.riskAmountUsd.toFixed(2);
+    lineModalA2.textContent = calc.riskAmountUsd.toFixed(2);
+
+    lineMargin2.textContent = calc.marginPer001.toFixed(4);
+    lineLotUnits.textContent = calc.lotUnits001.toFixed(2);
+    lineLotFinal.textContent = calc.lotFinal.toFixed(2);
+
+    linePips.textContent = Number.isFinite(calc.zonePips) ? calc.zonePips.toFixed(1) : "0.0";
+    lineLoss.textContent = calc.lossIfSlUsd.toFixed(2);
+
     submitBtn.disabled = !calc.valid;
   }
 
-  [balanceInput, leverageInput, priceInput, slPipsInput].forEach(function (el) {
+  [balanceInput, riskPctInput, zonePipsInput, leverageInput, priceInput].forEach(function (el) {
     el.addEventListener("input", function () {
       statusEl.textContent = "";
       render();
@@ -122,13 +155,15 @@
     var payload = {
       type: "risk_calculator_submit",
       balance_usd: calc.balance,
+      risk_pct: calc.riskPct,
+      zone_pips: calc.zonePips,
       leverage: calc.leverage,
       gold_price: calc.price,
-      stop_loss_pips: calc.slPips,
-      max_lot_margin: calc.maxLotMargin,
-      margin_used_usd: calc.marginUsedUsd,
-      loss_if_sl_usd: calc.lossIfSlUsd,
-      price_move_usd: calc.priceMoveUsd
+      margin_per_001: calc.marginPer001,
+      modal_a_usd: calc.riskAmountUsd,
+      lot_units_001: calc.lotUnits001,
+      lot_size: calc.lotFinal,
+      loss_if_sl_usd: calc.lossIfSlUsd
     };
 
     if (tg) {
@@ -139,6 +174,10 @@
 
     statusEl.textContent = "Preview mode: buka dari Telegram untuk submit.";
   });
+
+  if (currentBalance > 0) {
+    balanceInput.value = currentBalance.toFixed(2);
+  }
 
   render();
 })();

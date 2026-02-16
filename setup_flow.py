@@ -749,13 +749,15 @@ async def _handle_risk_calculator_submit(payload: dict, update: Update, context:
 
     try:
         balance_usd = float(payload.get("balance_usd"))
+        risk_pct = float(payload.get("risk_pct"))
+        zone_pips = float(payload.get("zone_pips"))
         leverage = float(payload.get("leverage"))
         gold_price = float(payload.get("gold_price"))
-        stop_loss_pips = float(payload.get("stop_loss_pips"))
-        max_lot_margin = float(payload.get("max_lot_margin"))
-        margin_used_usd = float(payload.get("margin_used_usd"))
+        margin_per_001 = float(payload.get("margin_per_001"))
+        modal_a_usd = float(payload.get("modal_a_usd"))
+        lot_units_001 = float(payload.get("lot_units_001"))
+        lot_size = float(payload.get("lot_size"))
         loss_if_sl_usd = float(payload.get("loss_if_sl_usd"))
-        price_move_usd = float(payload.get("price_move_usd"))
     except (TypeError, ValueError):
         await send_screen(
             context,
@@ -765,7 +767,7 @@ async def _handle_risk_calculator_submit(payload: dict, update: Update, context:
         )
         return
 
-    if min(balance_usd, leverage, gold_price, stop_loss_pips, max_lot_margin, margin_used_usd, loss_if_sl_usd) <= 0:
+    if min(balance_usd, risk_pct, zone_pips, leverage, gold_price, margin_per_001, modal_a_usd, lot_units_001, lot_size, loss_if_sl_usd) <= 0:
         await send_screen(
             context,
             message.chat_id,
@@ -776,14 +778,14 @@ async def _handle_risk_calculator_submit(payload: dict, update: Update, context:
 
     summary_text = (
         "*Risk Calculator Result*\n\n"
-        f"- Modal: USD {balance_usd:.2f}\n"
-        f"- Leverage: 1:{int(leverage)}\n"
-        f"- Harga XAUUSD: {gold_price:.2f}\n"
-        f"- Stop Loss: {stop_loss_pips:.0f} pips (USD {price_move_usd:.2f})\n\n"
-        f"- Max Lot ikut margin: *{max_lot_margin:.2f} lot*\n"
-        f"- Anggaran margin guna: USD {margin_used_usd:.2f}\n"
-        f"- Anggaran rugi kalau SL kena: USD {loss_if_sl_usd:.2f}\n\n"
-        "_Nota: Ini kiraan asas XAUUSD (contract 100 oz, 1 pip = 0.01)._"
+        "Jom kita kira\n"
+        f"({int(leverage)}) / ({gold_price:.2f}) = *{margin_per_001:.4f}*\n"
+        "_ini margin kau untuk setiap 0.01 lot_\n\n"
+        f"Sekarang modal kau *USD {balance_usd:.2f}*, risk kau pulak *{risk_pct:.2f}%*.\n"
+        f"Maknanya kau cuma ambil risiko *(USD {balance_usd:.2f} x {risk_pct:.2f}% = USD {modal_a_usd:.2f})* untuk setup ni.\n\n"
+        f"Jadi *(USD {modal_a_usd:.2f}) / ({margin_per_001:.4f}) = {lot_units_001:.2f}* unit 0.01 lot.\n"
+        f"*Lot size boleh buka: {lot_size:.2f} lot*\n\n"
+        f"Anggaran risiko jika SL {zone_pips:.1f} pips kena: *USD {loss_if_sl_usd:.2f}*"
     )
     await send_screen(
         context,

@@ -55,36 +55,31 @@
       letter-spacing: 0.05em;
     }
 
-    .result-grid {
+    .result-lines {
+      margin: 0;
+      padding: 0;
+      list-style: none;
       display: grid;
-      grid-template-columns: 1fr 1fr;
       gap: 8px;
     }
 
-    .result-item {
+    .result-lines li {
+      margin: 0;
       border-radius: 10px;
       border: 1px solid rgba(93, 136, 202, 0.36);
       background: rgba(8, 25, 52, 0.75);
-      padding: 10px;
+      padding: 9px 10px;
+      color: #e8f2ff;
+      line-height: 1.35;
     }
 
-    .result-label {
-      margin: 0;
-      color: #9fb6e0;
-      font-size: 12px;
-    }
-
-    .result-value {
-      margin: 6px 0 0;
-      font-size: 16px;
-      font-weight: 700;
-      color: #f6fbff;
+    .result-lines strong {
+      color: #ffffff;
     }
 
     .result-note {
-      margin: 10px 0 0;
-      font-size: 12px;
       color: #bcd0f0;
+      font-size: 12px;
     }
 
     .form-actions {
@@ -124,10 +119,6 @@
         line-height: 1.25;
       }
 
-      .result-grid {
-        grid-template-columns: 1fr;
-      }
-
       .form-actions {
         flex-direction: column;
         align-items: stretch;
@@ -150,13 +141,14 @@
     <section class="summary">
       <div class="summary-item"><strong>Nama:</strong> <span id="summaryName">-</span></div>
       <div class="summary-item"><strong>Tarikh mula:</strong> <span id="summaryDate">-</span></div>
+      <div class="summary-item"><strong>Current Balance:</strong> USD <span id="summaryBalance">0.00</span></div>
     </section>
 
     <form id="riskForm" class="card">
-      <p class="intro">Isi angka ikut setup semasa dulu. Miniapp ni kira berdasarkan XAUUSD standard: contract size 100 oz, 1 pip = 0.01.</p>
+      <p id="introText" class="intro"></p>
 
       <div class="field">
-        <p class="prompt">Modal (USD)</p>
+        <p class="prompt">1. Modal kau berapa untuk setup ni?</p>
         <div class="with-prefix">
           <span class="affix">USD</span>
           <input id="balanceInput" name="balance_usd" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="Contoh 10" required />
@@ -164,7 +156,20 @@
       </div>
 
       <div class="field">
-        <p class="prompt">Leverage</p>
+        <p class="prompt">2. Full margin? Kau masukkan berapa % risk kau ambil</p>
+        <div class="with-prefix with-suffix">
+          <span class="affix">%</span>
+          <input id="riskPctInput" name="risk_pct" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="Contoh 10" required />
+        </div>
+      </div>
+
+      <div class="field">
+        <p class="prompt">3. Saiz zon entry dan SL kau berapa pips?</p>
+        <input id="zonePipsInput" name="zone_pips" type="number" inputmode="decimal" min="0.1" step="0.1" placeholder="Contoh 60" required />
+      </div>
+
+      <div class="field">
+        <p class="prompt">4. Leverage kau berapa?</p>
         <div class="with-prefix">
           <span class="affix">1:</span>
           <input id="leverageInput" name="leverage" type="number" inputmode="numeric" min="1" step="1" placeholder="Contoh 2000" required />
@@ -172,36 +177,21 @@
       </div>
 
       <div class="field">
-        <p class="prompt">Harga semasa gold (XAUUSD)</p>
+        <p class="prompt">5. Harga XAUUSD sekarang berapa?</p>
         <input id="priceInput" name="gold_price" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="Contoh 3300.00" required />
-      </div>
-
-      <div class="field">
-        <p class="prompt">Stop Loss (pips)</p>
-        <input id="slPipsInput" name="stop_loss_pips" type="number" inputmode="decimal" min="0.1" step="0.1" placeholder="Contoh 60" required />
       </div>
 
       <div class="result-card">
         <p class="result-title">Live Result</p>
-        <div class="result-grid">
-          <div class="result-item">
-            <p class="result-label">Max Lot ikut Margin</p>
-            <p id="maxLotValue" class="result-value">0.00 lot</p>
-          </div>
-          <div class="result-item">
-            <p class="result-label">Margin untuk Lot tersebut</p>
-            <p id="marginUsedValue" class="result-value">USD 0.00</p>
-          </div>
-          <div class="result-item">
-            <p class="result-label">Pergerakan harga ikut SL</p>
-            <p id="priceMoveValue" class="result-value">USD 0.00</p>
-          </div>
-          <div class="result-item">
-            <p class="result-label">Rugi jika SL kena</p>
-            <p id="lossIfSlValue" class="result-value">USD 0.00</p>
-          </div>
-        </div>
-        <p class="result-note">Nota: kiraan ini asas pendidikan dan boleh berbeza ikut spec broker.</p>
+        <ul class="result-lines">
+          <li><strong>Jom kita kira</strong></li>
+          <li>(<span id="lineLeverage">0</span>) / (<span id="linePrice">0.00</span>) = <strong><span id="lineMargin">0.00</span></strong> <span class="result-note">ini margin kau untuk setiap 0.01 lot</span></li>
+          <li>sekarang modal kau <strong>USD <span id="lineModal">0.00</span></strong>, risk kau pulak <strong><span id="lineRisk">0.00</span>%</strong></li>
+          <li>maknanya kau cuma ambil risiko <strong>(USD <span id="lineModal2">0.00</span> x <span id="lineRisk2">0.00</span>%) = USD <span id="lineModalA">0.00</span></strong> untuk setup ni</li>
+          <li>jadi <strong>(USD <span id="lineModalA2">0.00</span>) / (<span id="lineMargin2">0.00</span>) = <span id="lineLotUnits">0.00</span></strong> unit 0.01 lot</li>
+          <li><strong>Lot size boleh buka: <span id="lineLotFinal">0.00</span> lot</strong></li>
+          <li>anggaran risiko jika SL <span id="linePips">0.0</span> pips kena: <strong>USD <span id="lineLoss">0.00</span></strong></li>
+        </ul>
       </div>
 
       <button id="submitBtn" type="submit" class="submit-btn" disabled>✅ Simpan Result</button>

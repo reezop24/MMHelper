@@ -126,6 +126,7 @@ def _build_main_menu_keyboard_for_user(user_id: int):
     risk_url = get_risk_calculator_webapp_url(
         name=summary["name"],
         saved_date=summary["saved_date"],
+        current_balance_usd=get_current_balance_usd(user_id),
     )
     return main_menu_keyboard(user_id, risk_calculator_url=risk_url)
 

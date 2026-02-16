@@ -12,7 +12,7 @@ from telegram.ext import ContextTypes
 
 from menu import main_menu_keyboard
 from settings import get_risk_calculator_webapp_url, get_setup_webapp_url
-from storage import get_initial_setup_summary, has_initial_setup
+from storage import get_current_balance_usd, get_initial_setup_summary, has_initial_setup
 from texts import DECLINED_TEXT, RETURNING_USER_TEXT, TNC_TEXT, WHY_MM_HELPER_TEXT
 from ui import send_screen
 
@@ -54,6 +54,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         risk_url = get_risk_calculator_webapp_url(
             name=summary["name"],
             saved_date=summary["saved_date"],
+            current_balance_usd=get_current_balance_usd(user.id),
         )
         await send_screen(
             context,
