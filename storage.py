@@ -560,12 +560,11 @@ def _count_tabung_mode_this_month(user_id: int, mode: str) -> int:
 def get_tabung_update_state(user_id: int) -> dict[str, Any]:
     goal = get_project_grow_goal_summary(user_id)
     target_balance = _to_float(goal.get("target_balance_usd"))
-    total_balance = get_total_balance_usd(user_id)
     emergency_limit = 2
     used = _count_tabung_mode_this_month(user_id, "emergency_withdrawal")
     return {
         "target_balance_usd": target_balance,
-        "goal_reached": target_balance > 0 and total_balance >= target_balance,
+        "goal_reached": is_project_grow_goal_reached(user_id),
         "emergency_limit": emergency_limit,
         "emergency_used": used,
         "emergency_left": max(emergency_limit - used, 0),
@@ -961,6 +960,16 @@ def get_project_grow_goal_summary(user_id: int) -> dict[str, Any]:
         "target_days": int(goal_data.get("target_days") or 0) if str(goal_data.get("target_days") or "").isdigit() else 0,
         "target_label": str(goal_data.get("target_label") or ""),
     }
+
+
+def is_project_grow_goal_reached(user_id: int) -> bool:
+    goal = get_project_grow_goal_summary(user_id)
+    target_balance = _to_float(goal.get("target_balance_usd"))
+    baseline_balance = _to_float(goal.get("current_balance_usd"))
+    grow_target = max(target_balance - baseline_balance, 0.0)
+    if grow_target <= 0:
+        return False
+    return get_tabung_balance_usd(user_id) >= grow_target
 
 
 def get_tabung_progress_summary(user_id: int) -> dict[str, Any]:

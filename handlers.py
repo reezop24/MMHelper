@@ -70,6 +70,7 @@ from storage import (
     get_weekly_performance_usd,
     get_weekly_profit_loss_usd,
     has_project_grow_goal,
+    is_project_grow_goal_reached,
     reset_all_data,
 )
 from texts import (
@@ -163,7 +164,7 @@ def _build_account_activity_keyboard_for_user(user_id: int):
         tabung_start_date=tabung_start_date,
         mission_status=get_project_grow_mission_status_text(user_id),
         has_goal=goal_summary["target_balance_usd"] > 0,
-        goal_reached=float(goal_summary["target_balance_usd"]) > 0 and total_balance >= float(goal_summary["target_balance_usd"]),
+        goal_reached=is_project_grow_goal_reached(user_id),
         target_balance_usd=goal_summary["target_balance_usd"],
         grow_target_usd=max(float(goal_summary["target_balance_usd"]) - current_balance, 0.0),
         target_label=goal_summary["target_label"],
@@ -297,7 +298,7 @@ def _build_project_grow_keyboard_for_user(user_id: int):
         tabung_start_date=tabung_start_date,
         mission_status=mission_status,
         has_goal=goal_summary["target_balance_usd"] > 0,
-        goal_reached=float(goal_summary["target_balance_usd"]) > 0 and get_total_balance_usd(user_id) >= float(goal_summary["target_balance_usd"]),
+        goal_reached=is_project_grow_goal_reached(user_id),
         target_balance_usd=goal_summary["target_balance_usd"],
         grow_target_usd=grow_target_usd,
         target_label=goal_summary["target_label"],
