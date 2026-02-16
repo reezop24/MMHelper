@@ -108,6 +108,35 @@ def get_current_profit_usd(user_id: int) -> float:
     return 0.0
 
 
+def get_total_withdrawal_usd(user_id: int) -> float:
+    db = load_db()
+    user = db.get("users", {}).get(str(user_id), {})
+    sections = user.get("sections", {})
+    withdrawal_data = sections.get("withdrawal_activity", {}).get("data", {})
+    records = withdrawal_data.get("records", [])
+
+    total = 0.0
+    if not isinstance(records, list):
+        return total
+
+    for item in records:
+        if not isinstance(item, dict):
+            continue
+        try:
+            total += float(item.get("amount_usd", 0))
+        except (TypeError, ValueError):
+            continue
+    return total
+
+
+def get_current_balance_usd(user_id: int) -> float:
+    summary = get_initial_setup_summary(user_id)
+    initial_capital = float(summary.get("initial_capital_usd") or 0)
+    current_profit = get_current_profit_usd(user_id)
+    total_withdrawn = get_total_withdrawal_usd(user_id)
+    return initial_capital + current_profit - total_withdrawn
+
+
 def has_any_transactions(user_id: int) -> bool:
     db = load_db()
     user = db.get("users", {}).get(str(user_id), {})

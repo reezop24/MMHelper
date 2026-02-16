@@ -23,6 +23,7 @@ def _miniapp_base_url() -> str:
 def get_initial_capital_reset_webapp_url(
     name: str,
     initial_capital: float,
+    current_balance: float,
     saved_date: str,
     can_reset: bool,
 ) -> str:
@@ -31,6 +32,7 @@ def get_initial_capital_reset_webapp_url(
         {
             "name": name,
             "initial_capital": f"{initial_capital:.2f}",
+            "current_balance": f"{current_balance:.2f}",
             "saved_date": saved_date,
             "can_reset": "1" if can_reset else "0",
         }
@@ -41,6 +43,7 @@ def get_initial_capital_reset_webapp_url(
 def get_withdrawal_activity_webapp_url(
     name: str,
     initial_capital_usd: float,
+    current_balance_usd: float,
     saved_date: str,
     current_profit_usd: float,
 ) -> str:
@@ -49,6 +52,7 @@ def get_withdrawal_activity_webapp_url(
         {
             "name": name,
             "initial_capital_usd": f"{initial_capital_usd:.2f}",
+            "current_balance_usd": f"{current_balance_usd:.2f}",
             "saved_date": saved_date,
             "current_profit_usd": f"{current_profit_usd:.2f}",
         }

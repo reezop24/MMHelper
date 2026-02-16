@@ -9,10 +9,12 @@
   var name = params.get("name") || "-";
   var initialCapital = params.get("initial_capital") || "0.00";
   var savedDate = params.get("saved_date") || "-";
+  var currentBalance = Number(params.get("current_balance") || 0);
   var canReset = (params.get("can_reset") || "0") === "1";
 
   document.getElementById("summaryName").textContent = name;
   document.getElementById("summaryCapital").textContent = initialCapital;
+  document.getElementById("summaryBalance").textContent = currentBalance.toFixed(2);
   document.getElementById("summaryDate").textContent = savedDate;
 
   var form = document.getElementById("resetForm");

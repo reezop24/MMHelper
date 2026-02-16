@@ -27,6 +27,7 @@ from settings import (
 )
 from storage import (
     can_reset_initial_capital,
+    get_current_balance_usd,
     get_current_profit_usd,
     get_initial_setup_summary,
     reset_all_data,
@@ -54,6 +55,7 @@ def _build_mm_setting_keyboard_for_user(user_id: int):
     reset_url = get_initial_capital_reset_webapp_url(
         name=summary["name"],
         initial_capital=summary["initial_capital_usd"],
+        current_balance=get_current_balance_usd(user_id),
         saved_date=summary["saved_date"],
         can_reset=can_reset_initial_capital(user_id),
     )
@@ -65,6 +67,7 @@ def _build_account_activity_keyboard_for_user(user_id: int):
     withdrawal_url = get_withdrawal_activity_webapp_url(
         name=summary["name"],
         initial_capital_usd=summary["initial_capital_usd"],
+        current_balance_usd=get_current_balance_usd(user_id),
         saved_date=summary["saved_date"],
         current_profit_usd=get_current_profit_usd(user_id),
     )

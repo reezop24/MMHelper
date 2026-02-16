@@ -57,5 +57,6 @@ def account_activity_keyboard(withdrawal_activity_url: str) -> ReplyKeyboardMark
         ],
         [SUBMENU_ACCOUNT_BUTTON_TRADING_ACTIVITY],
         [SUBMENU_ACCOUNT_BUTTON_TABUNG],
+        [SUBMENU_MM_BUTTON_BACK_MAIN],
     ]
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)

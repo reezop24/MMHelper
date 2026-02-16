@@ -11,14 +11,17 @@
   var name = params.get("name") || "-";
   var initialCapital = Number(params.get("initial_capital_usd") || 0);
   var savedDate = params.get("saved_date") || "-";
+  var currentBalance = Number(params.get("current_balance_usd") || 0);
   var currentProfit = Number(params.get("current_profit_usd") || 0);
 
   var summaryName = document.getElementById("summaryName");
   var summaryCapital = document.getElementById("summaryCapital");
   var summaryDate = document.getElementById("summaryDate");
+  var summaryBalance = document.getElementById("summaryBalance");
 
   summaryName.textContent = name;
   summaryCapital.textContent = initialCapital.toFixed(2);
+  summaryBalance.textContent = currentBalance.toFixed(2);
   summaryDate.textContent = savedDate;
 
   var introText = document.getElementById("introText");
