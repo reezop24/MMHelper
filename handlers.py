@@ -140,6 +140,10 @@ def _build_account_activity_keyboard_for_user(user_id: int):
     goal_summary = get_project_grow_goal_summary(user_id)
     tabung_update_state = get_tabung_update_state(user_id)
     tabung_start_date = get_tabung_start_date(user_id)
+    set_goal_grow_target = max(
+        float(goal_summary["target_balance_usd"]) - float(goal_summary["current_balance_usd"]) - tabung_balance,
+        0.0,
+    )
 
     common_kwargs = {
         "name": summary["name"],
@@ -166,7 +170,7 @@ def _build_account_activity_keyboard_for_user(user_id: int):
         has_goal=goal_summary["target_balance_usd"] > 0,
         goal_reached=is_project_grow_goal_reached(user_id),
         target_balance_usd=goal_summary["target_balance_usd"],
-        grow_target_usd=max(float(goal_summary["target_balance_usd"]) - current_balance, 0.0),
+        grow_target_usd=set_goal_grow_target,
         target_label=goal_summary["target_label"],
     )
     tabung_update_url = get_tabung_update_webapp_url(
@@ -275,7 +279,7 @@ def _build_project_grow_keyboard_for_user(user_id: int):
     current_balance = get_current_balance_usd(user_id)
     mission_status = get_project_grow_mission_status_text(user_id)
     tabung_start_date = get_tabung_start_date(user_id)
-    grow_target_usd = max(float(goal_summary["target_balance_usd"]) - current_balance, 0.0)
+    grow_target_usd = tabung_progress["grow_target_usd"]
     tabung_progress = get_tabung_progress_summary(user_id)
     mission_url = get_project_grow_mission_webapp_url(
         name=summary["name"],
