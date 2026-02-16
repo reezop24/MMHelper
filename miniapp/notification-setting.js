@@ -43,6 +43,7 @@
   var dailyTimesContainer = document.getElementById("dailyTimesContainer");
   var sectionToggles = Array.prototype.slice.call(document.querySelectorAll(".section-toggle"));
   var panels = Array.prototype.slice.call(document.querySelectorAll(".panel"));
+  var selectedSection = "";
 
   function defaultTimeByIndex(idx) {
     var defaults = ["09:00", "13:00", "17:00", "20:00", "22:00", "23:30"];
@@ -87,13 +88,21 @@
     panels.forEach(function (panel) {
       panel.classList.add("hidden");
     });
+    sectionToggles.forEach(function (btn) {
+      btn.classList.remove("active");
+    });
+    selectedSection = "";
   }
 
-  function openPanelById(panelId) {
+  function openPanelById(panelId, sourceBtn) {
     closeAllPanels();
     var target = document.getElementById(panelId);
     if (!target) return;
     target.classList.remove("hidden");
+    if (sourceBtn) {
+      sourceBtn.classList.add("active");
+    }
+    selectedSection = panelId;
   }
 
   sectionToggles.forEach(function (btn) {
@@ -104,16 +113,20 @@
       if (!targetPanel) return;
 
       var isOpen = !targetPanel.classList.contains("hidden");
-      closeAllPanels();
-      if (!isOpen) {
-        targetPanel.classList.remove("hidden");
+      if (isOpen) {
+        closeAllPanels();
+      } else {
+        openPanelById(targetId, btn);
       }
       statusEl.textContent = "";
     });
   });
 
   // Default open manual section first.
-  openPanelById("manualPanel");
+  var firstBtn = sectionToggles.find(function (btn) {
+    return btn.getAttribute("data-target") === "manualPanel";
+  });
+  openPanelById("manualPanel", firstBtn || null);
 
   function backToAdmin() {
     var payload = { type: "admin_panel_back_to_menu" };
@@ -136,11 +149,16 @@
 
   document.getElementById("notificationForm").addEventListener("submit", function (event) {
     event.preventDefault();
+    var openPanels = panels.filter(function (panel) { return !panel.classList.contains("hidden"); });
+    if (openPanels.length !== 1 || !selectedSection) {
+      statusEl.textContent = "Pilih satu setting sahaja sebelum submit.";
+      return;
+    }
 
-    var manualEnabled = document.getElementById("manualEnabled").checked;
-    var dailyEnabled = document.getElementById("dailyEnabled").checked;
-    var reportEnabled = document.getElementById("reportEnabled").checked;
-    var maintenanceEnabled = document.getElementById("maintenanceEnabled").checked;
+    var manualEnabled = selectedSection === "manualPanel";
+    var dailyEnabled = selectedSection === "dailyPanel";
+    var reportEnabled = selectedSection === "reportPanel";
+    var maintenanceEnabled = selectedSection === "maintenancePanel";
 
     var manualDate = (document.getElementById("manualDate").value || "").trim();
     var manualTime = (document.getElementById("manualTime").value || "").trim();
@@ -164,7 +182,7 @@
       return;
     }
 
-    if (dailyEnabled && dailyTimes.some(function (t) { return !t; })) {
+    if (dailyEnabled && (dailyTimes.length !== timesPerDay || dailyTimes.some(function (t) { return !t; }))) {
       statusEl.textContent = "Sila lengkapkan semua masa Daily Notification.";
       return;
     }

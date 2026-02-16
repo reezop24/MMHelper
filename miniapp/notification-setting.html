@@ -51,20 +51,16 @@
       margin: 0;
     }
 
+    .section-toggle.active {
+      border-color: #8cc7ff;
+      box-shadow: 0 0 0 1px rgba(140, 199, 255, 0.34) inset;
+      background: linear-gradient(180deg, rgba(33, 91, 169, 0.96), rgba(22, 65, 128, 0.94));
+      color: #ffffff;
+    }
+
     .section-title {
       margin: 0;
       font-size: 14px;
-    }
-
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      border: 1px solid rgba(93, 151, 232, 0.6);
-      border-radius: 999px;
-      padding: 2px 8px;
-      font-size: 11px;
-      color: #d7e9ff;
-      background: rgba(20, 59, 112, 0.6);
     }
 
     .prompt {
@@ -90,20 +86,6 @@
       font-size: 13px;
       margin-bottom: 6px;
       color: #dce8ff;
-    }
-
-    .control-toggle {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-      color: #deebff;
-    }
-
-    .control-toggle input[type="checkbox"] {
-      width: 16px;
-      height: 16px;
-      margin: 0;
     }
 
     .text-muted {
@@ -133,13 +115,13 @@
 
     .input-row {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr;
       gap: 10px;
     }
 
     .times-grid {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: 1fr;
       gap: 8px;
       margin-top: 8px;
     }
@@ -194,8 +176,9 @@
     </div>
 
     <header class="hero">
+      <img class="logo" src="logo.png" alt="MM HELPER Logo" />
       <h1>Notification Setting</h1>
-      <p>Control reminder dan push message untuk user aktif.</p>
+      <p>Pilih satu jenis setting untuk disimpan setiap kali submit.</p>
     </header>
 
     <section class="summary">
@@ -208,15 +191,10 @@
         <section class="section-card">
           <button type="button" class="section-toggle" data-target="manualPanel">
             <span class="section-title">1. Manual Push Notification</span>
-            <span class="badge">Tap untuk buka</span>
           </button>
           <div id="manualPanel" class="panel hidden">
             <p class="prompt">Tetapkan masa sekali push dan mesej custom untuk user aktif.</p>
-            <label class="control-toggle">
-              <input id="manualEnabled" type="checkbox" checked />
-              <span>Unhide</span>
-            </label>
-            <p class="text-muted">Jika off, setting ni akan disimpan tapi engine tak akan hantar.</p>
+            <p class="text-muted">Section ini akan aktif bila panel ini dipilih.</p>
             <div class="input-row">
               <div class="field">
                 <label for="manualDate">Tarikh</label>
@@ -237,15 +215,10 @@
         <section class="section-card">
           <button type="button" class="section-toggle" data-target="dailyPanel">
             <span class="section-title">2. Daily Notification</span>
-            <span class="badge">Tap untuk buka</span>
           </button>
           <div id="dailyPanel" class="panel hidden">
             <p class="prompt">Reminder santai untuk check user dah update transaksi harian atau belum.</p>
-            <label class="control-toggle">
-              <input id="dailyEnabled" type="checkbox" checked />
-              <span>Unhide</span>
-            </label>
-            <p class="text-muted">Pilih frequency dan masa reminder untuk semua user aktif.</p>
+            <p class="text-muted">Section ini akan aktif bila panel ini dipilih.</p>
             <div class="field">
               <label for="dailyTimesPerDay">Hantar berapa kali sehari</label>
               <select id="dailyTimesPerDay">
@@ -271,14 +244,10 @@
         <section class="section-card">
           <button type="button" class="section-toggle" data-target="reportPanel">
             <span class="section-title">3. Report Notification</span>
-            <span class="badge">Tap untuk buka</span>
           </button>
           <div id="reportPanel" class="panel hidden">
             <p class="prompt">Set tarikh auto reminder untuk weekly report dan monthly report.</p>
-            <label class="control-toggle">
-              <input id="reportEnabled" type="checkbox" checked />
-              <span>Unhide</span>
-            </label>
+            <p class="text-muted">Section ini akan aktif bila panel ini dipilih.</p>
             <div class="input-row">
               <div class="field">
                 <label for="weeklyReportDate">Weekly report reminder</label>
@@ -295,14 +264,10 @@
         <section class="section-card">
           <button type="button" class="section-toggle" data-target="maintenancePanel">
             <span class="section-title">4. Maintenance Notification</span>
-            <span class="badge">Tap untuk buka</span>
           </button>
           <div id="maintenancePanel" class="panel hidden">
             <p class="prompt">Maklumkan user bila maintenance mula dan tamat.</p>
-            <label class="control-toggle">
-              <input id="maintenanceEnabled" type="checkbox" checked />
-              <span>Unhide</span>
-            </label>
+            <p class="text-muted">Section ini akan aktif bila panel ini dipilih.</p>
             <div class="field">
               <label for="maintenancePresetMessage">Preset mesej maintenance</label>
               <select id="maintenancePresetMessage"></select>
