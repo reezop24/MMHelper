@@ -642,6 +642,45 @@ def get_project_grow_goal_summary(user_id: int) -> dict[str, Any]:
     }
 
 
+def get_tabung_progress_summary(user_id: int) -> dict[str, Any]:
+    goal = get_project_grow_goal_summary(user_id)
+    sections = _get_user_sections(user_id)
+    goal_section = sections.get("project_grow_goal", {})
+
+    current_balance = get_current_balance_usd(user_id)
+    tabung_balance = get_tabung_balance_usd(user_id)
+    target_balance = _to_float(goal.get("target_balance_usd"))
+    baseline_balance = _to_float(goal.get("current_balance_usd"))
+    total_grow_target = max(target_balance - baseline_balance, 0.0)
+    remaining_grow_target = max(target_balance - current_balance, 0.0)
+    achieved = max(current_balance - baseline_balance, 0.0)
+    grow_progress_pct = 0.0 if total_grow_target <= 0 else min((achieved / total_grow_target) * 100.0, 100.0)
+
+    target_days = int(goal.get("target_days") or 0)
+    saved_date = _parse_iso_date(goal_section.get("saved_date"))
+    today = malaysia_now().date()
+    if saved_date is None:
+        saved_date = today
+
+    elapsed_days = max((today - saved_date).days, 0)
+    days_left = max(target_days - elapsed_days, 0) if target_days > 0 else 0
+    if target_days > 0:
+        days_left_label = f"{days_left} hari lagi"
+    else:
+        days_left_label = "-"
+
+    return {
+        "tabung_balance_usd": tabung_balance,
+        "grow_target_usd": remaining_grow_target,
+        "capital_target_usd": target_balance,
+        "days_left": days_left,
+        "days_left_label": days_left_label,
+        "grow_progress_pct": grow_progress_pct,
+        "weekly_grow_usd": get_weekly_profit_loss_usd(user_id),
+        "monthly_grow_usd": get_monthly_profit_loss_usd(user_id),
+    }
+
+
 def can_open_project_grow_mission(user_id: int) -> bool:
     return has_project_grow_goal(user_id) and get_tabung_balance_usd(user_id) >= 10
 

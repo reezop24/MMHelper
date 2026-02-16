@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tabung Progress</title>
+  <link rel="stylesheet" href="global.css" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 16px;
+      background: rgba(6, 20, 47, 0.55);
+      border: 1px solid var(--border-input);
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .summary-item {
+      font-size: 14px;
+      color: #dce8ff;
+    }
+
+    .summary-item strong {
+      color: #fff;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+
+    .metric {
+      border: 1px solid rgba(83, 127, 193, 0.45);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: rgba(6, 20, 46, 0.78);
+    }
+
+    .metric-title {
+      margin: 0;
+      color: #bdd3f7;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .metric-value {
+      margin: 4px 0 0;
+      color: #fff;
+      font-size: 20px;
+      font-weight: 800;
+    }
+
+    .metric-value.positive {
+      color: #8df8b1;
+    }
+
+    .metric-value.negative {
+      color: #ff9ea8;
+    }
+
+    .progress-wrap {
+      margin-top: 8px;
+      width: 100%;
+      height: 10px;
+      background: rgba(32, 55, 93, 0.9);
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid rgba(82, 126, 190, 0.45);
+    }
+
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #37a3ff 0%, #71e9ff 100%);
+    }
+
+    .form-actions {
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 10px;
+    }
+
+    .back-btn {
+      margin: 0;
+      width: auto;
+      min-width: 150px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid #496ea9;
+      background: rgba(12, 34, 71, 0.9);
+      color: #e7f0ff;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    @media (max-width: 640px) {
+      .summary {
+        gap: 6px;
+        padding: 10px;
+      }
+
+      .summary-item {
+        font-size: 12.5px;
+        line-height: 1.25;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="top-nav">
+      <button id="topBackBtn" type="button" class="top-back-btn">← Back</button>
+    </div>
+
+    <header class="hero">
+      <img class="logo" src="logo.png" alt="MM HELPER Logo" />
+      <h1>Tabung Progress</h1>
+      <p>Pantau progress target kau dalam satu paparan.</p>
+    </header>
+
+    <section class="summary">
+      <div class="summary-item"><strong>Name:</strong> <span id="summaryName">-</span></div>
+      <div class="summary-item"><strong>Tarikh mula:</strong> <span id="summaryDate">-</span></div>
+    </section>
+
+    <section class="card metrics">
+      <div class="metric">
+        <p class="metric-title">Tabung Balance</p>
+        <p id="tabungBalance" class="metric-value">USD 0.00</p>
+      </div>
+      <div class="metric">
+        <p class="metric-title">Grow Target</p>
+        <p id="growTarget" class="metric-value">USD 0.00</p>
+      </div>
+      <div class="metric">
+        <p class="metric-title">Capital Target</p>
+        <p id="capitalTarget" class="metric-value">USD 0.00</p>
+      </div>
+      <div class="metric">
+        <p class="metric-title">Days Left to Target</p>
+        <p id="daysLeftLabel" class="metric-value">-</p>
+      </div>
+      <div class="metric">
+        <p class="metric-title">Grow Progress</p>
+        <p id="growProgress" class="metric-value">0%</p>
+        <div class="progress-wrap">
+          <div id="growProgressBar" class="progress-bar"></div>
+        </div>
+      </div>
+      <div class="metric">
+        <p class="metric-title">Weekly Grow</p>
+        <p id="weeklyGrow" class="metric-value">USD 0.00</p>
+      </div>
+      <div class="metric">
+        <p class="metric-title">Monthly Grow</p>
+        <p id="monthlyGrow" class="metric-value">USD 0.00</p>
+      </div>
+      <div class="form-actions">
+        <button id="backToProjectBtn" type="button" class="back-btn">⬅️ Back to Project Grow</button>
+      </div>
+      <p id="formStatus" class="status" aria-live="polite"></p>
+    </section>
+  </main>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="tabung-progress.js"></script>
+</body>
+</html>

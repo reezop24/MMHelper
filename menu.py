@@ -27,6 +27,7 @@ SUBMENU_PROJECT_BUTTON_SET_NEW_GOAL = "🎯 Set New Goal"
 SUBMENU_PROJECT_BUTTON_MISSION = "🧭 Mission"
 SUBMENU_PROJECT_BUTTON_MISSION_LOCKED = "🔒 Mission"
 SUBMENU_PROJECT_BUTTON_TABUNG_PROGRESS = "🏦 Tabung Progress"
+SUBMENU_PROJECT_BUTTON_TABUNG_PROGRESS_LOCKED = "🔒 Tabung Progress"
 SUBMENU_PROJECT_BUTTON_ACHIEVEMENT = "🏆 Achievement"
 
 SUBMENU_ADMIN_BUTTON_BETA_RESET = "🧪 BETA RESET"
@@ -105,6 +106,8 @@ def project_grow_keyboard(
     set_new_goal_url: str,
     mission_url: str,
     can_open_mission: bool,
+    tabung_progress_url: str,
+    can_open_tabung_progress: bool,
 ) -> ReplyKeyboardMarkup:
     mission_button: KeyboardButton | str
     if can_open_mission:
@@ -115,6 +118,15 @@ def project_grow_keyboard(
     else:
         mission_button = SUBMENU_PROJECT_BUTTON_MISSION_LOCKED
 
+    tabung_progress_button: KeyboardButton | str
+    if can_open_tabung_progress:
+        tabung_progress_button = KeyboardButton(
+            SUBMENU_PROJECT_BUTTON_TABUNG_PROGRESS,
+            web_app=WebAppInfo(url=tabung_progress_url),
+        )
+    else:
+        tabung_progress_button = SUBMENU_PROJECT_BUTTON_TABUNG_PROGRESS_LOCKED
+
     rows = [
         [
             KeyboardButton(
@@ -123,7 +135,7 @@ def project_grow_keyboard(
             ),
             mission_button,
         ],
-        [SUBMENU_PROJECT_BUTTON_TABUNG_PROGRESS, SUBMENU_PROJECT_BUTTON_ACHIEVEMENT],
+        [tabung_progress_button, SUBMENU_PROJECT_BUTTON_ACHIEVEMENT],
         [SUBMENU_MM_BUTTON_BACK_MAIN],
     ]
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)

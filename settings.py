@@ -250,6 +250,36 @@ def get_project_grow_mission_webapp_url(
     return f"{page}?{query}"
 
 
+def get_tabung_progress_webapp_url(
+    name: str,
+    saved_date: str,
+    tabung_balance_usd: float,
+    grow_target_usd: float,
+    capital_target_usd: float,
+    days_left: int,
+    days_left_label: str,
+    grow_progress_pct: float,
+    weekly_grow_usd: float,
+    monthly_grow_usd: float,
+) -> str:
+    page = f"{_miniapp_base_url()}/tabung-progress.html"
+    query = urlencode(
+        {
+            "name": name,
+            "saved_date": saved_date,
+            "tabung_balance_usd": f"{tabung_balance_usd:.2f}",
+            "grow_target_usd": f"{grow_target_usd:.2f}",
+            "capital_target_usd": f"{capital_target_usd:.2f}",
+            "days_left": str(max(0, int(days_left))),
+            "days_left_label": days_left_label,
+            "grow_progress_pct": f"{grow_progress_pct:.2f}",
+            "weekly_grow_usd": f"{weekly_grow_usd:.2f}",
+            "monthly_grow_usd": f"{monthly_grow_usd:.2f}",
+        }
+    )
+    return f"{page}?{query}"
+
+
 def get_notification_setting_webapp_url(name: str, saved_date: str) -> str:
     page = f"{_miniapp_base_url()}/notification-setting.html"
     query = urlencode(

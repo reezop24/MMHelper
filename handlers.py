@@ -23,6 +23,7 @@ from menu import (
     SUBMENU_PROJECT_BUTTON_MISSION_LOCKED,
     SUBMENU_PROJECT_BUTTON_SET_NEW_GOAL,
     SUBMENU_PROJECT_BUTTON_TABUNG_PROGRESS,
+    SUBMENU_PROJECT_BUTTON_TABUNG_PROGRESS_LOCKED,
     admin_panel_keyboard,
     account_activity_keyboard,
     is_admin_user,
@@ -37,6 +38,7 @@ from settings import (
     get_notification_setting_webapp_url,
     get_project_grow_mission_webapp_url,
     get_set_new_goal_webapp_url,
+    get_tabung_progress_webapp_url,
     get_trading_activity_webapp_url,
     get_withdrawal_activity_webapp_url,
 )
@@ -55,10 +57,12 @@ from storage import (
     get_project_grow_mission_state,
     get_project_grow_mission_status_text,
     get_tabung_start_date,
+    get_tabung_progress_summary,
     get_tabung_balance_usd,
     get_total_balance_usd,
     get_weekly_performance_usd,
     get_weekly_profit_loss_usd,
+    has_project_grow_goal,
     reset_all_data,
 )
 from texts import (
@@ -227,6 +231,7 @@ def _build_project_grow_keyboard_for_user(user_id: int):
     mission_status = get_project_grow_mission_status_text(user_id)
     tabung_start_date = get_tabung_start_date(user_id)
     grow_target_usd = max(float(goal_summary["target_balance_usd"]) - current_balance, 0.0)
+    tabung_progress = get_tabung_progress_summary(user_id)
     mission_url = get_project_grow_mission_webapp_url(
         name=summary["name"],
         current_balance_usd=current_balance,
@@ -254,10 +259,24 @@ def _build_project_grow_keyboard_for_user(user_id: int):
         grow_target_usd=grow_target_usd,
         target_label=goal_summary["target_label"],
     )
+    tabung_progress_url = get_tabung_progress_webapp_url(
+        name=summary["name"],
+        saved_date=summary["saved_date"],
+        tabung_balance_usd=tabung_progress["tabung_balance_usd"],
+        grow_target_usd=tabung_progress["grow_target_usd"],
+        capital_target_usd=tabung_progress["capital_target_usd"],
+        days_left=tabung_progress["days_left"],
+        days_left_label=tabung_progress["days_left_label"],
+        grow_progress_pct=tabung_progress["grow_progress_pct"],
+        weekly_grow_usd=tabung_progress["weekly_grow_usd"],
+        monthly_grow_usd=tabung_progress["monthly_grow_usd"],
+    )
     return project_grow_keyboard(
         set_new_goal_url=set_new_goal_url,
         mission_url=mission_url,
         can_open_mission=can_open_project_grow_mission(user_id),
+        tabung_progress_url=tabung_progress_url,
+        can_open_tabung_progress=has_project_grow_goal(user_id),
     )
 
 
@@ -469,6 +488,15 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
             TABUNG_PROGRESS_OPENED_TEXT,
             reply_markup=_build_project_grow_keyboard_for_user(user.id),
             parse_mode="Markdown",
+        )
+        return
+
+    if text == SUBMENU_PROJECT_BUTTON_TABUNG_PROGRESS_LOCKED:
+        await send_screen(
+            context,
+            message.chat_id,
+            "Tabung Progress masih locked. Set New Goal dulu baru boleh buka.",
+            reply_markup=_build_project_grow_keyboard_for_user(user.id),
         )
         return
 
