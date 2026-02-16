@@ -10,7 +10,7 @@ window.MMHELPER_CONTENT = {
     return [
       "Berapa kau withdraw tadi?",
       "",
-      "Aku cek tadi untuk keseluruhan kau tengah untung " + profitUsdFormatted + ", nak ambil untung tak da hal , tapi jangan sampai modal trade kau lari"
+      "Minggu ni flow kau tengah hijau " + profitUsdFormatted + ". Nak ambil untung takde hal, asalkan modal trade kau tak lari dari plan."
     ].join("\n");
   },
 
@@ -18,7 +18,7 @@ window.MMHELPER_CONTENT = {
     return [
       "Berapa kau withdraw tadi?",
       "",
-      "Aku cek tadi untuk keseluruhan kau tengah rugi " + lossUsdFormatted + ". Kalau boleh, jaga dulu flow modal trade kau sebelum withdraw besar-besar."
+      "Minggu ni akaun tengah merah " + lossUsdFormatted + ". Kalau boleh, jaga dulu flow modal trade kau sebelum withdraw besar-besar."
     ].join("\n");
   },
 
