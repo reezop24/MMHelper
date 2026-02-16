@@ -538,6 +538,247 @@ def get_current_balance_usd(user_id: int) -> float:
     return total_balance + current_profit + total_adjustment
 
 
+def _current_tabung_month_range() -> tuple[date, date]:
+    today = malaysia_now().date()
+    first_day = today.replace(day=1)
+    next_month = (first_day.replace(day=28) + timedelta(days=4)).replace(day=1)
+    return first_day, next_month - timedelta(days=1)
+
+
+def _count_tabung_mode_this_month(user_id: int, mode: str) -> int:
+    start_date, end_date = _current_tabung_month_range()
+    count = 0
+    for record in _tabung_records_since(user_id, start_date):
+        rec_date = _record_date_myt(record)
+        if rec_date is None or rec_date > end_date:
+            continue
+        if str(record.get("mode") or "").strip().lower() == mode:
+            count += 1
+    return count
+
+
+def get_tabung_update_state(user_id: int) -> dict[str, Any]:
+    goal = get_project_grow_goal_summary(user_id)
+    target_balance = _to_float(goal.get("target_balance_usd"))
+    total_balance = get_total_balance_usd(user_id)
+    emergency_limit = 2
+    used = _count_tabung_mode_this_month(user_id, "emergency_withdrawal")
+    return {
+        "target_balance_usd": target_balance,
+        "goal_reached": target_balance > 0 and total_balance >= target_balance,
+        "emergency_limit": emergency_limit,
+        "emergency_used": used,
+        "emergency_left": max(emergency_limit - used, 0),
+    }
+
+
+def _ensure_tabung_section(user: dict[str, Any], user_id: int, saved_at_iso: str, saved_date: str, saved_time: str):
+    sections = user.setdefault("sections", {})
+    tabung_section = sections.setdefault(
+        "tabung",
+        {
+            "section": "tabung",
+            "user_id": user_id,
+            "telegram_name": user.get("telegram_name") or str(user_id),
+            "saved_at": saved_at_iso,
+            "saved_date": saved_date,
+            "saved_time": saved_time,
+            "timezone": "Asia/Kuala_Lumpur",
+            "data": {"balance_usd": 0.0, "records": []},
+        },
+    )
+    tabung_data = tabung_section.setdefault("data", {})
+    records = tabung_data.setdefault("records", [])
+    if not isinstance(records, list):
+        records = []
+        tabung_data["records"] = records
+    current_tabung_balance = get_tabung_balance_usd(user_id)
+    return sections, tabung_section, tabung_data, records, current_tabung_balance
+
+
+def _append_balance_adjustment_transfer(
+    user: dict[str, Any],
+    user_id: int,
+    mode: str,
+    net_usd: float,
+    saved_at_iso: str,
+    saved_date: str,
+    saved_time: str,
+    record_date: date,
+) -> None:
+    sections = user.setdefault("sections", {})
+    _append_monthly_record(
+        user_id,
+        "balance_adjustment",
+        {
+            "mode": mode,
+            "amount_usd": abs(float(net_usd)),
+            "net_usd": float(net_usd),
+            "saved_at": saved_at_iso,
+            "saved_date": saved_date,
+            "saved_time": saved_time,
+            "timezone": "Asia/Kuala_Lumpur",
+        },
+        record_date,
+    )
+
+    adjustment_section = sections.setdefault(
+        "balance_adjustment",
+        {
+            "section": "balance_adjustment",
+            "user_id": user_id,
+            "telegram_name": user.get("telegram_name") or str(user_id),
+            "saved_at": saved_at_iso,
+            "saved_date": saved_date,
+            "saved_time": saved_time,
+            "timezone": "Asia/Kuala_Lumpur",
+            "data": {"record_count": 0},
+        },
+    )
+    adjustment_data = adjustment_section.setdefault("data", {})
+    adjustment_data["record_count"] = _to_int(adjustment_data.get("record_count")) + 1
+    adjustment_section["saved_at"] = saved_at_iso
+    adjustment_section["saved_date"] = saved_date
+    adjustment_section["saved_time"] = saved_time
+    adjustment_section["timezone"] = "Asia/Kuala_Lumpur"
+    _bump_rollup(
+        user,
+        saved_at_iso=saved_at_iso,
+        balance_adjustment_delta=float(net_usd),
+        balance_adjustment_count=1,
+    )
+
+
+def apply_tabung_update_action(user_id: int, action: str, amount_usd: float) -> tuple[bool, str]:
+    action = str(action or "").strip().lower()
+    amount = _to_float(amount_usd)
+    if amount <= 0:
+        return False, "Jumlah kena lebih dari 0."
+
+    valid_actions = {"save", "emergency_withdrawal", "goal_to_current", "goal_direct_withdrawal"}
+    if action not in valid_actions:
+        return False, "Action tabung tak dikenali."
+
+    db = load_core_db()
+    user = db.get("users", {}).get(str(user_id))
+    if not user:
+        return False, "User tak dijumpai."
+
+    now = malaysia_now()
+    saved_at_iso = now.isoformat()
+    saved_date = now.strftime("%Y-%m-%d")
+    saved_time = now.strftime("%H:%M:%S")
+
+    sections, tabung_section, tabung_data, records, current_tabung_balance = _ensure_tabung_section(
+        user, user_id, saved_at_iso, saved_date, saved_time
+    )
+    current_balance = get_current_balance_usd(user_id)
+    state = get_tabung_update_state(user_id)
+
+    if action == "save":
+        if amount > current_balance:
+            return False, f"Current Balance tak cukup. Baki sekarang USD {current_balance:.2f}."
+        new_balance = current_tabung_balance + amount
+        records.append(
+            {
+                "mode": "save",
+                "amount_usd": float(amount),
+                "balance_after_usd": float(new_balance),
+                "saved_at": saved_at_iso,
+                "saved_date": saved_date,
+                "saved_time": saved_time,
+                "timezone": "Asia/Kuala_Lumpur",
+            }
+        )
+        tabung_data["balance_usd"] = float(new_balance)
+        _append_balance_adjustment_transfer(
+            user,
+            user_id,
+            "tabung_save_transfer_out",
+            -float(amount),
+            saved_at_iso,
+            saved_date,
+            saved_time,
+            now.date(),
+        )
+
+    elif action == "emergency_withdrawal":
+        if state["emergency_left"] <= 0:
+            return False, "Emergency withdrawal dah capai limit 2 kali bulan ni."
+        if amount > current_tabung_balance:
+            return False, f"Baki tabung tak cukup. Baki sekarang USD {current_tabung_balance:.2f}."
+        new_balance = current_tabung_balance - amount
+        records.append(
+            {
+                "mode": "emergency_withdrawal",
+                "amount_usd": -float(amount),
+                "balance_after_usd": float(new_balance),
+                "saved_at": saved_at_iso,
+                "saved_date": saved_date,
+                "saved_time": saved_time,
+                "timezone": "Asia/Kuala_Lumpur",
+            }
+        )
+        tabung_data["balance_usd"] = float(new_balance)
+
+    elif action == "goal_to_current":
+        if not state["goal_reached"]:
+            return False, "Action ni hanya boleh guna bila goal dah capai."
+        if amount > current_tabung_balance:
+            return False, f"Baki tabung tak cukup. Baki sekarang USD {current_tabung_balance:.2f}."
+        new_balance = current_tabung_balance - amount
+        records.append(
+            {
+                "mode": "goal_withdraw_to_current",
+                "amount_usd": -float(amount),
+                "balance_after_usd": float(new_balance),
+                "saved_at": saved_at_iso,
+                "saved_date": saved_date,
+                "saved_time": saved_time,
+                "timezone": "Asia/Kuala_Lumpur",
+            }
+        )
+        tabung_data["balance_usd"] = float(new_balance)
+        _append_balance_adjustment_transfer(
+            user,
+            user_id,
+            "tabung_goal_withdraw_to_current",
+            float(amount),
+            saved_at_iso,
+            saved_date,
+            saved_time,
+            now.date(),
+        )
+
+    elif action == "goal_direct_withdrawal":
+        if not state["goal_reached"]:
+            return False, "Action ni hanya boleh guna bila goal dah capai."
+        if amount > current_tabung_balance:
+            return False, f"Baki tabung tak cukup. Baki sekarang USD {current_tabung_balance:.2f}."
+        new_balance = current_tabung_balance - amount
+        records.append(
+            {
+                "mode": "goal_direct_withdrawal",
+                "amount_usd": -float(amount),
+                "balance_after_usd": float(new_balance),
+                "saved_at": saved_at_iso,
+                "saved_date": saved_date,
+                "saved_time": saved_time,
+                "timezone": "Asia/Kuala_Lumpur",
+            }
+        )
+        tabung_data["balance_usd"] = float(new_balance)
+
+    tabung_section["saved_at"] = saved_at_iso
+    tabung_section["saved_date"] = saved_date
+    tabung_section["saved_time"] = saved_time
+    tabung_section["timezone"] = "Asia/Kuala_Lumpur"
+    user["updated_at"] = saved_at_iso
+    save_core_db(db)
+
+    return True, "ok"
+
+
 def _month_range(reference_date: date) -> tuple[date, date]:
     first_day = reference_date.replace(day=1)
     next_month = (first_day.replace(day=28) + timedelta(days=4)).replace(day=1)

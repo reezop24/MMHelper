@@ -79,6 +79,7 @@ def account_activity_keyboard(
     deposit_activity_url: str,
     withdrawal_activity_url: str,
     trading_activity_url: str,
+    tabung_update_url: str,
 ) -> ReplyKeyboardMarkup:
     rows = [
         [SUBMENU_ACCOUNT_BUTTON_SUMMARY],
@@ -100,7 +101,7 @@ def account_activity_keyboard(
                 web_app=WebAppInfo(url=trading_activity_url),
             )
         ],
-        [SUBMENU_ACCOUNT_BUTTON_TABUNG],
+        [KeyboardButton(SUBMENU_ACCOUNT_BUTTON_TABUNG, web_app=WebAppInfo(url=tabung_update_url))],
         [SUBMENU_MM_BUTTON_BACK_MAIN],
     ]
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)

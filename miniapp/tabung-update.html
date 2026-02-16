@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Update Tabung</title>
+  <link rel="stylesheet" href="global.css" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 16px;
+      background: rgba(6, 20, 47, 0.55);
+      border: 1px solid var(--border-input);
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .summary-item {
+      font-size: 14px;
+      color: #dce8ff;
+    }
+
+    .summary-item strong {
+      color: #fff;
+    }
+
+    .lead {
+      margin: 0 0 12px;
+      color: #d6e6ff;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .mode-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .mode-btn {
+      margin: 0;
+      width: 100%;
+      border: 1px solid rgba(79, 126, 194, 0.6);
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #dce8ff;
+      background: rgba(8, 30, 62, 0.8);
+      min-height: 52px;
+    }
+
+    .mode-btn.active {
+      border-color: rgba(113, 177, 255, 0.95);
+      background: linear-gradient(90deg, #2569bf 0%, #2f89ff 100%);
+      color: #fff;
+    }
+
+    .mode-btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .note {
+      margin: 8px 0 0;
+      color: #a8c0e8;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .panel {
+      margin-top: 12px;
+      border: 1px solid rgba(83, 127, 193, 0.45);
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(6, 20, 46, 0.78);
+    }
+
+    .panel h3 {
+      margin: 0 0 8px;
+      font-size: 16px;
+      color: #fff;
+    }
+
+    .panel p {
+      margin: 0 0 10px;
+      color: #cfe0fb;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .full-input {
+      width: 100%;
+      border: 1px solid var(--border-input);
+      background: #06142f;
+      color: var(--text);
+      border-radius: 10px;
+      padding: 11px 12px;
+      font-size: 15px;
+    }
+
+    .goal-options {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .goal-option {
+      border: 1px solid rgba(83, 127, 193, 0.45);
+      border-radius: 10px;
+      padding: 10px;
+      background: rgba(10, 28, 58, 0.82);
+      color: #e6efff;
+      font-size: 13px;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .goal-option input {
+      width: 16px;
+      height: 16px;
+      margin-top: 2px;
+      flex: 0 0 auto;
+    }
+
+    .form-actions {
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .secondary-btn {
+      margin: 0;
+      width: auto;
+      min-width: 170px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid #496ea9;
+      background: rgba(12, 34, 71, 0.9);
+      color: #e7f0ff;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .hide {
+      display: none;
+    }
+
+    @media (max-width: 680px) {
+      .mode-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .summary {
+        gap: 6px;
+        padding: 10px;
+      }
+
+      .summary-item {
+        font-size: 12.5px;
+        line-height: 1.25;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="top-nav">
+      <button id="topBackBtn" type="button" class="top-back-btn">← Back</button>
+    </div>
+
+    <header class="hero">
+      <img class="logo" src="logo.png" alt="MM HELPER Logo" />
+      <h1>Update Tabung</h1>
+      <p>Satu tempat untuk urus simpanan tabung kau.</p>
+    </header>
+
+    <section class="summary">
+      <div class="summary-item"><strong>Name:</strong> <span id="summaryName">-</span></div>
+      <div class="summary-item"><strong>Tarikh mula:</strong> <span id="summaryDate">-</span></div>
+      <div class="summary-item"><strong>Current Balance:</strong> USD <span id="summaryCurrentBalance">0.00</span></div>
+      <div class="summary-item"><strong>Tabung Balance:</strong> USD <span id="summaryTabungBalance">0.00</span></div>
+      <div class="summary-item"><strong>Total Balance:</strong> USD <span id="summaryTotalBalance">0.00</span></div>
+      <div class="summary-item"><strong>Goal Target:</strong> USD <span id="summaryGoalTarget">0.00</span></div>
+    </section>
+
+    <section class="card">
+      <p class="lead">
+        Dalam menu ni, duit tabung datang dari <strong>Current Balance</strong> kau sendiri. Bukan dari duit luar.
+        Jadi setiap simpanan tabung memang auto tolak dari Current Balance.
+      </p>
+
+      <div class="mode-grid">
+        <button id="modeSave" type="button" class="mode-btn active">Simpan</button>
+        <button id="modeEmergency" type="button" class="mode-btn">Withdrawal Kecemasan</button>
+        <button id="modeGoal" type="button" class="mode-btn">Withdrawal Bila Goal Capai</button>
+      </div>
+
+      <p id="modeNote" class="note"></p>
+
+      <form id="tabungForm" class="panel">
+        <h3 id="panelTitle">Simpan ke Tabung</h3>
+        <p id="panelDesc"></p>
+
+        <div id="goalOptionsWrap" class="goal-options hide">
+          <label class="goal-option">
+            <input type="radio" name="goal_mode" value="goal_to_current" checked />
+            <span>Pengeluaran ke Current Balance (duit masuk semula ke balance trade dalam bot)</span>
+          </label>
+          <label class="goal-option">
+            <input type="radio" name="goal_mode" value="goal_direct_withdrawal" />
+            <span>Pengeluaran terus (duit keluar dari ledger bot)</span>
+          </label>
+          <label class="goal-option">
+            <input type="radio" name="goal_mode" value="goal_keep_and_new_goal" />
+            <span>Kekalkan dalam tabung & terus pergi Set New Goal</span>
+          </label>
+        </div>
+
+        <div id="amountField" class="field">
+          <label class="question" for="amountInput">Jumlah (USD)</label>
+          <input id="amountInput" class="full-input" name="amount" type="number" min="0.01" step="0.01" placeholder="Contoh: 50" required />
+        </div>
+
+        <button id="submitBtn" type="submit">✅ Submit</button>
+        <div class="form-actions">
+          <button id="backToAccountBtn" type="button" class="secondary-btn">⬅️ Back to Account Activity</button>
+        </div>
+        <p id="formStatus" class="status" aria-live="polite"></p>
+      </form>
+    </section>
+  </main>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="tabung-update.js"></script>
+</body>
+</html>

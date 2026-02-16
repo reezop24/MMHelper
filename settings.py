@@ -296,3 +296,31 @@ def get_transaction_history_webapp_url(
         }
     )
     return f"{page}?{query}"
+
+
+def get_tabung_update_webapp_url(
+    name: str,
+    saved_date: str,
+    current_balance_usd: float,
+    tabung_balance_usd: float,
+    total_balance_usd: float,
+    target_balance_usd: float,
+    goal_reached: bool,
+    emergency_left: int,
+    set_new_goal_url: str,
+) -> str:
+    page = f"{_miniapp_base_url()}/tabung-update.html"
+    query = urlencode(
+        {
+            "name": name,
+            "saved_date": saved_date,
+            "current_balance_usd": f"{current_balance_usd:.2f}",
+            "tabung_balance_usd": f"{tabung_balance_usd:.2f}",
+            "total_balance_usd": f"{total_balance_usd:.2f}",
+            "target_balance_usd": f"{target_balance_usd:.2f}",
+            "goal_reached": "1" if goal_reached else "0",
+            "emergency_left": str(max(0, int(emergency_left))),
+            "set_new_goal_url": set_new_goal_url,
+        }
+    )
+    return f"{page}?{query}"

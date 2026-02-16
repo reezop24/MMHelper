@@ -23,6 +23,7 @@ from settings import (
     get_notification_setting_webapp_url,
     get_project_grow_mission_webapp_url,
     get_set_new_goal_webapp_url,
+    get_tabung_update_webapp_url,
     get_tabung_progress_webapp_url,
     get_transaction_history_webapp_url,
     get_trading_activity_webapp_url,
@@ -35,6 +36,7 @@ from storage import (
     apply_balance_adjustment,
     apply_project_grow_unlock_to_tabung,
     apply_initial_capital_reset,
+    apply_tabung_update_action,
     get_balance_adjustment_rules,
     can_open_project_grow_mission,
     can_reset_initial_capital,
@@ -46,6 +48,7 @@ from storage import (
     get_project_grow_mission_status_text,
     get_tabung_balance_usd,
     get_tabung_progress_summary,
+    get_tabung_update_state,
     get_tabung_start_date,
     get_total_balance_usd,
     get_transaction_history_records,
@@ -119,6 +122,45 @@ def _build_trading_saved_text(user_id: int, mode: str, amount_usd: float) -> str
         f"{_weekly_pl_line(user_id)}\n\n"
         f"Current Balance sekarang: **{_usd(get_current_balance_usd(user_id))}**.\n"
         f"Baki tabung sekarang: **{_usd(get_tabung_balance_usd(user_id))}**."
+    )
+
+
+def _build_tabung_saved_text(user_id: int, action: str, amount_usd: float) -> str:
+    current_balance = _usd(get_current_balance_usd(user_id))
+    tabung_balance = _usd(get_tabung_balance_usd(user_id))
+    total_balance = _usd(get_total_balance_usd(user_id))
+    if action == "save":
+        return (
+            "Nice, simpanan tabung kau dah masuk ✅\n\n"
+            f"Kau baru simpan **{_usd(amount_usd)}** ke tabung.\n"
+            "Jumlah ni diambil terus dari Current Balance kau.\n\n"
+            f"Current Balance sekarang: **{current_balance}**\n"
+            f"Tabung Balance sekarang: **{tabung_balance}**\n"
+            f"Total Balance sekarang: **{total_balance}**"
+        )
+    if action == "emergency_withdrawal":
+        return (
+            "Emergency withdrawal dah direkod ✅\n\n"
+            f"Kau keluarkan **{_usd(amount_usd)}** dari tabung.\n"
+            "Aku ingatkan je, guna mode ni bila betul-betul perlu.\n\n"
+            f"Current Balance kekal: **{current_balance}**\n"
+            f"Tabung Balance sekarang: **{tabung_balance}**\n"
+            f"Total Balance sekarang: **{total_balance}**"
+        )
+    if action == "goal_to_current":
+        return (
+            "Withdrawal goal ke Current Balance berjaya ✅\n\n"
+            f"Kau pindahkan **{_usd(amount_usd)}** dari tabung ke Current Balance.\n\n"
+            f"Current Balance sekarang: **{current_balance}**\n"
+            f"Tabung Balance sekarang: **{tabung_balance}**\n"
+            f"Total Balance sekarang: **{total_balance}**"
+        )
+    return (
+        "Withdrawal goal terus berjaya ✅\n\n"
+        f"Kau keluarkan **{_usd(amount_usd)}** terus dari tabung.\n\n"
+        f"Current Balance kekal: **{current_balance}**\n"
+        f"Tabung Balance sekarang: **{tabung_balance}**\n"
+        f"Total Balance sekarang: **{total_balance}**"
     )
 
 
@@ -201,13 +243,16 @@ def _build_account_activity_keyboard_for_user(user_id: int):
     tabung_balance = get_tabung_balance_usd(user_id)
     weekly_performance = get_weekly_performance_usd(user_id)
     monthly_performance = get_monthly_performance_usd(user_id)
+    goal_summary = get_project_grow_goal_summary(user_id)
+    tabung_update_state = get_tabung_update_state(user_id)
+    tabung_start_date = get_tabung_start_date(user_id)
 
     common_kwargs = {
         "name": summary["name"],
         "initial_capital_usd": summary["initial_capital_usd"],
         "current_balance_usd": current_balance,
         "saved_date": summary["saved_date"],
-        "tabung_start_date": get_tabung_start_date(user_id),
+        "tabung_start_date": tabung_start_date,
         "current_profit_usd": current_profit,
         "total_balance_usd": total_balance,
         "tabung_balance_usd": tabung_balance,
@@ -218,11 +263,34 @@ def _build_account_activity_keyboard_for_user(user_id: int):
     deposit_url = get_deposit_activity_webapp_url(**common_kwargs)
     withdrawal_url = get_withdrawal_activity_webapp_url(**common_kwargs)
     trading_url = get_trading_activity_webapp_url(**common_kwargs)
+    set_new_goal_url = get_set_new_goal_webapp_url(
+        name=summary["name"],
+        current_balance_usd=current_balance,
+        saved_date=summary["saved_date"],
+        tabung_start_date=tabung_start_date,
+        mission_status=get_project_grow_mission_status_text(user_id),
+        has_goal=goal_summary["target_balance_usd"] > 0,
+        target_balance_usd=goal_summary["target_balance_usd"],
+        grow_target_usd=max(float(goal_summary["target_balance_usd"]) - current_balance, 0.0),
+        target_label=goal_summary["target_label"],
+    )
+    tabung_update_url = get_tabung_update_webapp_url(
+        name=summary["name"],
+        saved_date=summary["saved_date"],
+        current_balance_usd=current_balance,
+        tabung_balance_usd=tabung_balance,
+        total_balance_usd=total_balance,
+        target_balance_usd=float(goal_summary["target_balance_usd"]),
+        goal_reached=bool(tabung_update_state["goal_reached"]),
+        emergency_left=int(tabung_update_state["emergency_left"]),
+        set_new_goal_url=set_new_goal_url,
+    )
 
     return account_activity_keyboard(
         deposit_activity_url=deposit_url,
         withdrawal_activity_url=withdrawal_url,
         trading_activity_url=trading_url,
+        tabung_update_url=tabung_update_url,
     )
 
 
@@ -537,6 +605,41 @@ async def _handle_trading_activity_update(payload: dict, update: Update, context
         context,
         message.chat_id,
         _build_trading_saved_text(user_id, mode, amount_usd),
+        reply_markup=_build_account_activity_keyboard_for_user(user_id),
+        parse_mode="Markdown",
+    )
+
+
+async def _handle_tabung_update_action(payload: dict, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    user_id = update.effective_user.id
+
+    action = str(payload.get("action") or "").strip().lower()
+    try:
+        amount_usd = float(payload.get("amount_usd"))
+    except (TypeError, ValueError):
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Jumlah tabung tak sah.",
+            reply_markup=_build_account_activity_keyboard_for_user(user_id),
+        )
+        return
+
+    ok, status = apply_tabung_update_action(user_id, action, amount_usd)
+    if not ok:
+        await send_screen(
+            context,
+            message.chat_id,
+            f"❌ {status}",
+            reply_markup=_build_account_activity_keyboard_for_user(user_id),
+        )
+        return
+
+    await send_screen(
+        context,
+        message.chat_id,
+        _build_tabung_saved_text(user_id, action, amount_usd),
         reply_markup=_build_account_activity_keyboard_for_user(user_id),
         parse_mode="Markdown",
     )
@@ -891,6 +994,10 @@ async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if payload_type == "trading_activity_update":
         await _handle_trading_activity_update(payload, update, context)
+        return
+
+    if payload_type == "tabung_update_action":
+        await _handle_tabung_update_action(payload, update, context)
         return
 
     if payload_type == "set_new_goal":
