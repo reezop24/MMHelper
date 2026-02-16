@@ -24,8 +24,8 @@ Kalau tak boleh hadam benda ni, boleh keluar awal-awal.
 Kalau tekan Teruskan, maknanya kau setuju dan kita proceed macam orang matang 😎"""
 
 DECLINED_TEXT = (
-    "❌ Anda pilih untuk tidak setuju.\\n\\n"
-    "Akses ke MM HELPER dihentikan. Tekan /start semula bila anda sudah bersedia."
+    "❌ Okey, kau pilih untuk stop dulu.\\n\\n"
+    "No hal. Tekan /start balik bila dah ready nak proceed."
 )
 
 WHY_MM_HELPER_TEXT = """⚙️ Kenapa MM HELPER Wujud?
@@ -54,8 +54,20 @@ Jangan tipu modal… nanti sistem tak boleh selamatkan kau 😌
 
 Tekan Initial Setup untuk teruskan."""
 
-SETUP_SAVED_TEXT = (
-    "✅ Setup anda berjaya disimpan.\n\n"
-    "MM HELPER dah rekod tetapan asas anda dalam USD.\n"
-    "Anda dibawa ke Main Menu."
+SETUP_SAVED_TEXT = """Setup dah lock 🔒
+Modal kau dah masuk sistem.
+
+Sekarang kita tengok kau betul-betul nak jaga akaun…
+atau nak ulang cerita “burn account” lagi 😏
+
+Main Menu ready !!"""
+
+RETURNING_USER_TEXT = (
+    "👋 Welcome back! Setup kau dah siap, jadi tak payah isi lagi.\\n\\n"
+    "Main Menu terus, jom jalan."
+)
+
+BETA_RESET_DONE_TEXT = (
+    "🧪 BETA RESET done. Semua data dah clear.\\n\\n"
+    "Kita start balik dari awal, no mercy 😎"
 )

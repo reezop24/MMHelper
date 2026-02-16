@@ -39,6 +39,17 @@ def save_db(data: dict[str, Any]) -> None:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
+def has_initial_setup(user_id: int) -> bool:
+    db = load_db()
+    user = db.get("users", {}).get(str(user_id), {})
+    sections = user.get("sections", {})
+    return bool(sections.get("initial_setup"))
+
+
+def reset_all_data() -> None:
+    save_db(_default_db())
+
+
 def save_user_setup_section(
     user_id: int,
     telegram_name: str,

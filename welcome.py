@@ -10,24 +10,59 @@ from telegram import (
 )
 from telegram.ext import ContextTypes
 
+from menu import main_menu_keyboard
 from settings import get_setup_webapp_url
-from texts import TNC_TEXT, DECLINED_TEXT, WHY_MM_HELPER_TEXT
+from storage import has_initial_setup
+from texts import DECLINED_TEXT, RETURNING_USER_TEXT, TNC_TEXT, WHY_MM_HELPER_TEXT
+from ui import send_screen
 
 TNC_ACCEPT = "TNC_ACCEPT"
 TNC_DECLINE = "TNC_DECLINE"
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    keyboard = InlineKeyboardMarkup(
+def _tnc_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
         [
-            [InlineKeyboardButton("Agree & Continue", callback_data=TNC_ACCEPT)],
-            [InlineKeyboardButton("Decline", callback_data=TNC_DECLINE)],
+            [InlineKeyboardButton("✅ Agree & Continue", callback_data=TNC_ACCEPT)],
+            [InlineKeyboardButton("❌ Decline", callback_data=TNC_DECLINE)],
         ]
     )
 
-    await update.effective_message.reply_text(
+
+def _initial_setup_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        [
+            [
+                KeyboardButton(
+                    "🚀 Initial Setup",
+                    web_app=WebAppInfo(url=get_setup_webapp_url()),
+                )
+            ]
+        ],
+        resize_keyboard=True,
+    )
+
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    chat = update.effective_chat
+    if not user or not chat:
+        return
+
+    if has_initial_setup(user.id):
+        await send_screen(
+            context,
+            chat.id,
+            RETURNING_USER_TEXT,
+            reply_markup=main_menu_keyboard(),
+        )
+        return
+
+    await send_screen(
+        context,
+        chat.id,
         TNC_TEXT,
-        reply_markup=keyboard,
+        reply_markup=_tnc_keyboard(),
     )
 
 
@@ -40,27 +75,21 @@ async def handle_tnc_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if query.data == TNC_ACCEPT:
         context.user_data["tnc_accepted"] = True
-        setup_keyboard = ReplyKeyboardMarkup(
-            [
-                [
-                    KeyboardButton(
-                        "Initial Setup",
-                        web_app=WebAppInfo(url=get_setup_webapp_url()),
-                    )
-                ]
-            ],
-            resize_keyboard=True,
-        )
         try:
             await query.message.delete()
         except Exception:
             pass
-        await context.bot.send_message(
-            chat_id=query.message.chat_id,
-            text=WHY_MM_HELPER_TEXT,
-            reply_markup=setup_keyboard,
+        await send_screen(
+            context,
+            query.message.chat_id,
+            WHY_MM_HELPER_TEXT,
+            reply_markup=_initial_setup_keyboard(),
         )
         return
 
     context.user_data["tnc_accepted"] = False
-    await query.edit_message_text(DECLINED_TEXT)
+    try:
+        await query.message.delete()
+    except Exception:
+        pass
+    await send_screen(context, query.message.chat_id, DECLINED_TEXT)

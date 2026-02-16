@@ -10,6 +10,7 @@ from telegram.ext import ContextTypes
 from menu import main_menu_keyboard
 from storage import save_user_setup_section
 from texts import SETUP_SAVED_TEXT
+from ui import send_screen
 
 
 async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -20,7 +21,7 @@ async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE
     try:
         payload = json.loads(message.web_app_data.data)
     except json.JSONDecodeError:
-        await message.reply_text("❌ Data setup tak sah. Cuba submit semula.")
+        await send_screen(context, message.chat_id, "❌ Eh data tak lepas. Cuba submit lagi sekali.")
         return
 
     if payload.get("type") != "setup_profile":
@@ -28,7 +29,7 @@ async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     name = (payload.get("name") or "").strip()
     if not name:
-        await message.reply_text("❌ Nama wajib diisi.")
+        await send_screen(context, message.chat_id, "❌ Nama kosong lagi. Isi dulu bro.")
         return
 
     try:
@@ -37,16 +38,16 @@ async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE
         max_daily_loss = float(payload.get("max_daily_loss_pct"))
         daily_profit_target = float(payload.get("daily_profit_target_pct"))
     except (TypeError, ValueError):
-        await message.reply_text("❌ Nilai angka tak sah. Sila semak semula borang setup.")
+        await send_screen(context, message.chat_id, "❌ Nombor ada yang pelik. Check balik input.")
         return
 
     if initial_capital <= 0:
-        await message.reply_text("❌ Modal permulaan mesti lebih besar dari 0.")
+        await send_screen(context, message.chat_id, "❌ Modal kena lebih dari 0, baru game start.")
         return
 
     numeric_values = [risk_per_trade, max_daily_loss, daily_profit_target]
     if any(v <= 0 for v in numeric_values):
-        await message.reply_text("❌ Nilai peratus mesti lebih besar dari 0.")
+        await send_screen(context, message.chat_id, "❌ Value % kena lebih dari 0 boss.")
         return
 
     telegram_name = (update.effective_user.full_name or "").strip() or str(update.effective_user.id)
@@ -64,7 +65,9 @@ async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE
         },
     )
 
-    await message.reply_text(
+    await send_screen(
+        context,
+        message.chat_id,
         SETUP_SAVED_TEXT,
         reply_markup=main_menu_keyboard(),
     )

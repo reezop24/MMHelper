@@ -3,9 +3,10 @@
 from telegram import ReplyKeyboardMarkup
 
 MAIN_MENU_ROWS = [
-    ["MM Helper setting", "Risk Calculator"],
-    ["Transaction", "Project Grow"],
-    ["Statistic", "Extra"],
+    ["⚙️ MM Helper setting", "🧮 Risk Calculator"],
+    ["💳 Transaction", "📈 Project Grow"],
+    ["📊 Statistic", "🧰 Extra"],
+    ["🧪 BETA RESET"],
 ]
 
 

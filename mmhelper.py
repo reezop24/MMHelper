@@ -11,6 +11,7 @@ from telegram.ext import (
     filters,
 )
 
+from handlers import handle_text_actions
 from setup_flow import handle_setup_webapp
 from welcome import TNC_ACCEPT, TNC_DECLINE, handle_tnc_callback, start
 
@@ -45,6 +46,7 @@ def main() -> None:
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(handle_tnc_callback, pattern=f"^({TNC_ACCEPT}|{TNC_DECLINE})$"))
     app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_setup_webapp))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_actions))
 
     app.run_polling()
 
