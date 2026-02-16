@@ -11,8 +11,8 @@ from telegram import (
 from telegram.ext import ContextTypes
 
 from menu import main_menu_keyboard
-from settings import get_setup_webapp_url
-from storage import has_initial_setup
+from settings import get_risk_calculator_webapp_url, get_setup_webapp_url
+from storage import get_initial_setup_summary, has_initial_setup
 from texts import DECLINED_TEXT, RETURNING_USER_TEXT, TNC_TEXT, WHY_MM_HELPER_TEXT
 from ui import send_screen
 
@@ -50,11 +50,16 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
 
     if has_initial_setup(user.id):
+        summary = get_initial_setup_summary(user.id)
+        risk_url = get_risk_calculator_webapp_url(
+            name=summary["name"],
+            saved_date=summary["saved_date"],
+        )
         await send_screen(
             context,
             chat.id,
             RETURNING_USER_TEXT,
-            reply_markup=main_menu_keyboard(user.id),
+            reply_markup=main_menu_keyboard(user.id, risk_calculator_url=risk_url),
             parse_mode="Markdown",
         )
         return

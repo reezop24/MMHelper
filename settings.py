@@ -282,6 +282,17 @@ def get_notification_setting_webapp_url(name: str, saved_date: str) -> str:
     return f"{page}?{query}"
 
 
+def get_risk_calculator_webapp_url(name: str, saved_date: str) -> str:
+    page = f"{_miniapp_base_url()}/risk-calculator.html"
+    query = urlencode(
+        {
+            "name": name,
+            "saved_date": saved_date,
+        }
+    )
+    return f"{page}?{query}"
+
+
 def get_transaction_history_webapp_url(
     name: str,
     saved_date: str,

@@ -14,6 +14,7 @@ from menu import (
 from handlers import (
     _build_account_activity_keyboard_for_user,
     _build_admin_panel_keyboard_for_user,
+    _build_main_menu_keyboard_for_user,
     _build_mm_setting_keyboard_for_user,
     _build_project_grow_keyboard_for_user,
     _build_records_reports_keyboard_for_user,
@@ -195,7 +196,7 @@ async def _handle_initial_setup(payload: dict, update: Update, context: ContextT
         context,
         message.chat_id,
         SETUP_SAVED_TEXT,
-        reply_markup=main_menu_keyboard(update.effective_user.id),
+        reply_markup=_build_main_menu_keyboard_for_user(update.effective_user.id),
         parse_mode="Markdown",
     )
 
@@ -712,7 +713,7 @@ async def _handle_admin_panel_back_to_menu(update: Update, context: ContextTypes
             context,
             message.chat_id,
             "❌ Akses ditolak.",
-            reply_markup=main_menu_keyboard(user.id),
+            reply_markup=_build_main_menu_keyboard_for_user(user.id),
         )
         return
 
@@ -740,6 +741,74 @@ async def _handle_records_reports_back_to_menu(update: Update, context: ContextT
     )
 
 
+async def _handle_risk_calculator_submit(payload: dict, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    user = update.effective_user
+    if not user:
+        return
+
+    try:
+        balance_usd = float(payload.get("balance_usd"))
+        leverage = float(payload.get("leverage"))
+        gold_price = float(payload.get("gold_price"))
+        stop_loss_pips = float(payload.get("stop_loss_pips"))
+        max_lot_margin = float(payload.get("max_lot_margin"))
+        margin_used_usd = float(payload.get("margin_used_usd"))
+        loss_if_sl_usd = float(payload.get("loss_if_sl_usd"))
+        price_move_usd = float(payload.get("price_move_usd"))
+    except (TypeError, ValueError):
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Data risk calculator tak sah. Cuba submit semula.",
+            reply_markup=_build_main_menu_keyboard_for_user(user.id),
+        )
+        return
+
+    if min(balance_usd, leverage, gold_price, stop_loss_pips, max_lot_margin, margin_used_usd, loss_if_sl_usd) <= 0:
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Nilai risk calculator mesti lebih besar dari 0.",
+            reply_markup=_build_main_menu_keyboard_for_user(user.id),
+        )
+        return
+
+    summary_text = (
+        "*Risk Calculator Result*\n\n"
+        f"- Modal: USD {balance_usd:.2f}\n"
+        f"- Leverage: 1:{int(leverage)}\n"
+        f"- Harga XAUUSD: {gold_price:.2f}\n"
+        f"- Stop Loss: {stop_loss_pips:.0f} pips (USD {price_move_usd:.2f})\n\n"
+        f"- Max Lot ikut margin: *{max_lot_margin:.2f} lot*\n"
+        f"- Anggaran margin guna: USD {margin_used_usd:.2f}\n"
+        f"- Anggaran rugi kalau SL kena: USD {loss_if_sl_usd:.2f}\n\n"
+        "_Nota: Ini kiraan asas XAUUSD (contract 100 oz, 1 pip = 0.01)._"
+    )
+    await send_screen(
+        context,
+        message.chat_id,
+        summary_text,
+        reply_markup=_build_main_menu_keyboard_for_user(user.id),
+        parse_mode="Markdown",
+    )
+
+
+async def _handle_risk_calculator_back_to_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    user = update.effective_user
+    if not user:
+        return
+
+    await send_screen(
+        context,
+        message.chat_id,
+        "Main Menu _dibuka_.",
+        reply_markup=_build_main_menu_keyboard_for_user(user.id),
+        parse_mode="Markdown",
+    )
+
+
 async def _handle_notification_settings_save(payload: dict, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     user = update.effective_user
@@ -751,7 +820,7 @@ async def _handle_notification_settings_save(payload: dict, update: Update, cont
             context,
             message.chat_id,
             "❌ Akses ditolak.",
-            reply_markup=main_menu_keyboard(user.id),
+            reply_markup=_build_main_menu_keyboard_for_user(user.id),
         )
         return
 
@@ -850,6 +919,14 @@ async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE
         await _handle_records_reports_back_to_menu(update, context)
         return
 
+    if payload_type == "risk_calculator_submit":
+        await _handle_risk_calculator_submit(payload, update, context)
+        return
+
+    if payload_type == "risk_calculator_back_to_menu":
+        await _handle_risk_calculator_back_to_menu(update, context)
+        return
+
     if payload_type == "notification_settings_save":
         await _handle_notification_settings_save(payload, update, context)
         return
@@ -858,5 +935,5 @@ async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE
         context,
         message.chat_id,
         "❌ Jenis data tak dikenali. Sila buka semula menu dan cuba lagi.",
-        reply_markup=main_menu_keyboard(update.effective_user.id if update.effective_user else None),
+        reply_markup=_build_main_menu_keyboard_for_user(update.effective_user.id) if update.effective_user else main_menu_keyboard(),
     )

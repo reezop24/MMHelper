@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Risk Calculator</title>
+  <link rel="stylesheet" href="global.css" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 16px;
+      background: rgba(6, 20, 47, 0.55);
+      border: 1px solid var(--border-input);
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .summary-item {
+      font-size: 14px;
+      color: #dce8ff;
+    }
+
+    .summary-item strong {
+      color: #fff;
+    }
+
+    .intro {
+      white-space: pre-line;
+      line-height: 1.45;
+      margin: 0 0 14px;
+      color: #dce8ff;
+    }
+
+    .prompt {
+      margin: 0 0 8px;
+      color: #e8f0ff;
+    }
+
+    .result-card {
+      margin-top: 14px;
+      border-radius: 12px;
+      border: 1px solid #2a4f8d;
+      background: linear-gradient(165deg, rgba(10, 28, 57, 0.92), rgba(7, 19, 40, 0.96));
+      padding: 12px;
+    }
+
+    .result-title {
+      margin: 0 0 10px;
+      font-size: 13px;
+      color: #9ebdf4;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .result-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .result-item {
+      border-radius: 10px;
+      border: 1px solid rgba(93, 136, 202, 0.36);
+      background: rgba(8, 25, 52, 0.75);
+      padding: 10px;
+    }
+
+    .result-label {
+      margin: 0;
+      color: #9fb6e0;
+      font-size: 12px;
+    }
+
+    .result-value {
+      margin: 6px 0 0;
+      font-size: 16px;
+      font-weight: 700;
+      color: #f6fbff;
+    }
+
+    .result-note {
+      margin: 10px 0 0;
+      font-size: 12px;
+      color: #bcd0f0;
+    }
+
+    .form-actions {
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 10px;
+    }
+
+    .back-btn {
+      margin: 0;
+      width: auto;
+      min-width: 180px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid #496ea9;
+      background: rgba(12, 34, 71, 0.9);
+      color: #e7f0ff;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .submit-btn[disabled] {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+
+    @media (max-width: 640px) {
+      .summary {
+        gap: 6px;
+        padding: 10px;
+      }
+
+      .summary-item {
+        font-size: 12.5px;
+        line-height: 1.25;
+      }
+
+      .result-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .form-actions {
+        flex-direction: column;
+        align-items: stretch;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="top-nav">
+      <button id="topBackBtn" type="button" class="top-back-btn">← Back</button>
+    </div>
+
+    <header class="hero">
+      <img class="logo" src="logo.png" alt="MM HELPER Logo" />
+      <h1>Risk Calculator</h1>
+      <p>Kira dulu, baru entry.</p>
+    </header>
+
+    <section class="summary">
+      <div class="summary-item"><strong>Nama:</strong> <span id="summaryName">-</span></div>
+      <div class="summary-item"><strong>Tarikh mula:</strong> <span id="summaryDate">-</span></div>
+    </section>
+
+    <form id="riskForm" class="card">
+      <p class="intro">Isi angka ikut setup semasa dulu. Miniapp ni kira berdasarkan XAUUSD standard: contract size 100 oz, 1 pip = 0.01.</p>
+
+      <div class="field">
+        <p class="prompt">Modal (USD)</p>
+        <div class="with-prefix">
+          <span class="affix">USD</span>
+          <input id="balanceInput" name="balance_usd" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="Contoh 10" required />
+        </div>
+      </div>
+
+      <div class="field">
+        <p class="prompt">Leverage</p>
+        <div class="with-prefix">
+          <span class="affix">1:</span>
+          <input id="leverageInput" name="leverage" type="number" inputmode="numeric" min="1" step="1" placeholder="Contoh 2000" required />
+        </div>
+      </div>
+
+      <div class="field">
+        <p class="prompt">Harga semasa gold (XAUUSD)</p>
+        <input id="priceInput" name="gold_price" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="Contoh 3300.00" required />
+      </div>
+
+      <div class="field">
+        <p class="prompt">Stop Loss (pips)</p>
+        <input id="slPipsInput" name="stop_loss_pips" type="number" inputmode="decimal" min="0.1" step="0.1" placeholder="Contoh 60" required />
+      </div>
+
+      <div class="result-card">
+        <p class="result-title">Live Result</p>
+        <div class="result-grid">
+          <div class="result-item">
+            <p class="result-label">Max Lot ikut Margin</p>
+            <p id="maxLotValue" class="result-value">0.00 lot</p>
+          </div>
+          <div class="result-item">
+            <p class="result-label">Margin untuk Lot tersebut</p>
+            <p id="marginUsedValue" class="result-value">USD 0.00</p>
+          </div>
+          <div class="result-item">
+            <p class="result-label">Pergerakan harga ikut SL</p>
+            <p id="priceMoveValue" class="result-value">USD 0.00</p>
+          </div>
+          <div class="result-item">
+            <p class="result-label">Rugi jika SL kena</p>
+            <p id="lossIfSlValue" class="result-value">USD 0.00</p>
+          </div>
+        </div>
+        <p class="result-note">Nota: kiraan ini asas pendidikan dan boleh berbeza ikut spec broker.</p>
+      </div>
+
+      <button id="submitBtn" type="submit" class="submit-btn" disabled>✅ Simpan Result</button>
+      <div class="form-actions">
+        <button id="backToMainBtn" type="button" class="back-btn">⬅️ Back to Main Menu</button>
+      </div>
+      <p id="formStatus" class="status" aria-live="polite"></p>
+    </form>
+  </main>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="risk-calculator.js"></script>
+</body>
+</html>
