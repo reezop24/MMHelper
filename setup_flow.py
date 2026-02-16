@@ -68,6 +68,44 @@ from texts import (
 from ui import send_screen
 
 
+def _usd(value: float) -> str:
+    return f"USD {float(value):.2f}"
+
+
+def _build_deposit_saved_text(user_id: int, reason: str, amount_usd: float) -> str:
+    return (
+        "Deposit berjaya disimpan ✅\n\n"
+        f"Nice bro, transaksi masuk kali ni {_usd(amount_usd)}.\n"
+        f"Duit ni masuk untuk: {reason}.\n"
+        f"Baki semasa sekarang: {_usd(get_current_balance_usd(user_id))}.\n"
+        f"Baki tabung semasa: {_usd(get_tabung_balance_usd(user_id))}.\n\n"
+        "Good job update cepat, senang jaga rekod dengan kepala tenang."
+    )
+
+
+def _build_withdrawal_saved_text(user_id: int, reason: str, amount_usd: float) -> str:
+    return (
+        "Withdrawal berjaya disimpan ✅\n\n"
+        f"Alright bro, transaksi keluar kali ni {_usd(amount_usd)}.\n"
+        f"Duit bergerak ke: {reason}.\n"
+        f"Baki semasa sekarang: {_usd(get_current_balance_usd(user_id))}.\n"
+        f"Baki tabung semasa: {_usd(get_tabung_balance_usd(user_id))}.\n\n"
+        "Terima kasih update terus, flow jadi lebih kemas dan jelas."
+    )
+
+
+def _build_trading_saved_text(user_id: int, mode: str, amount_usd: float) -> str:
+    mode_label = "profit" if mode == "profit" else "loss"
+    return (
+        "Trading activity berjaya disimpan ✅\n\n"
+        f"Update trade dah masuk: {mode_label} {_usd(amount_usd)}.\n"
+        f"Weekly P/L minggu ni: {_usd(get_weekly_performance_usd(user_id))}.\n"
+        f"Baki semasa sekarang: {_usd(get_current_balance_usd(user_id))}.\n"
+        f"Baki tabung semasa: {_usd(get_tabung_balance_usd(user_id))}.\n\n"
+        "Mantap, keep konsisten update supaya decision lepas ni lagi padu."
+    )
+
+
 def _build_project_grow_keyboard_for_user(user_id: int):
     summary = get_initial_setup_summary(user_id)
     goal_summary = get_project_grow_goal_summary(user_id)
@@ -285,9 +323,8 @@ async def _handle_withdrawal_activity(payload: dict, update: Update, context: Co
     await send_screen(
         context,
         message.chat_id,
-        WITHDRAWAL_ACTIVITY_SAVED_TEXT,
+        _build_withdrawal_saved_text(user_id, reason, amount_usd),
         reply_markup=main_menu_keyboard(user_id),
-        parse_mode="Markdown",
     )
 
 
@@ -319,9 +356,8 @@ async def _handle_deposit_activity(payload: dict, update: Update, context: Conte
     await send_screen(
         context,
         message.chat_id,
-        DEPOSIT_ACTIVITY_SAVED_TEXT,
+        _build_deposit_saved_text(user_id, reason, amount_usd),
         reply_markup=main_menu_keyboard(user_id),
-        parse_mode="Markdown",
     )
 
 
@@ -349,9 +385,8 @@ async def _handle_trading_activity_update(payload: dict, update: Update, context
     await send_screen(
         context,
         message.chat_id,
-        TRADING_ACTIVITY_SAVED_TEXT,
+        _build_trading_saved_text(user_id, mode, amount_usd),
         reply_markup=main_menu_keyboard(user_id),
-        parse_mode="Markdown",
     )
 
 
