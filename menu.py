@@ -2,13 +2,15 @@
 
 from telegram import KeyboardButton, ReplyKeyboardMarkup, WebAppInfo
 
+ADMIN_USER_IDS = {627116869}
+
 MAIN_MENU_BUTTON_MM_SETTING = "⚙️ MM Helper Setting"
 MAIN_MENU_BUTTON_RISK = "🧮 Risk Calculator"
 MAIN_MENU_BUTTON_ACCOUNT_ACTIVITY = "📒 Account Activity"
 MAIN_MENU_BUTTON_PROJECT_GROW = "📈 Project Grow"
 MAIN_MENU_BUTTON_STATISTIC = "📊 Statistic"
 MAIN_MENU_BUTTON_EXTRA = "🧰 Extra"
-MAIN_MENU_BUTTON_BETA_RESET = "🧪 BETA RESET"
+MAIN_MENU_BUTTON_ADMIN_PANEL = "🛡️ Admin Panel"
 
 SUBMENU_MM_BUTTON_INITIAL_CAPITAL_RESET = "💸 Initial Capital Reset"
 SUBMENU_MM_BUTTON_CORRECTION = "🛠️ Correction"
@@ -27,16 +29,25 @@ SUBMENU_PROJECT_BUTTON_MISSION_LOCKED = "🔒 Mission"
 SUBMENU_PROJECT_BUTTON_TABUNG_PROGRESS = "🏦 Tabung Progress"
 SUBMENU_PROJECT_BUTTON_ACHIEVEMENT = "🏆 Achievement"
 
-MAIN_MENU_ROWS = [
+SUBMENU_ADMIN_BUTTON_BETA_RESET = "🧪 BETA RESET"
+SUBMENU_ADMIN_BUTTON_NOTIFICATION_SETTING = "🔔 Notification Setting"
+
+BASE_MAIN_MENU_ROWS = [
     [MAIN_MENU_BUTTON_MM_SETTING, MAIN_MENU_BUTTON_RISK],
     [MAIN_MENU_BUTTON_ACCOUNT_ACTIVITY, MAIN_MENU_BUTTON_PROJECT_GROW],
     [MAIN_MENU_BUTTON_STATISTIC, MAIN_MENU_BUTTON_EXTRA],
-    [MAIN_MENU_BUTTON_BETA_RESET],
 ]
 
 
-def main_menu_keyboard() -> ReplyKeyboardMarkup:
-    return ReplyKeyboardMarkup(MAIN_MENU_ROWS, resize_keyboard=True)
+def is_admin_user(user_id: int | None) -> bool:
+    return user_id in ADMIN_USER_IDS
+
+
+def main_menu_keyboard(user_id: int | None = None) -> ReplyKeyboardMarkup:
+    rows = [list(row) for row in BASE_MAIN_MENU_ROWS]
+    if is_admin_user(user_id):
+        rows.append([MAIN_MENU_BUTTON_ADMIN_PANEL])
+    return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
 
 def mm_helper_setting_keyboard(initial_capital_reset_url: str) -> ReplyKeyboardMarkup:
@@ -107,6 +118,15 @@ def project_grow_keyboard(
             mission_button,
         ],
         [SUBMENU_PROJECT_BUTTON_TABUNG_PROGRESS, SUBMENU_PROJECT_BUTTON_ACHIEVEMENT],
+        [SUBMENU_MM_BUTTON_BACK_MAIN],
+    ]
+    return ReplyKeyboardMarkup(rows, resize_keyboard=True)
+
+
+def admin_panel_keyboard() -> ReplyKeyboardMarkup:
+    rows = [
+        [SUBMENU_ADMIN_BUTTON_BETA_RESET],
+        [SUBMENU_ADMIN_BUTTON_NOTIFICATION_SETTING],
         [SUBMENU_MM_BUTTON_BACK_MAIN],
     ]
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)

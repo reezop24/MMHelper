@@ -56,6 +56,8 @@ Tekan Initial Setup untuk teruskan."""
 
 MAIN_MENU_OPENED_TEXT = "Main Menu _dibuka_."
 MM_HELPER_SETTING_OPENED_TEXT = "MM Helper Setting _dibuka_."
+ADMIN_PANEL_OPENED_TEXT = "Admin Panel _dibuka_."
+NOTIFICATION_SETTING_OPENED_TEXT = "Notification Setting _dibuka_."
 CORRECTION_OPENED_TEXT = "Correction _dibuka_."
 SYSTEM_INFO_OPENED_TEXT = "System Info _dibuka_."
 

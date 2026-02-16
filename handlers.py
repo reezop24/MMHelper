@@ -5,12 +5,14 @@ from telegram.ext import ContextTypes
 
 from menu import (
     MAIN_MENU_BUTTON_ACCOUNT_ACTIVITY,
-    MAIN_MENU_BUTTON_BETA_RESET,
+    MAIN_MENU_BUTTON_ADMIN_PANEL,
     MAIN_MENU_BUTTON_EXTRA,
     MAIN_MENU_BUTTON_MM_SETTING,
     MAIN_MENU_BUTTON_PROJECT_GROW,
     MAIN_MENU_BUTTON_RISK,
     MAIN_MENU_BUTTON_STATISTIC,
+    SUBMENU_ADMIN_BUTTON_BETA_RESET,
+    SUBMENU_ADMIN_BUTTON_NOTIFICATION_SETTING,
     SUBMENU_ACCOUNT_BUTTON_SUMMARY,
     SUBMENU_ACCOUNT_BUTTON_TABUNG,
     SUBMENU_MM_BUTTON_BACK_MAIN,
@@ -21,7 +23,9 @@ from menu import (
     SUBMENU_PROJECT_BUTTON_MISSION_LOCKED,
     SUBMENU_PROJECT_BUTTON_SET_NEW_GOAL,
     SUBMENU_PROJECT_BUTTON_TABUNG_PROGRESS,
+    admin_panel_keyboard,
     account_activity_keyboard,
+    is_admin_user,
     main_menu_keyboard,
     mm_helper_setting_keyboard,
     project_grow_keyboard,
@@ -54,11 +58,13 @@ from storage import (
 from texts import (
     ACCOUNT_ACTIVITY_OPENED_TEXT,
     ACHIEVEMENT_OPENED_TEXT,
+    ADMIN_PANEL_OPENED_TEXT,
     CORRECTION_OPENED_TEXT,
     EXTRA_OPENED_TEXT,
     MAIN_MENU_OPENED_TEXT,
     MISSION_OPENED_TEXT,
     MM_HELPER_SETTING_OPENED_TEXT,
+    NOTIFICATION_SETTING_OPENED_TEXT,
     PROJECT_GROW_OPENED_TEXT,
     RISK_CALCULATOR_OPENED_TEXT,
     SET_NEW_GOAL_OPENED_TEXT,
@@ -223,11 +229,58 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     text = message.text.strip()
 
-    if text == MAIN_MENU_BUTTON_BETA_RESET:
+    if text == MAIN_MENU_BUTTON_ADMIN_PANEL:
+        if not is_admin_user(user.id):
+            await send_screen(
+                context,
+                message.chat_id,
+                "❌ Akses ditolak.",
+                reply_markup=main_menu_keyboard(user.id),
+            )
+            return
+
+        await send_screen(
+            context,
+            message.chat_id,
+            ADMIN_PANEL_OPENED_TEXT,
+            reply_markup=admin_panel_keyboard(),
+            parse_mode="Markdown",
+        )
+        return
+
+    if text == SUBMENU_ADMIN_BUTTON_BETA_RESET:
+        if not is_admin_user(user.id):
+            await send_screen(
+                context,
+                message.chat_id,
+                "❌ Akses ditolak.",
+                reply_markup=main_menu_keyboard(user.id),
+            )
+            return
+
         reset_all_data()
         await clear_last_screen(context, message.chat_id)
         context.user_data.clear()
         await start(update, context)
+        return
+
+    if text == SUBMENU_ADMIN_BUTTON_NOTIFICATION_SETTING:
+        if not is_admin_user(user.id):
+            await send_screen(
+                context,
+                message.chat_id,
+                "❌ Akses ditolak.",
+                reply_markup=main_menu_keyboard(user.id),
+            )
+            return
+
+        await send_screen(
+            context,
+            message.chat_id,
+            NOTIFICATION_SETTING_OPENED_TEXT,
+            reply_markup=admin_panel_keyboard(),
+            parse_mode="Markdown",
+        )
         return
 
     if text == MAIN_MENU_BUTTON_MM_SETTING:
@@ -255,7 +308,7 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
             context,
             message.chat_id,
             RISK_CALCULATOR_OPENED_TEXT,
-            reply_markup=main_menu_keyboard(),
+            reply_markup=main_menu_keyboard(user.id),
             parse_mode="Markdown",
         )
         return
@@ -275,7 +328,7 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
             context,
             message.chat_id,
             STATISTIC_OPENED_TEXT,
-            reply_markup=main_menu_keyboard(),
+            reply_markup=main_menu_keyboard(user.id),
             parse_mode="Markdown",
         )
         return
@@ -285,7 +338,7 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
             context,
             message.chat_id,
             EXTRA_OPENED_TEXT,
-            reply_markup=main_menu_keyboard(),
+            reply_markup=main_menu_keyboard(user.id),
             parse_mode="Markdown",
         )
         return
@@ -295,7 +348,7 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
             context,
             message.chat_id,
             MAIN_MENU_OPENED_TEXT,
-            reply_markup=main_menu_keyboard(),
+            reply_markup=main_menu_keyboard(user.id),
             parse_mode="Markdown",
         )
         return

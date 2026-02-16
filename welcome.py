@@ -54,7 +54,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             context,
             chat.id,
             RETURNING_USER_TEXT,
-            reply_markup=main_menu_keyboard(),
+            reply_markup=main_menu_keyboard(user.id),
             parse_mode="Markdown",
         )
         return

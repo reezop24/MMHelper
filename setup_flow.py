@@ -196,7 +196,7 @@ async def _handle_initial_setup(payload: dict, update: Update, context: ContextT
         context,
         message.chat_id,
         SETUP_SAVED_TEXT,
-        reply_markup=main_menu_keyboard(),
+        reply_markup=main_menu_keyboard(update.effective_user.id),
         parse_mode="Markdown",
     )
 
@@ -210,7 +210,7 @@ async def _handle_initial_capital_reset(payload: dict, update: Update, context: 
             context,
             message.chat_id,
             "❌ Reset tak dibenarkan sebab dah ada rekod transaksi.",
-            reply_markup=main_menu_keyboard(),
+            reply_markup=main_menu_keyboard(user_id),
         )
         return
 
@@ -226,7 +226,7 @@ async def _handle_initial_capital_reset(payload: dict, update: Update, context: 
             context,
             message.chat_id,
             "❌ Reset gagal. Cuba semula dari menu.",
-            reply_markup=main_menu_keyboard(),
+            reply_markup=main_menu_keyboard(user_id),
         )
         return
 
@@ -234,7 +234,7 @@ async def _handle_initial_capital_reset(payload: dict, update: Update, context: 
         context,
         message.chat_id,
         INITIAL_CAPITAL_RESET_SUCCESS_TEXT,
-        reply_markup=main_menu_keyboard(),
+        reply_markup=main_menu_keyboard(user_id),
     )
 
 
@@ -267,7 +267,7 @@ async def _handle_withdrawal_activity(payload: dict, update: Update, context: Co
         context,
         message.chat_id,
         WITHDRAWAL_ACTIVITY_SAVED_TEXT,
-        reply_markup=main_menu_keyboard(),
+        reply_markup=main_menu_keyboard(user_id),
         parse_mode="Markdown",
     )
 
@@ -301,7 +301,7 @@ async def _handle_deposit_activity(payload: dict, update: Update, context: Conte
         context,
         message.chat_id,
         DEPOSIT_ACTIVITY_SAVED_TEXT,
-        reply_markup=main_menu_keyboard(),
+        reply_markup=main_menu_keyboard(user_id),
         parse_mode="Markdown",
     )
 
@@ -331,7 +331,7 @@ async def _handle_trading_activity_update(payload: dict, update: Update, context
         context,
         message.chat_id,
         TRADING_ACTIVITY_SAVED_TEXT,
-        reply_markup=main_menu_keyboard(),
+        reply_markup=main_menu_keyboard(user_id),
         parse_mode="Markdown",
     )
 
@@ -408,7 +408,7 @@ async def _handle_set_new_goal(payload: dict, update: Update, context: ContextTy
         context,
         message.chat_id,
         SET_NEW_GOAL_SAVED_TEXT,
-        reply_markup=main_menu_keyboard(),
+        reply_markup=main_menu_keyboard(user.id),
         parse_mode="Markdown",
     )
 
@@ -424,7 +424,7 @@ async def _handle_project_grow_mission_start(payload: dict, update: Update, cont
             context,
             message.chat_id,
             "❌ Mission tak boleh start lagi. Pastikan goal dah set dan tabung minimum USD 10.",
-            reply_markup=main_menu_keyboard(),
+            reply_markup=main_menu_keyboard(user.id),
         )
         return
 
@@ -438,7 +438,7 @@ async def _handle_project_grow_mission_start(payload: dict, update: Update, cont
         context,
         message.chat_id,
         MISSION_STARTED_TEXT,
-        reply_markup=main_menu_keyboard(),
+        reply_markup=main_menu_keyboard(user.id),
         parse_mode="Markdown",
     )
 
@@ -602,5 +602,5 @@ async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE
         context,
         message.chat_id,
         "❌ Jenis data tak dikenali. Sila buka semula menu dan cuba lagi.",
-        reply_markup=main_menu_keyboard(),
+        reply_markup=main_menu_keyboard(update.effective_user.id if update.effective_user else None),
     )
