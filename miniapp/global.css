@@ -52,6 +52,26 @@ body::before {
   text-align: center;
 }
 
+.top-nav {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 8px;
+}
+
+.top-back-btn {
+  margin: 0;
+  width: auto;
+  min-width: 0;
+  border: 1px solid rgba(129, 166, 225, 0.55);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #eaf3ff;
+  background: rgba(8, 30, 63, 0.86);
+  line-height: 1;
+}
+
 .logo {
   width: 152px;
   height: 152px;
@@ -162,5 +182,10 @@ button {
 
   .hero h1 {
     font-size: 27px;
+  }
+
+  .top-back-btn {
+    font-size: 12px;
+    padding: 7px 11px;
   }
 }

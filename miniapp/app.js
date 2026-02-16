@@ -7,6 +7,15 @@
 
   var form = document.getElementById("setupForm");
   var statusEl = document.getElementById("formStatus");
+  var topBackBtn = document.getElementById("topBackBtn");
+
+  topBackBtn.addEventListener("click", function () {
+    if (tg) {
+      tg.close();
+      return;
+    }
+    statusEl.textContent = "Preview mode: back hanya aktif dalam Telegram.";
+  });
 
   function getNumberValue(id) {
     var raw = (document.getElementById(id).value || "").trim();

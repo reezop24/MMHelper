@@ -69,7 +69,21 @@
 
   var form = document.getElementById("depositForm");
   var statusEl = document.getElementById("formStatus");
+  var topBackBtn = document.getElementById("topBackBtn");
   var backToAccountBtn = document.getElementById("backToAccountBtn");
+
+  topBackBtn.textContent = content.accountActivityBackBtn || "⬅️ Back to Account Activity";
+  topBackBtn.addEventListener("click", function () {
+    var payload = { type: "account_activity_back_to_menu" };
+
+    if (tg) {
+      tg.sendData(JSON.stringify(payload));
+      tg.close();
+      return;
+    }
+
+    statusEl.textContent = "Preview mode: buka dari Telegram untuk kembali ke Account Activity.";
+  });
 
   backToAccountBtn.textContent = content.accountActivityBackBtn || "⬅️ Back to Account Activity";
   backToAccountBtn.addEventListener("click", function () {

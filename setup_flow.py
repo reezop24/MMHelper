@@ -7,9 +7,10 @@ import json
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from menu import account_activity_keyboard, main_menu_keyboard, project_grow_keyboard
+from menu import account_activity_keyboard, main_menu_keyboard, mm_helper_setting_keyboard, project_grow_keyboard
 from settings import (
     get_deposit_activity_webapp_url,
+    get_initial_capital_reset_webapp_url,
     get_project_grow_mission_webapp_url,
     get_set_new_goal_webapp_url,
     get_trading_activity_webapp_url,
@@ -44,6 +45,7 @@ from texts import (
     ACCOUNT_ACTIVITY_OPENED_TEXT,
     DEPOSIT_ACTIVITY_SAVED_TEXT,
     INITIAL_CAPITAL_RESET_SUCCESS_TEXT,
+    MM_HELPER_SETTING_OPENED_TEXT,
     PROJECT_GROW_OPENED_TEXT,
     MISSION_RESET_TEXT,
     MISSION_STARTED_TEXT,
@@ -135,6 +137,18 @@ def _build_account_activity_keyboard_for_user(user_id: int):
         withdrawal_activity_url=withdrawal_url,
         trading_activity_url=trading_url,
     )
+
+
+def _build_mm_setting_keyboard_for_user(user_id: int):
+    summary = get_initial_setup_summary(user_id)
+    reset_url = get_initial_capital_reset_webapp_url(
+        name=summary["name"],
+        initial_capital=summary["initial_capital_usd"],
+        current_balance=get_current_balance_usd(user_id),
+        saved_date=summary["saved_date"],
+        can_reset=can_reset_initial_capital(user_id),
+    )
+    return mm_helper_setting_keyboard(reset_url)
 
 
 async def _handle_initial_setup(payload: dict, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -509,6 +523,21 @@ async def _handle_account_activity_back_to_menu(update: Update, context: Context
     )
 
 
+async def _handle_mm_setting_back_to_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    user = update.effective_user
+    if not user:
+        return
+
+    await send_screen(
+        context,
+        message.chat_id,
+        MM_HELPER_SETTING_OPENED_TEXT,
+        reply_markup=_build_mm_setting_keyboard_for_user(user.id),
+        parse_mode="Markdown",
+    )
+
+
 async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     if not message or not message.web_app_data:
@@ -563,6 +592,10 @@ async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if payload_type == "account_activity_back_to_menu":
         await _handle_account_activity_back_to_menu(update, context)
+        return
+
+    if payload_type == "mm_setting_back_to_menu":
+        await _handle_mm_setting_back_to_menu(update, context)
         return
 
     await send_screen(

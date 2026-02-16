@@ -44,6 +44,7 @@
   var lockedCard = document.getElementById("lockedCard");
   var beforeLayer = document.getElementById("beforeStartLayer");
   var runningLayer = document.getElementById("runningLayer");
+  var topBackBtn = document.getElementById("topBackBtn");
   var backToMenuBtn = document.getElementById("backToMenuBtn");
   var resetMissionBtn = document.getElementById("resetMissionBtn");
   var runningStatus = document.getElementById("runningStatus");
@@ -143,6 +144,15 @@
 
     statusEl.textContent = "Preview mode: buka dari Telegram untuk kembali ke Project Grow.";
   }
+
+  topBackBtn.textContent = content.missionBackToMenuBtn || "⬅️ Back to Project Grow";
+  topBackBtn.addEventListener("click", function () {
+    if (missionActive) {
+      sendBackToProjectGrow(runningStatus);
+      return;
+    }
+    sendBackToProjectGrow(beforeStatus);
+  });
 
   if (!canOpen) {
     lockedCard.classList.remove("hidden");

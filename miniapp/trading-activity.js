@@ -83,12 +83,12 @@
   var form = document.getElementById("tradingForm");
   var submitBtn = document.getElementById("submitBtn");
   var statusEl = document.getElementById("formStatus");
+  var topBackBtn = document.getElementById("topBackBtn");
   var backToAccountBtn = document.getElementById("backToAccountBtn");
 
   var selectedMode = "";
 
-  backToAccountBtn.textContent = content.accountActivityBackBtn || "⬅️ Back to Account Activity";
-  backToAccountBtn.addEventListener("click", function () {
+  function goBackAccountActivity() {
     var payload = { type: "account_activity_back_to_menu" };
 
     if (tg) {
@@ -98,6 +98,14 @@
     }
 
     statusEl.textContent = "Preview mode: buka dari Telegram untuk kembali ke Account Activity.";
+  }
+
+  topBackBtn.textContent = content.accountActivityBackBtn || "⬅️ Back to Account Activity";
+  topBackBtn.addEventListener("click", goBackAccountActivity);
+
+  backToAccountBtn.textContent = content.accountActivityBackBtn || "⬅️ Back to Account Activity";
+  backToAccountBtn.addEventListener("click", function () {
+    goBackAccountActivity();
   });
 
   function updateStepState(amount) {

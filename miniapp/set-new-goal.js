@@ -53,6 +53,7 @@
   var growTargetHint = document.getElementById("growTargetHint");
 
   var backToMenuBtn = document.getElementById("backToMenuBtn");
+  var topBackBtn = document.getElementById("topBackBtn");
   var configuredBackBtn = document.getElementById("configuredBackBtn");
   var configuredResetBtn = document.getElementById("configuredResetBtn");
 
@@ -63,6 +64,7 @@
   document.getElementById("targetPrompt").textContent = content.setNewGoalTargetPrompt || "";
   document.getElementById("unlockPrompt").textContent = content.setNewGoalUnlockPrompt || "";
   document.getElementById("finalPrompt").textContent = content.setNewGoalFinalPrompt || "";
+  topBackBtn.textContent = content.setNewGoalBackToMenuBtn || "⬅️ Back to Project Grow";
   backToMenuBtn.textContent = content.setNewGoalBackToMenuBtn || "⬅️ Back to Project Grow";
 
   document.getElementById("configuredIntro").textContent = content.setNewGoalIntro || "";
@@ -110,6 +112,7 @@
     statusEl.textContent = content.setNewGoalResetPreviewText || "Preview mode: reset hanya berfungsi bila buka dari Telegram.";
   }
 
+  topBackBtn.addEventListener("click", sendBackToProjectGrow);
   backToMenuBtn.addEventListener("click", sendBackToProjectGrow);
   configuredBackBtn.addEventListener("click", sendBackToProjectGrow);
 

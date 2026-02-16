@@ -18,9 +18,22 @@
   document.getElementById("summaryDate").textContent = savedDate;
 
   var form = document.getElementById("resetForm");
+  var topBackBtn = document.getElementById("topBackBtn");
   var submitBtn = document.getElementById("submitBtn");
   var disabledNote = document.getElementById("disabledNote");
   var statusEl = document.getElementById("formStatus");
+
+  topBackBtn.addEventListener("click", function () {
+    var payload = { type: "mm_setting_back_to_menu" };
+
+    if (tg) {
+      tg.sendData(JSON.stringify(payload));
+      tg.close();
+      return;
+    }
+
+    statusEl.textContent = "Preview mode: buka dari Telegram untuk kembali ke MM Helper Setting.";
+  });
 
   if (!canReset) {
     submitBtn.disabled = true;
