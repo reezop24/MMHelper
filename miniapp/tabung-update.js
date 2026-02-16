@@ -95,7 +95,7 @@
     }
 
     panelTitle.textContent = "Withdrawal Bila Goal Dah Capai";
-    panelDesc.textContent = "Mode ni aktif bila Total Balance capai target Project Grow. Pilih cara pengeluaran ikut keperluan kau.";
+    panelDesc.textContent = "Mode ni aktif bila Capital capai target Project Grow. Pilih cara pengeluaran ikut keperluan kau.";
     modeNote.textContent = goalReached
       ? "Goal dah capai. Kau boleh guna mode withdrawal goal."
       : "Mode ni masih lock sampai goal capai.";

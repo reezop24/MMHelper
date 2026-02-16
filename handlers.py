@@ -224,7 +224,7 @@ def _build_account_summary_text(user_id: int) -> str:
         f"- Initial Balance: USD {_usd(summary['initial_capital_usd'])}",
         f"- Current Balance: USD {_usd(current_balance)}",
         f"- Current Profit: USD {_usd(current_profit)}",
-        f"- Total Balance: USD {_usd(total_balance)}",
+        f"- Capital: USD {_usd(total_balance)}",
         f"- Tabung Balance: USD {_usd(tabung_balance)}",
         f"- Weekly P/L: USD {_usd(weekly)}",
         f"- Monthly P/L: USD {_usd(monthly)}",

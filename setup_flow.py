@@ -111,7 +111,7 @@ def _build_tabung_saved_text(user_id: int, action: str, amount_usd: float) -> st
             "Jumlah ni diambil terus dari Current Balance kau.\n\n"
             f"Current Balance sekarang: **{current_balance}**\n"
             f"Tabung Balance sekarang: **{tabung_balance}**\n"
-            f"Total Balance sekarang: **{total_balance}**"
+            f"Capital sekarang: **{total_balance}**"
         )
     if action == "emergency_withdrawal":
         return (
@@ -120,7 +120,7 @@ def _build_tabung_saved_text(user_id: int, action: str, amount_usd: float) -> st
             "Aku ingatkan je, guna mode ni bila betul-betul perlu.\n\n"
             f"Current Balance kekal: **{current_balance}**\n"
             f"Tabung Balance sekarang: **{tabung_balance}**\n"
-            f"Total Balance sekarang: **{total_balance}**"
+            f"Capital sekarang: **{total_balance}**"
         )
     if action == "goal_to_current":
         return (
@@ -128,14 +128,14 @@ def _build_tabung_saved_text(user_id: int, action: str, amount_usd: float) -> st
             f"Kau pindahkan **{_usd(amount_usd)}** dari tabung ke Current Balance.\n\n"
             f"Current Balance sekarang: **{current_balance}**\n"
             f"Tabung Balance sekarang: **{tabung_balance}**\n"
-            f"Total Balance sekarang: **{total_balance}**"
+            f"Capital sekarang: **{total_balance}**"
         )
     return (
         "Withdrawal goal terus berjaya ✅\n\n"
         f"Kau keluarkan **{_usd(amount_usd)}** terus dari tabung.\n\n"
         f"Current Balance kekal: **{current_balance}**\n"
         f"Tabung Balance sekarang: **{tabung_balance}**\n"
-        f"Total Balance sekarang: **{total_balance}**"
+        f"Capital sekarang: **{total_balance}**"
     )
 
 
