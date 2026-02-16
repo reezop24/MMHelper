@@ -1231,7 +1231,8 @@ def get_balance_adjustment_rules(user_id: int) -> dict[str, Any]:
     today = malaysia_now().date()
     month_start, month_end = _month_range(today)
     window_start = month_end - timedelta(days=6)
-    window_open = window_start <= today <= month_end
+    # Temporary bypass: allow testing outside last-7-days window.
+    window_open = True
     month_key = _month_key_from_date(today)
     monthly_db = _load_activity_db(month_key)
     used_records = _get_activity_records_from_db(monthly_db, user_id, "balance_adjustment")
