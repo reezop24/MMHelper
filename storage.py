@@ -490,6 +490,10 @@ def get_total_balance_adjustment_usd(user_id: int) -> float:
 
 
 def get_total_balance_usd(user_id: int) -> float:
+    return get_current_balance_usd(user_id) + get_tabung_balance_usd(user_id)
+
+
+def _get_account_flow_balance_usd(user_id: int) -> float:
     summary = get_initial_setup_summary(user_id)
     initial_balance = float(summary.get("initial_capital_usd") or 0)
     total_withdrawn = get_total_withdrawal_usd(user_id)
@@ -528,11 +532,11 @@ def get_tabung_balance_usd(user_id: int) -> float:
 
 
 def get_capital_usd(user_id: int) -> float:
-    return get_current_balance_usd(user_id) + get_tabung_balance_usd(user_id)
+    return get_total_balance_usd(user_id)
 
 
 def get_current_balance_usd(user_id: int) -> float:
-    total_balance = get_total_balance_usd(user_id)
+    total_balance = _get_account_flow_balance_usd(user_id)
     current_profit = get_current_profit_usd(user_id)
     total_adjustment = get_total_balance_adjustment_usd(user_id)
     return total_balance + current_profit + total_adjustment
