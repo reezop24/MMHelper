@@ -1,12 +1,12 @@
 :root {
-  --bg: #071736;
-  --panel: #0d2350;
-  --panel-soft: #112e68;
+  --bg: #030c21;
+  --panel: #081832;
+  --panel-soft: #0c2348;
   --text: #f4f8ff;
-  --muted: #c7d2ea;
+  --muted: #b7c8e8;
   --accent-red: #d9324b;
   --accent-white: #ffffff;
-  --border: #24498f;
+  --border: #17376f;
 }
 
 * {
@@ -16,7 +16,10 @@
 body {
   margin: 0;
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-  background: radial-gradient(circle at top right, #173d84 0%, var(--bg) 55%);
+  background:
+    radial-gradient(circle at top right, #102f67 0%, rgba(16, 47, 103, 0) 36%),
+    radial-gradient(circle at top left, #0b1f44 0%, rgba(11, 31, 68, 0) 30%),
+    linear-gradient(180deg, #020816 0%, var(--bg) 100%);
   color: var(--text);
 }
 
@@ -28,6 +31,16 @@ body {
 
 .hero {
   margin-bottom: 16px;
+  text-align: center;
+}
+
+.logo {
+  width: 108px;
+  height: 108px;
+  object-fit: contain;
+  margin: 0 auto 10px;
+  display: block;
+  filter: drop-shadow(0 7px 16px rgba(0, 0, 0, 0.45));
 }
 
 .hero h1 {
@@ -46,6 +59,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 16px;
   padding: 18px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.34);
 }
 
 .field + .field {
@@ -64,8 +78,8 @@ body {
 
 input {
   width: 100%;
-  border: 1px solid #547bc3;
-  background: #061733;
+  border: 1px solid #3e66a7;
+  background: #06142f;
   color: var(--text);
   border-radius: 10px;
   padding: 11px 12px;
@@ -80,10 +94,10 @@ input::placeholder {
 .with-prefix {
   display: flex;
   align-items: center;
-  border: 1px solid #547bc3;
+  border: 1px solid #3e66a7;
   border-radius: 10px;
   overflow: hidden;
-  background: #061733;
+  background: #06142f;
 }
 
 .with-suffix input,
@@ -95,7 +109,7 @@ input::placeholder {
 .affix {
   padding: 0 12px;
   color: #f4f8ff;
-  background: #1b3b75;
+  background: #143262;
   height: 43px;
   display: flex;
   align-items: center;
@@ -121,6 +135,11 @@ button {
 }
 
 @media (max-width: 640px) {
+  .logo {
+    width: 92px;
+    height: 92px;
+  }
+
   .hero h1 {
     font-size: 27px;
   }
