@@ -41,6 +41,8 @@
 
   var dailyTimesPerDay = document.getElementById("dailyTimesPerDay");
   var dailyTimesContainer = document.getElementById("dailyTimesContainer");
+  var sectionToggles = Array.prototype.slice.call(document.querySelectorAll(".section-toggle"));
+  var panels = Array.prototype.slice.call(document.querySelectorAll(".panel"));
 
   function defaultTimeByIndex(idx) {
     var defaults = ["09:00", "13:00", "17:00", "20:00", "22:00", "23:30"];
@@ -81,23 +83,37 @@
   });
   renderDailyTimePickers();
 
-  function wireToggle(toggleId, fieldsId) {
-    var toggleEl = document.getElementById(toggleId);
-    var fieldsEl = document.getElementById(fieldsId);
-    function sync() {
-      fieldsEl.classList.toggle("hidden", !toggleEl.checked);
-    }
-    toggleEl.addEventListener("change", function () {
-      sync();
-      statusEl.textContent = "";
+  function closeAllPanels() {
+    panels.forEach(function (panel) {
+      panel.classList.add("hidden");
     });
-    sync();
   }
 
-  wireToggle("manualEnabled", "manualFields");
-  wireToggle("dailyEnabled", "dailyFields");
-  wireToggle("reportEnabled", "reportFields");
-  wireToggle("maintenanceEnabled", "maintenanceFields");
+  function openPanelById(panelId) {
+    closeAllPanels();
+    var target = document.getElementById(panelId);
+    if (!target) return;
+    target.classList.remove("hidden");
+  }
+
+  sectionToggles.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var targetId = btn.getAttribute("data-target");
+      if (!targetId) return;
+      var targetPanel = document.getElementById(targetId);
+      if (!targetPanel) return;
+
+      var isOpen = !targetPanel.classList.contains("hidden");
+      closeAllPanels();
+      if (!isOpen) {
+        targetPanel.classList.remove("hidden");
+      }
+      statusEl.textContent = "";
+    });
+  });
+
+  // Default open manual section first.
+  openPanelById("manualPanel");
 
   function backToAdmin() {
     var payload = { type: "admin_panel_back_to_menu" };

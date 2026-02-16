@@ -12,6 +12,7 @@ from telegram.ext import (
 )
 
 from handlers import handle_text_actions
+from notification_engine import run_notification_engine
 from setup_flow import handle_setup_webapp
 from welcome import TNC_ACCEPT, TNC_DECLINE, handle_tnc_callback, start
 
@@ -47,6 +48,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(handle_tnc_callback, pattern=f"^({TNC_ACCEPT}|{TNC_DECLINE})$"))
     app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_setup_webapp))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_actions))
+    app.job_queue.run_repeating(run_notification_engine, interval=60, first=20, name="notification_engine")
 
     app.run_polling()
 

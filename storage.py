@@ -1076,6 +1076,11 @@ def save_notification_settings(user_id: int, payload: dict[str, Any]) -> bool:
         daily_count = 1
     daily_count = max(1, min(daily_count, 6))
 
+    sections = user.setdefault("sections", {})
+    existing_section = sections.get("notification_settings", {})
+    existing_data = existing_section.get("data", {}) if isinstance(existing_section, dict) else {}
+    existing_runtime = existing_data.get("runtime", {}) if isinstance(existing_data, dict) else {}
+
     data = {
         "manual_push": {
             "enabled": bool(manual_obj.get("enabled")),
@@ -1102,9 +1107,9 @@ def save_notification_settings(user_id: int, payload: dict[str, Any]) -> bool:
             "end_time": _normalize_time_str(maintenance_obj.get("end_time")),
             "message": str(maintenance_obj.get("message") or "").strip(),
         },
+        "runtime": existing_runtime if isinstance(existing_runtime, dict) else {},
     }
 
-    sections = user.setdefault("sections", {})
     sections["notification_settings"] = {
         "section": "notification_settings",
         "user_id": user_id,
@@ -1117,5 +1122,97 @@ def save_notification_settings(user_id: int, payload: dict[str, Any]) -> bool:
     }
 
     user["updated_at"] = saved_at_iso
+    save_core_db(db)
+    return True
+
+
+def get_notification_settings(user_id: int) -> dict[str, Any]:
+    db = load_core_db()
+    user = db.get("users", {}).get(str(user_id), {})
+    sections = user.get("sections", {}) if isinstance(user, dict) else {}
+    section = sections.get("notification_settings", {}) if isinstance(sections, dict) else {}
+    data = section.get("data", {}) if isinstance(section, dict) else {}
+    return data if isinstance(data, dict) else {}
+
+
+def list_active_user_ids() -> list[int]:
+    db = load_core_db()
+    users = db.get("users", {})
+    if not isinstance(users, dict):
+        return []
+
+    active_ids: list[int] = []
+    for raw_user_id, user_obj in users.items():
+        if not isinstance(user_obj, dict):
+            continue
+        sections = user_obj.get("sections", {})
+        if not isinstance(sections, dict):
+            continue
+        if "initial_setup" not in sections:
+            continue
+        try:
+            active_ids.append(int(raw_user_id))
+        except (TypeError, ValueError):
+            continue
+    return sorted(set(active_ids))
+
+
+def was_notification_sent(user_id: int, category: str, marker: str) -> bool:
+    if not category or not marker:
+        return False
+    data = get_notification_settings(user_id)
+    runtime = data.get("runtime", {})
+    if not isinstance(runtime, dict):
+        return False
+    bucket = runtime.get(category, [])
+    if not isinstance(bucket, list):
+        return False
+    return marker in bucket
+
+
+def mark_notification_sent(user_id: int, category: str, marker: str) -> bool:
+    if not category or not marker:
+        return False
+
+    db = load_core_db()
+    user = db.get("users", {}).get(str(user_id))
+    if not isinstance(user, dict):
+        return False
+
+    sections = user.setdefault("sections", {})
+    notification_section = sections.setdefault(
+        "notification_settings",
+        {
+            "section": "notification_settings",
+            "user_id": user_id,
+            "telegram_name": user.get("telegram_name") or str(user_id),
+            "saved_at": "",
+            "saved_date": "",
+            "saved_time": "",
+            "timezone": "Asia/Kuala_Lumpur",
+            "data": {},
+        },
+    )
+    data = notification_section.setdefault("data", {})
+    runtime = data.setdefault("runtime", {})
+    bucket = runtime.setdefault(category, [])
+    if not isinstance(bucket, list):
+        bucket = []
+        runtime[category] = bucket
+
+    if marker in bucket:
+        return False
+    bucket.append(marker)
+
+    # Keep runtime compact.
+    if len(bucket) > 400:
+        runtime[category] = bucket[-400:]
+
+    now = malaysia_now()
+    notification_section["saved_at"] = now.isoformat()
+    notification_section["saved_date"] = now.strftime("%Y-%m-%d")
+    notification_section["saved_time"] = now.strftime("%H:%M:%S")
+    notification_section["timezone"] = "Asia/Kuala_Lumpur"
+    user["updated_at"] = now.isoformat()
     save_core_db(db)
     return True

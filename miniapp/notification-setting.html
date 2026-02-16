@@ -27,46 +27,58 @@
       color: #fff;
     }
 
-    .section-card {
-      background: rgba(8, 24, 52, 0.82);
-      border: 1px solid rgba(69, 104, 165, 0.6);
-      border-radius: 12px;
-      padding: 12px;
-      margin-top: 12px;
+    .accordion {
+      margin-top: 10px;
     }
 
-    .section-head {
+    .section-card + .section-card {
+      margin-top: 10px;
+    }
+
+    .section-toggle {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 10px;
-      margin-bottom: 8px;
+      width: 100%;
+      border: 1px solid rgba(129, 166, 225, 0.5);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: rgba(8, 31, 66, 0.88);
+      color: #eaf3ff;
+      font-size: 14px;
+      font-weight: 700;
+      margin: 0;
     }
 
     .section-title {
       margin: 0;
-      font-size: 15px;
-      color: #fff;
+      font-size: 14px;
     }
 
-    .toggle-wrap {
+    .badge {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
-      font-size: 12px;
-      color: #c9dbff;
-    }
-
-    .toggle-wrap input {
-      width: 18px;
-      height: 18px;
-      margin: 0;
+      border: 1px solid rgba(93, 151, 232, 0.6);
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 11px;
+      color: #d7e9ff;
+      background: rgba(20, 59, 112, 0.6);
     }
 
     .prompt {
       margin: 0 0 8px;
       color: #d8e8ff;
       font-size: 13px;
+    }
+
+    .panel {
+      margin-top: 8px;
+      border: 1px solid rgba(83, 127, 193, 0.45);
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(6, 20, 46, 0.78);
     }
 
     .field {
@@ -80,6 +92,27 @@
       color: #dce8ff;
     }
 
+    .control-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: #deebff;
+    }
+
+    .control-toggle input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      margin: 0;
+    }
+
+    .text-muted {
+      color: #bfd2f7;
+      font-size: 12px;
+      margin: 6px 0 0;
+    }
+
+    .field input,
     select,
     textarea {
       width: 100%;
@@ -171,122 +204,132 @@
     </section>
 
     <form id="notificationForm" class="card">
-      <section class="section-card">
-        <div class="section-head">
-          <p class="section-title">1. Manual Push Notification</p>
-          <label class="toggle-wrap">
-            <span>Unhide</span>
-            <input id="manualEnabled" type="checkbox" checked />
-          </label>
-        </div>
-        <p class="prompt">Tetapkan masa sekali push dan mesej custom untuk user aktif.</p>
-        <div id="manualFields">
-          <div class="input-row">
-            <div class="field">
-              <label for="manualDate">Tarikh</label>
-              <input id="manualDate" type="date" />
+      <div class="accordion">
+        <section class="section-card">
+          <button type="button" class="section-toggle" data-target="manualPanel">
+            <span class="section-title">1. Manual Push Notification</span>
+            <span class="badge">Tap untuk buka</span>
+          </button>
+          <div id="manualPanel" class="panel hidden">
+            <p class="prompt">Tetapkan masa sekali push dan mesej custom untuk user aktif.</p>
+            <label class="control-toggle">
+              <input id="manualEnabled" type="checkbox" checked />
+              <span>Unhide</span>
+            </label>
+            <p class="text-muted">Jika off, setting ni akan disimpan tapi engine tak akan hantar.</p>
+            <div class="input-row">
+              <div class="field">
+                <label for="manualDate">Tarikh</label>
+                <input id="manualDate" type="date" />
+              </div>
+              <div class="field">
+                <label for="manualTime">Masa</label>
+                <input id="manualTime" type="time" />
+              </div>
             </div>
             <div class="field">
-              <label for="manualTime">Masa</label>
-              <input id="manualTime" type="time" />
+              <label for="manualMessage">Mesej</label>
+              <textarea id="manualMessage" placeholder="Tulis mesej untuk dihantar ke user aktif..."></textarea>
             </div>
           </div>
-          <div class="field">
-            <label for="manualMessage">Mesej</label>
-            <textarea id="manualMessage" placeholder="Tulis mesej untuk dihantar ke user aktif..."></textarea>
-          </div>
-        </div>
-      </section>
+        </section>
 
-      <section class="section-card">
-        <div class="section-head">
-          <p class="section-title">2. Daily Notification</p>
-          <label class="toggle-wrap">
-            <span>Unhide</span>
-            <input id="dailyEnabled" type="checkbox" checked />
-          </label>
-        </div>
-        <p class="prompt">Reminder santai untuk check user dah update transaksi harian atau belum.</p>
-        <div id="dailyFields">
-          <div class="field">
-            <label for="dailyTimesPerDay">Hantar berapa kali sehari</label>
-            <select id="dailyTimesPerDay">
-              <option value="1">1 kali sehari</option>
-              <option value="2">2 kali sehari</option>
-              <option value="3" selected>3 kali sehari</option>
-              <option value="4">4 kali sehari</option>
-              <option value="5">5 kali sehari</option>
-              <option value="6">6 kali sehari</option>
-            </select>
+        <section class="section-card">
+          <button type="button" class="section-toggle" data-target="dailyPanel">
+            <span class="section-title">2. Daily Notification</span>
+            <span class="badge">Tap untuk buka</span>
+          </button>
+          <div id="dailyPanel" class="panel hidden">
+            <p class="prompt">Reminder santai untuk check user dah update transaksi harian atau belum.</p>
+            <label class="control-toggle">
+              <input id="dailyEnabled" type="checkbox" checked />
+              <span>Unhide</span>
+            </label>
+            <p class="text-muted">Pilih frequency dan masa reminder untuk semua user aktif.</p>
+            <div class="field">
+              <label for="dailyTimesPerDay">Hantar berapa kali sehari</label>
+              <select id="dailyTimesPerDay">
+                <option value="1">1 kali sehari</option>
+                <option value="2">2 kali sehari</option>
+                <option value="3" selected>3 kali sehari</option>
+                <option value="4">4 kali sehari</option>
+                <option value="5">5 kali sehari</option>
+                <option value="6">6 kali sehari</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>Masa reminder</label>
+              <div id="dailyTimesContainer" class="times-grid"></div>
+            </div>
+            <div class="field">
+              <label for="dailyPresetMessage">Preset mesej reminder</label>
+              <select id="dailyPresetMessage"></select>
+            </div>
           </div>
-          <div class="field">
-            <label>Masa reminder</label>
-            <div id="dailyTimesContainer" class="times-grid"></div>
-          </div>
-          <div class="field">
-            <label for="dailyPresetMessage">Preset mesej reminder</label>
-            <select id="dailyPresetMessage"></select>
-          </div>
-        </div>
-      </section>
+        </section>
 
-      <section class="section-card">
-        <div class="section-head">
-          <p class="section-title">3. Report Notification</p>
-          <label class="toggle-wrap">
-            <span>Unhide</span>
-            <input id="reportEnabled" type="checkbox" checked />
-          </label>
-        </div>
-        <p class="prompt">Set tarikh auto reminder untuk weekly report dan monthly report.</p>
-        <div id="reportFields" class="input-row">
-          <div class="field">
-            <label for="weeklyReportDate">Weekly report reminder</label>
-            <input id="weeklyReportDate" type="date" />
+        <section class="section-card">
+          <button type="button" class="section-toggle" data-target="reportPanel">
+            <span class="section-title">3. Report Notification</span>
+            <span class="badge">Tap untuk buka</span>
+          </button>
+          <div id="reportPanel" class="panel hidden">
+            <p class="prompt">Set tarikh auto reminder untuk weekly report dan monthly report.</p>
+            <label class="control-toggle">
+              <input id="reportEnabled" type="checkbox" checked />
+              <span>Unhide</span>
+            </label>
+            <div class="input-row">
+              <div class="field">
+                <label for="weeklyReportDate">Weekly report reminder</label>
+                <input id="weeklyReportDate" type="date" />
+              </div>
+              <div class="field">
+                <label for="monthlyReportDate">Monthly report reminder</label>
+                <input id="monthlyReportDate" type="date" />
+              </div>
+            </div>
           </div>
-          <div class="field">
-            <label for="monthlyReportDate">Monthly report reminder</label>
-            <input id="monthlyReportDate" type="date" />
-          </div>
-        </div>
-      </section>
+        </section>
 
-      <section class="section-card">
-        <div class="section-head">
-          <p class="section-title">4. Maintenance Notification</p>
-          <label class="toggle-wrap">
-            <span>Unhide</span>
-            <input id="maintenanceEnabled" type="checkbox" checked />
-          </label>
-        </div>
-        <p class="prompt">Maklumkan user bila maintenance mula dan tamat.</p>
-        <div id="maintenanceFields">
-          <div class="field">
-            <label for="maintenancePresetMessage">Preset mesej maintenance</label>
-            <select id="maintenancePresetMessage"></select>
+        <section class="section-card">
+          <button type="button" class="section-toggle" data-target="maintenancePanel">
+            <span class="section-title">4. Maintenance Notification</span>
+            <span class="badge">Tap untuk buka</span>
+          </button>
+          <div id="maintenancePanel" class="panel hidden">
+            <p class="prompt">Maklumkan user bila maintenance mula dan tamat.</p>
+            <label class="control-toggle">
+              <input id="maintenanceEnabled" type="checkbox" checked />
+              <span>Unhide</span>
+            </label>
+            <div class="field">
+              <label for="maintenancePresetMessage">Preset mesej maintenance</label>
+              <select id="maintenancePresetMessage"></select>
+            </div>
+            <div class="input-row">
+              <div class="field">
+                <label for="maintenanceStartDate">Tarikh mula</label>
+                <input id="maintenanceStartDate" type="date" />
+              </div>
+              <div class="field">
+                <label for="maintenanceStartTime">Masa mula</label>
+                <input id="maintenanceStartTime" type="time" />
+              </div>
+            </div>
+            <div class="input-row">
+              <div class="field">
+                <label for="maintenanceEndDate">Tarikh tamat</label>
+                <input id="maintenanceEndDate" type="date" />
+              </div>
+              <div class="field">
+                <label for="maintenanceEndTime">Masa tamat</label>
+                <input id="maintenanceEndTime" type="time" />
+              </div>
+            </div>
           </div>
-          <div class="input-row">
-            <div class="field">
-              <label for="maintenanceStartDate">Tarikh mula</label>
-              <input id="maintenanceStartDate" type="date" />
-            </div>
-            <div class="field">
-              <label for="maintenanceStartTime">Masa mula</label>
-              <input id="maintenanceStartTime" type="time" />
-            </div>
-          </div>
-          <div class="input-row">
-            <div class="field">
-              <label for="maintenanceEndDate">Tarikh tamat</label>
-              <input id="maintenanceEndDate" type="date" />
-            </div>
-            <div class="field">
-              <label for="maintenanceEndTime">Masa tamat</label>
-              <input id="maintenanceEndTime" type="time" />
-            </div>
-          </div>
-        </div>
-      </section>
+        </section>
+      </div>
 
       <button id="submitBtn" type="submit">✅ Submit Notification Setting</button>
       <div class="form-actions">
