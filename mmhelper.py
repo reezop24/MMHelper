@@ -1,5 +1,6 @@
 """Main entry point for MM HELPER Telegram bot."""
 
+import logging
 import os
 from pathlib import Path
 
@@ -15,6 +16,9 @@ from handlers import handle_text_actions
 from notification_engine import run_notification_engine
 from setup_flow import handle_setup_webapp
 from welcome import TNC_ACCEPT, TNC_DECLINE, handle_tnc_callback, start
+
+
+logger = logging.getLogger(__name__)
 
 
 def load_local_env() -> None:
@@ -48,7 +52,10 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(handle_tnc_callback, pattern=f"^({TNC_ACCEPT}|{TNC_DECLINE})$"))
     app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_setup_webapp))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_actions))
-    app.job_queue.run_repeating(run_notification_engine, interval=60, first=20, name="notification_engine")
+    if app.job_queue is not None:
+        app.job_queue.run_repeating(run_notification_engine, interval=60, first=20, name="notification_engine")
+    else:
+        logger.warning("JobQueue unavailable; notification engine is disabled.")
 
     app.run_polling()
 
