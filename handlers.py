@@ -31,6 +31,7 @@ from menu import (
     project_grow_keyboard,
 )
 from settings import (
+    get_balance_adjustment_webapp_url,
     get_deposit_activity_webapp_url,
     get_initial_capital_reset_webapp_url,
     get_notification_setting_webapp_url,
@@ -40,6 +41,7 @@ from settings import (
     get_withdrawal_activity_webapp_url,
 )
 from storage import (
+    get_balance_adjustment_rules,
     can_open_project_grow_mission,
     can_reset_initial_capital,
     get_capital_usd,
@@ -83,6 +85,7 @@ from welcome import start
 
 def _build_mm_setting_keyboard_for_user(user_id: int):
     summary = get_initial_setup_summary(user_id)
+    rules = get_balance_adjustment_rules(user_id)
     reset_url = get_initial_capital_reset_webapp_url(
         name=summary["name"],
         initial_capital=summary["initial_capital_usd"],
@@ -90,7 +93,16 @@ def _build_mm_setting_keyboard_for_user(user_id: int):
         saved_date=summary["saved_date"],
         can_reset=can_reset_initial_capital(user_id),
     )
-    return mm_helper_setting_keyboard(reset_url)
+    balance_adjustment_url = get_balance_adjustment_webapp_url(
+        name=summary["name"],
+        current_balance=get_current_balance_usd(user_id),
+        saved_date=summary["saved_date"],
+        can_adjust=rules["can_adjust"],
+        used_this_month=rules["used_this_month"],
+        window_open=rules["window_open"],
+        window_label=rules["window_label"],
+    )
+    return mm_helper_setting_keyboard(reset_url, balance_adjustment_url)
 
 
 def _build_admin_panel_keyboard_for_user(user_id: int):

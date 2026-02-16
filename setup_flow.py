@@ -16,6 +16,7 @@ from menu import (
     project_grow_keyboard,
 )
 from settings import (
+    get_balance_adjustment_webapp_url,
     get_deposit_activity_webapp_url,
     get_initial_capital_reset_webapp_url,
     get_notification_setting_webapp_url,
@@ -28,8 +29,10 @@ from storage import (
     add_deposit_activity,
     add_trading_activity_update,
     add_withdrawal_activity,
+    apply_balance_adjustment,
     apply_project_grow_unlock_to_tabung,
     apply_initial_capital_reset,
+    get_balance_adjustment_rules,
     can_open_project_grow_mission,
     can_reset_initial_capital,
     get_capital_usd,
@@ -197,6 +200,7 @@ def _build_account_activity_keyboard_for_user(user_id: int):
 
 def _build_mm_setting_keyboard_for_user(user_id: int):
     summary = get_initial_setup_summary(user_id)
+    rules = get_balance_adjustment_rules(user_id)
     reset_url = get_initial_capital_reset_webapp_url(
         name=summary["name"],
         initial_capital=summary["initial_capital_usd"],
@@ -204,7 +208,16 @@ def _build_mm_setting_keyboard_for_user(user_id: int):
         saved_date=summary["saved_date"],
         can_reset=can_reset_initial_capital(user_id),
     )
-    return mm_helper_setting_keyboard(reset_url)
+    balance_adjustment_url = get_balance_adjustment_webapp_url(
+        name=summary["name"],
+        current_balance=get_current_balance_usd(user_id),
+        saved_date=summary["saved_date"],
+        can_adjust=rules["can_adjust"],
+        used_this_month=rules["used_this_month"],
+        window_open=rules["window_open"],
+        window_label=rules["window_label"],
+    )
+    return mm_helper_setting_keyboard(reset_url, balance_adjustment_url)
 
 
 def _build_admin_panel_keyboard_for_user(user_id: int):
@@ -300,6 +313,45 @@ async def _handle_initial_capital_reset(payload: dict, update: Update, context: 
         message.chat_id,
         INITIAL_CAPITAL_RESET_SUCCESS_TEXT,
         reply_markup=main_menu_keyboard(user_id),
+    )
+
+
+async def _handle_balance_adjustment(payload: dict, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    user_id = update.effective_user.id
+
+    mode = str(payload.get("mode") or "").strip().lower()
+    try:
+        amount_usd = float(payload.get("amount_usd"))
+    except (TypeError, ValueError):
+        await send_screen(context, message.chat_id, "❌ Nilai balance adjustment tak sah.")
+        return
+
+    ok, status_text = apply_balance_adjustment(user_id, mode, amount_usd)
+    if not ok:
+        await send_screen(
+            context,
+            message.chat_id,
+            f"❌ {status_text}",
+            reply_markup=_build_mm_setting_keyboard_for_user(user_id),
+        )
+        return
+
+    current_balance = get_current_balance_usd(user_id)
+    tabung_balance = get_tabung_balance_usd(user_id)
+    direction = "Tambah" if mode == "add" else "Tolak"
+    sign = "+" if mode == "add" else "-"
+    confirmation = (
+        "Balance Adjustment berjaya disimpan ✅\n\n"
+        f"{direction} balance: {sign}USD {amount_usd:.2f}\n"
+        f"Current Balance sekarang: USD {current_balance:.2f}\n"
+        f"Baki tabung sekarang: USD {tabung_balance:.2f}"
+    )
+    await send_screen(
+        context,
+        message.chat_id,
+        confirmation,
+        reply_markup=_build_mm_setting_keyboard_for_user(user_id),
     )
 
 
@@ -679,6 +731,10 @@ async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if payload_type == "initial_capital_reset":
         await _handle_initial_capital_reset(payload, update, context)
+        return
+
+    if payload_type == "balance_adjustment":
+        await _handle_balance_adjustment(payload, update, context)
         return
 
     if payload_type == "withdrawal_activity":

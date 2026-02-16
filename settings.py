@@ -40,6 +40,30 @@ def get_initial_capital_reset_webapp_url(
     return f"{reset_page}?{query}"
 
 
+def get_balance_adjustment_webapp_url(
+    name: str,
+    current_balance: float,
+    saved_date: str,
+    can_adjust: bool,
+    used_this_month: bool,
+    window_open: bool,
+    window_label: str,
+) -> str:
+    page = f"{_miniapp_base_url()}/balance-adjustment.html"
+    query = urlencode(
+        {
+            "name": name,
+            "current_balance": f"{current_balance:.2f}",
+            "saved_date": saved_date,
+            "can_adjust": "1" if can_adjust else "0",
+            "used_this_month": "1" if used_this_month else "0",
+            "window_open": "1" if window_open else "0",
+            "window_label": window_label,
+        }
+    )
+    return f"{page}?{query}"
+
+
 def _build_activity_query(
     name: str,
     initial_capital_usd: float,

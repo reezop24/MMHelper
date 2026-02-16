@@ -13,7 +13,7 @@ MAIN_MENU_BUTTON_EXTRA = "🧰 Extra"
 MAIN_MENU_BUTTON_ADMIN_PANEL = "🛡️ Admin Panel"
 
 SUBMENU_MM_BUTTON_INITIAL_CAPITAL_RESET = "💸 Initial Capital Reset"
-SUBMENU_MM_BUTTON_CORRECTION = "🛠️ Correction"
+SUBMENU_MM_BUTTON_CORRECTION = "⚖️ Balance Adjustment"
 SUBMENU_MM_BUTTON_SYSTEM_INFO = "ℹ️ System Info"
 SUBMENU_MM_BUTTON_BACK_MAIN = "⬅️ Back to Main Menu"
 
@@ -50,7 +50,7 @@ def main_menu_keyboard(user_id: int | None = None) -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
 
-def mm_helper_setting_keyboard(initial_capital_reset_url: str) -> ReplyKeyboardMarkup:
+def mm_helper_setting_keyboard(initial_capital_reset_url: str, balance_adjustment_url: str) -> ReplyKeyboardMarkup:
     rows = [
         [
             KeyboardButton(
@@ -58,7 +58,13 @@ def mm_helper_setting_keyboard(initial_capital_reset_url: str) -> ReplyKeyboardM
                 web_app=WebAppInfo(url=initial_capital_reset_url),
             )
         ],
-        [SUBMENU_MM_BUTTON_CORRECTION, SUBMENU_MM_BUTTON_SYSTEM_INFO],
+        [
+            KeyboardButton(
+                SUBMENU_MM_BUTTON_CORRECTION,
+                web_app=WebAppInfo(url=balance_adjustment_url),
+            ),
+            SUBMENU_MM_BUTTON_SYSTEM_INFO,
+        ],
         [SUBMENU_MM_BUTTON_BACK_MAIN],
     ]
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)

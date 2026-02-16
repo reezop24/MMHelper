@@ -28,9 +28,11 @@ def _default_rollup() -> dict[str, Any]:
         "total_deposit_usd": 0.0,
         "total_withdrawal_usd": 0.0,
         "total_trading_net_usd": 0.0,
+        "total_balance_adjustment_usd": 0.0,
         "deposit_record_count": 0,
         "withdrawal_record_count": 0,
         "trading_record_count": 0,
+        "balance_adjustment_record_count": 0,
         "last_activity_at": "",
     }
 
@@ -285,6 +287,8 @@ def _sum_trading_net_between(user_id: int, start_date: date, end_date: date) -> 
     total = 0.0
     for record in _iter_section_records_between(user_id, "trading_activity", start_date, end_date):
         total += _record_net_usd(record)
+    for record in _iter_section_records_between(user_id, "balance_adjustment", start_date, end_date):
+        total += _record_net_usd(record)
     return total
 
 
@@ -295,9 +299,11 @@ def _is_rollup_valid(rollup: Any) -> bool:
         "total_deposit_usd",
         "total_withdrawal_usd",
         "total_trading_net_usd",
+        "total_balance_adjustment_usd",
         "deposit_record_count",
         "withdrawal_record_count",
         "trading_record_count",
+        "balance_adjustment_record_count",
         "last_activity_at",
     }
     return required.issubset(set(rollup.keys()))
@@ -308,9 +314,11 @@ def _normalize_rollup(rollup: dict[str, Any]) -> dict[str, Any]:
     out["total_deposit_usd"] = _to_float(rollup.get("total_deposit_usd"))
     out["total_withdrawal_usd"] = _to_float(rollup.get("total_withdrawal_usd"))
     out["total_trading_net_usd"] = _to_float(rollup.get("total_trading_net_usd"))
+    out["total_balance_adjustment_usd"] = _to_float(rollup.get("total_balance_adjustment_usd"))
     out["deposit_record_count"] = max(0, _to_int(rollup.get("deposit_record_count")))
     out["withdrawal_record_count"] = max(0, _to_int(rollup.get("withdrawal_record_count")))
     out["trading_record_count"] = max(0, _to_int(rollup.get("trading_record_count")))
+    out["balance_adjustment_record_count"] = max(0, _to_int(rollup.get("balance_adjustment_record_count")))
     out["last_activity_at"] = str(rollup.get("last_activity_at") or "")
     return out
 
@@ -322,6 +330,7 @@ def _rebuild_rollup_for_user(user_id: int, user_obj: dict[str, Any]) -> dict[str
     dep_legacy = sections.get("deposit_activity", {}).get("data", {}).get("records", [])
     wdr_legacy = sections.get("withdrawal_activity", {}).get("data", {}).get("records", [])
     trd_legacy = sections.get("trading_activity", {}).get("data", {}).get("records", [])
+    adj_legacy = sections.get("balance_adjustment", {}).get("data", {}).get("records", [])
 
     if isinstance(dep_legacy, list):
         rollup["total_deposit_usd"] += _sum_records(dep_legacy, "amount_usd")
@@ -334,6 +343,12 @@ def _rebuild_rollup_for_user(user_id: int, user_obj: dict[str, Any]) -> dict[str
             if isinstance(rec, dict):
                 rollup["total_trading_net_usd"] += _record_net_usd(rec)
                 rollup["trading_record_count"] += 1
+    if isinstance(adj_legacy, list):
+        for rec in adj_legacy:
+            if isinstance(rec, dict):
+                net = _record_net_usd(rec)
+                rollup["total_balance_adjustment_usd"] += net
+                rollup["balance_adjustment_record_count"] += 1
 
     for month_key in _iter_activity_month_keys():
         monthly_db = _load_activity_db(month_key)
@@ -341,15 +356,20 @@ def _rebuild_rollup_for_user(user_id: int, user_obj: dict[str, Any]) -> dict[str
         dep_records = _get_activity_records_from_db(monthly_db, user_id, "deposit_activity")
         wdr_records = _get_activity_records_from_db(monthly_db, user_id, "withdrawal_activity")
         trd_records = _get_activity_records_from_db(monthly_db, user_id, "trading_activity")
+        adj_records = _get_activity_records_from_db(monthly_db, user_id, "balance_adjustment")
 
         rollup["total_deposit_usd"] += _sum_records(dep_records, "amount_usd")
         rollup["total_withdrawal_usd"] += _sum_records(wdr_records, "amount_usd")
         for rec in trd_records:
             rollup["total_trading_net_usd"] += _record_net_usd(rec)
+        for rec in adj_records:
+            net = _record_net_usd(rec)
+            rollup["total_balance_adjustment_usd"] += net
 
         rollup["deposit_record_count"] += len(dep_records)
         rollup["withdrawal_record_count"] += len(wdr_records)
         rollup["trading_record_count"] += len(trd_records)
+        rollup["balance_adjustment_record_count"] += len(adj_records)
 
     return _normalize_rollup(rollup)
 
@@ -378,17 +398,21 @@ def _bump_rollup(
     deposit_delta: float = 0.0,
     withdrawal_delta: float = 0.0,
     trading_delta: float = 0.0,
+    balance_adjustment_delta: float = 0.0,
     deposit_count: int = 0,
     withdrawal_count: int = 0,
     trading_count: int = 0,
+    balance_adjustment_count: int = 0,
 ) -> None:
     rollup = _normalize_rollup(user_obj.get("stats_rollup", {}))
     rollup["total_deposit_usd"] += float(deposit_delta)
     rollup["total_withdrawal_usd"] += float(withdrawal_delta)
     rollup["total_trading_net_usd"] += float(trading_delta)
+    rollup["total_balance_adjustment_usd"] += float(balance_adjustment_delta)
     rollup["deposit_record_count"] += int(deposit_count)
     rollup["withdrawal_record_count"] += int(withdrawal_count)
     rollup["trading_record_count"] += int(trading_count)
+    rollup["balance_adjustment_record_count"] += int(balance_adjustment_count)
     if not rollup["last_activity_at"] or saved_at_iso > str(rollup["last_activity_at"]):
         rollup["last_activity_at"] = saved_at_iso
     user_obj["stats_rollup"] = _normalize_rollup(rollup)
@@ -461,6 +485,10 @@ def get_total_deposit_usd(user_id: int) -> float:
     return float(_get_user_rollup(user_id)["total_deposit_usd"])
 
 
+def get_total_balance_adjustment_usd(user_id: int) -> float:
+    return float(_get_user_rollup(user_id)["total_balance_adjustment_usd"])
+
+
 def get_total_balance_usd(user_id: int) -> float:
     summary = get_initial_setup_summary(user_id)
     initial_balance = float(summary.get("initial_capital_usd") or 0)
@@ -506,7 +534,8 @@ def get_capital_usd(user_id: int) -> float:
 def get_current_balance_usd(user_id: int) -> float:
     total_balance = get_total_balance_usd(user_id)
     current_profit = get_current_profit_usd(user_id)
-    return total_balance + current_profit
+    total_adjustment = get_total_balance_adjustment_usd(user_id)
+    return total_balance + current_profit + total_adjustment
 
 
 def _month_range(reference_date: date) -> tuple[date, date]:
@@ -556,6 +585,7 @@ def has_any_transactions(user_id: int) -> bool:
         rollup["deposit_record_count"] > 0
         or rollup["withdrawal_record_count"] > 0
         or rollup["trading_record_count"] > 0
+        or rollup["balance_adjustment_record_count"] > 0
     ):
         return True
 
@@ -1195,6 +1225,96 @@ def apply_initial_capital_reset(user_id: int, new_initial_capital: float) -> boo
     user["updated_at"] = saved_at_iso
     save_core_db(db)
     return True
+
+
+def get_balance_adjustment_rules(user_id: int) -> dict[str, Any]:
+    today = malaysia_now().date()
+    month_start, month_end = _month_range(today)
+    window_start = month_end - timedelta(days=6)
+    window_open = window_start <= today <= month_end
+    month_key = _month_key_from_date(today)
+    monthly_db = _load_activity_db(month_key)
+    used_records = _get_activity_records_from_db(monthly_db, user_id, "balance_adjustment")
+    used_this_month = len(used_records) > 0
+    can_adjust = window_open and not used_this_month
+    return {
+        "can_adjust": can_adjust,
+        "used_this_month": used_this_month,
+        "window_open": window_open,
+        "window_start": window_start.isoformat(),
+        "window_end": month_end.isoformat(),
+        "window_label": f"{window_start.isoformat()} hingga {month_end.isoformat()}",
+    }
+
+
+def apply_balance_adjustment(user_id: int, mode: str, amount_usd: float) -> tuple[bool, str]:
+    mode = (mode or "").strip().lower()
+    if mode not in {"add", "subtract"}:
+        return False, "Mode adjustment tak sah."
+    if amount_usd <= 0:
+        return False, "Nilai adjustment mesti lebih dari 0."
+
+    db = load_core_db()
+    user = db.get("users", {}).get(str(user_id))
+    if not isinstance(user, dict):
+        return False, "User tak dijumpai."
+
+    sections = user.setdefault("sections", {})
+    if "initial_setup" not in sections:
+        return False, "Initial setup belum ada."
+
+    rules = get_balance_adjustment_rules(user_id)
+    if not rules["window_open"]:
+        return False, f"Adjustment hanya dibenarkan pada 7 hari terakhir bulan ({rules['window_label']})."
+    if rules["used_this_month"]:
+        return False, "Bulan ni dah guna balance adjustment sekali."
+
+    now = malaysia_now()
+    saved_at_iso = now.isoformat()
+    saved_date = now.strftime("%Y-%m-%d")
+    saved_time = now.strftime("%H:%M:%S")
+    net_usd = float(amount_usd) if mode == "add" else -float(amount_usd)
+
+    record = {
+        "mode": mode,
+        "amount_usd": float(amount_usd),
+        "net_usd": net_usd,
+        "saved_at": saved_at_iso,
+        "saved_date": saved_date,
+        "saved_time": saved_time,
+        "timezone": "Asia/Kuala_Lumpur",
+    }
+    _append_monthly_record(user_id, "balance_adjustment", record, now.date())
+
+    adjustment_section = sections.setdefault(
+        "balance_adjustment",
+        {
+            "section": "balance_adjustment",
+            "user_id": user_id,
+            "telegram_name": user.get("telegram_name") or str(user_id),
+            "saved_at": saved_at_iso,
+            "saved_date": saved_date,
+            "saved_time": saved_time,
+            "timezone": "Asia/Kuala_Lumpur",
+            "data": {"record_count": 0},
+        },
+    )
+    adjustment_data = adjustment_section.setdefault("data", {})
+    adjustment_data["record_count"] = _to_int(adjustment_data.get("record_count")) + 1
+    adjustment_section["saved_at"] = saved_at_iso
+    adjustment_section["saved_date"] = saved_date
+    adjustment_section["saved_time"] = saved_time
+    adjustment_section["timezone"] = "Asia/Kuala_Lumpur"
+
+    _bump_rollup(
+        user,
+        saved_at_iso=saved_at_iso,
+        balance_adjustment_delta=net_usd,
+        balance_adjustment_count=1,
+    )
+    user["updated_at"] = saved_at_iso
+    save_core_db(db)
+    return True, "Balance adjustment berjaya disimpan."
 
 
 def _normalize_date_str(value: Any) -> str:
