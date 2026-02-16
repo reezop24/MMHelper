@@ -879,10 +879,20 @@ def get_transaction_history_records(user_id: int, days: int, limit: int = 100) -
     day_window = max(1, int(days))
     end_date = malaysia_now().date()
     start_date = end_date - timedelta(days=day_window - 1)
+    hidden_adjustment_modes = {
+        "project_grow_unlock_transfer_out",
+        "project_grow_goal_reset_transfer",
+        "tabung_save_transfer_out",
+        "tabung_goal_withdraw_to_current",
+    }
 
     rows: list[dict[str, Any]] = []
     for section_name in ("deposit_activity", "withdrawal_activity", "trading_activity", "balance_adjustment"):
         for record in _iter_section_records_between(user_id, section_name, start_date, end_date):
+            if section_name == "balance_adjustment":
+                mode = str(record.get("mode") or "").strip().lower()
+                if mode in hidden_adjustment_modes:
+                    continue
             item = _build_transaction_history_entry(section_name, record)
             if item is not None:
                 rows.append(item)
