@@ -243,3 +243,10 @@ async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE
     if payload_type == "trading_activity_update":
         await _handle_trading_activity_update(payload, update, context)
         return
+
+    await send_screen(
+        context,
+        message.chat_id,
+        "❌ Jenis data tak dikenali. Sila buka semula menu dan cuba lagi.",
+        reply_markup=main_menu_keyboard(),
+    )

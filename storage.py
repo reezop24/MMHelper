@@ -296,13 +296,29 @@ def has_any_transactions(user_id: int) -> bool:
     db = load_db()
     user = db.get("users", {}).get(str(user_id), {})
     sections = user.get("sections", {})
-    tx = sections.get("transactions", {}).get("data")
 
-    if isinstance(tx, list):
-        return len(tx) > 0
-    if isinstance(tx, dict):
-        return len(tx) > 0
-    return bool(tx)
+    def _has_records(data: Any) -> bool:
+        if isinstance(data, list):
+            return len(data) > 0
+        if isinstance(data, dict):
+            records = data.get("records")
+            if isinstance(records, list):
+                return len(records) > 0
+            return len(data) > 0
+        return bool(data)
+
+    # Legacy section (older schema)
+    tx = sections.get("transactions", {}).get("data")
+    if _has_records(tx):
+        return True
+
+    # Active sections in current schema
+    for section_name in ("deposit_activity", "withdrawal_activity", "trading_activity", "tabung"):
+        section_data = sections.get(section_name, {}).get("data")
+        if _has_records(section_data):
+            return True
+
+    return False
 
 
 def can_reset_initial_capital(user_id: int) -> bool:
@@ -507,7 +523,7 @@ def apply_initial_capital_reset(user_id: int, new_initial_capital: float) -> boo
     initial_setup["saved_time"] = saved_time
     initial_setup["timezone"] = "Asia/Kuala_Lumpur"
 
-    # Rekod lama berkaitan kiraan dibersihkan.
+    # Legacy cleanup for older schema.
     sections.pop("transactions", None)
 
     user["updated_at"] = saved_at_iso
