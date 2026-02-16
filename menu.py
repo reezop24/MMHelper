@@ -48,18 +48,8 @@ def is_admin_user(user_id: int | None) -> bool:
     return user_id in ADMIN_USER_IDS
 
 
-def main_menu_keyboard(user_id: int | None = None, risk_calculator_url: str | None = None) -> ReplyKeyboardMarkup:
-    risk_button: KeyboardButton | str
-    if risk_calculator_url:
-        risk_button = KeyboardButton(
-            MAIN_MENU_BUTTON_RISK,
-            web_app=WebAppInfo(url=risk_calculator_url),
-        )
-    else:
-        risk_button = MAIN_MENU_BUTTON_RISK
-
+def main_menu_keyboard(user_id: int | None = None) -> ReplyKeyboardMarkup:
     rows = [list(row) for row in BASE_MAIN_MENU_ROWS]
-    rows[0][1] = risk_button
     if is_admin_user(user_id):
         rows.append([MAIN_MENU_BUTTON_ADMIN_PANEL])
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)

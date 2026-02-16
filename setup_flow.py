@@ -14,7 +14,6 @@ from menu import (
 from handlers import (
     _build_account_activity_keyboard_for_user,
     _build_admin_panel_keyboard_for_user,
-    _build_main_menu_keyboard_for_user,
     _build_mm_setting_keyboard_for_user,
     _build_project_grow_keyboard_for_user,
     _build_records_reports_keyboard_for_user,
@@ -196,7 +195,7 @@ async def _handle_initial_setup(payload: dict, update: Update, context: ContextT
         context,
         message.chat_id,
         SETUP_SAVED_TEXT,
-        reply_markup=_build_main_menu_keyboard_for_user(update.effective_user.id),
+        reply_markup=main_menu_keyboard(update.effective_user.id),
         parse_mode="Markdown",
     )
 
@@ -713,7 +712,7 @@ async def _handle_admin_panel_back_to_menu(update: Update, context: ContextTypes
             context,
             message.chat_id,
             "❌ Akses ditolak.",
-            reply_markup=_build_main_menu_keyboard_for_user(user.id),
+            reply_markup=main_menu_keyboard(user.id),
         )
         return
 
@@ -741,77 +740,6 @@ async def _handle_records_reports_back_to_menu(update: Update, context: ContextT
     )
 
 
-async def _handle_risk_calculator_submit(payload: dict, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    message = update.effective_message
-    user = update.effective_user
-    if not user:
-        return
-
-    try:
-        balance_usd = float(payload.get("balance_usd"))
-        risk_pct = float(payload.get("risk_pct"))
-        zone_pips = float(payload.get("zone_pips"))
-        leverage = float(payload.get("leverage"))
-        gold_price = float(payload.get("gold_price"))
-        margin_per_001 = float(payload.get("margin_per_001"))
-        modal_a_usd = float(payload.get("modal_a_usd"))
-        lot_a = float(payload.get("lot_a"))
-        lot_b = float(payload.get("lot_b"))
-        lot_c = float(payload.get("lot_c"))
-    except (TypeError, ValueError):
-        await send_screen(
-            context,
-            message.chat_id,
-            "❌ Data risk calculator tak sah. Cuba submit semula.",
-            reply_markup=_build_main_menu_keyboard_for_user(user.id),
-        )
-        return
-
-    if min(balance_usd, risk_pct, zone_pips, leverage, gold_price, margin_per_001, modal_a_usd, lot_a, lot_b, lot_c) <= 0:
-        await send_screen(
-            context,
-            message.chat_id,
-            "❌ Nilai risk calculator mesti lebih besar dari 0.",
-            reply_markup=_build_main_menu_keyboard_for_user(user.id),
-        )
-        return
-
-    summary_text = (
-        "*Risk Calculator Result*\n\n"
-        "Jom kita kira, mula mula cari margin dulu. "
-        f"\"${gold_price:.2f}\" (Harga XAUUSD sekarang) ÷ \"{int(leverage)}\" (leverage kau) = \"{margin_per_001:.4f}\" "
-        "<--- ini margin yang diperlukan untuk buka lot 0.01\n\n"
-        f"Sekarang kau ambil risiko (risk percentage) dari (modal user) bersamaan \"{risk_pct:.2f}% x USD {balance_usd:.2f} = USD {modal_a_usd:.2f}\"\n\n"
-        f"Jadi dengan modal bersih \"USD {modal_a_usd:.2f}\" dibahagikan dengan \"{margin_per_001:.4f}\" (margin kau) , "
-        f"kau boleh buka \"USD {modal_a_usd:.2f} ÷ {margin_per_001:.4f} = {lot_a:.2f}\" kemudian darab dengan 100 maka kau boleh buka \"{lot_a:.2f} x 100 = {lot_b:.2f}\"\n\n"
-        f"Tapi tu baru boleh buka , bukan boleh floating.. zon kau \"{zone_pips:.1f}\" pips\n\n"
-        f"Jadi \"{zone_pips:.1f} ÷ {lot_b:.2f} = {lot_c:.4f}\"\n\n"
-        f"Jadi lot yang kau boleh buka dengan risiko sebenar \"USD {modal_a_usd:.2f}\" adalah \"{lot_c:.4f}\" lot"
-    )
-    await send_screen(
-        context,
-        message.chat_id,
-        summary_text,
-        reply_markup=_build_main_menu_keyboard_for_user(user.id),
-        parse_mode="Markdown",
-    )
-
-
-async def _handle_risk_calculator_back_to_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    message = update.effective_message
-    user = update.effective_user
-    if not user:
-        return
-
-    await send_screen(
-        context,
-        message.chat_id,
-        "Main Menu _dibuka_.",
-        reply_markup=_build_main_menu_keyboard_for_user(user.id),
-        parse_mode="Markdown",
-    )
-
-
 async def _handle_notification_settings_save(payload: dict, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     user = update.effective_user
@@ -823,7 +751,7 @@ async def _handle_notification_settings_save(payload: dict, update: Update, cont
             context,
             message.chat_id,
             "❌ Akses ditolak.",
-            reply_markup=_build_main_menu_keyboard_for_user(user.id),
+            reply_markup=main_menu_keyboard(user.id),
         )
         return
 
@@ -922,14 +850,6 @@ async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE
         await _handle_records_reports_back_to_menu(update, context)
         return
 
-    if payload_type == "risk_calculator_submit":
-        await _handle_risk_calculator_submit(payload, update, context)
-        return
-
-    if payload_type == "risk_calculator_back_to_menu":
-        await _handle_risk_calculator_back_to_menu(update, context)
-        return
-
     if payload_type == "notification_settings_save":
         await _handle_notification_settings_save(payload, update, context)
         return
@@ -938,5 +858,5 @@ async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE
         context,
         message.chat_id,
         "❌ Jenis data tak dikenali. Sila buka semula menu dan cuba lagi.",
-        reply_markup=_build_main_menu_keyboard_for_user(update.effective_user.id) if update.effective_user else main_menu_keyboard(),
+        reply_markup=main_menu_keyboard(update.effective_user.id if update.effective_user else None),
     )
