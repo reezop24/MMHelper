@@ -149,6 +149,7 @@ def _build_account_summary_text(user_id: int) -> str:
     tabung_start = get_tabung_start_date(user_id)
 
     goal = get_project_grow_goal_summary(user_id)
+    mission_state = get_project_grow_mission_state(user_id)
     mission = get_mission_progress_summary(user_id)
     target_capital = float(goal.get("target_balance_usd") or 0)
     grow_target = max(target_capital - current_balance, 0.0)
@@ -174,7 +175,7 @@ def _build_account_summary_text(user_id: int) -> str:
         f"- Monthly P/L: USD {_usd(monthly)}",
         "",
         "*Project Grow*",
-        f"- Mission Status: {mission['mission_status']}",
+        f"- Mission: {'Active' if mission_state['active'] else 'Inactive'}",
     ]
 
     if target_capital > 0:
@@ -188,18 +189,19 @@ def _build_account_summary_text(user_id: int) -> str:
     else:
         lines.append("- Target Capital: belum diset")
 
-    lines.extend(
-        [
-            "",
-            "*Mission Progress*",
-            f"- Mission Mode: {mission['mode_level']}",
-            f"- Mission Status: {mission['mission_status']}",
-            mission["mission_1"],
-            mission["mission_2"],
-            mission["mission_3"],
-            mission["mission_4"],
-        ]
-    )
+    if mission_state["active"]:
+        lines.extend(
+            [
+                "",
+                "*Mission Progress*",
+                f"- Mission Mode: {mission['mode_level']}",
+                f"- Mission Status: {mission['progress_count']}",
+                mission["mission_1"],
+                mission["mission_2"],
+                mission["mission_3"],
+                mission["mission_4"],
+            ]
+        )
 
     return "\n".join(lines)
 

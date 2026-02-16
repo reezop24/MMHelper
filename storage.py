@@ -740,12 +740,14 @@ def get_mission_progress_summary(user_id: int) -> dict[str, str]:
 
     if not state["active"]:
         return {
+            "active": "0",
             "mode_level": "-",
             "mission_status": mission_status,
+            "progress_count": "0/4",
             "mission_1": "Mission 1 : in progress 0/14",
             "mission_2": "Mission 2 : in progress 0/14",
             "mission_3": "Mission 3 : in progress 0/30",
-            "mission_4": "Mission 4 : 0%",
+            "mission_4": "Mission 4 : in progress 0%",
         }
 
     start_date = _mission_start_date(user_id) or malaysia_now().date()
@@ -813,14 +815,27 @@ def get_mission_progress_summary(user_id: int) -> dict[str, str]:
     grow_target = max(target_balance - baseline_balance, 0.0)
     achieved = max(get_current_balance_usd(user_id) - baseline_balance, 0.0)
     mission4_pct = 0.0 if grow_target <= 0 else min((achieved / grow_target) * 100.0, 100.0)
-    if mission4_pct >= 100 and grow_target > 0:
-        mission4_text = "Mission 4 : _PASS_"
+    mission4_pass = mission4_pct >= 100 and grow_target > 0
+    if mission4_pass:
+        mission4_text = "Mission 4 : _PASS_ 100%"
     else:
-        mission4_text = f"Mission 4 : {mission4_pct:.0f}%"
+        mission4_text = f"Mission 4 : in progress {mission4_pct:.0f}%"
+
+    pass_count = 0
+    if mission1_pass:
+        pass_count += 1
+    if mission2_pass:
+        pass_count += 1
+    if mission3_pass:
+        pass_count += 1
+    if mission4_pass:
+        pass_count += 1
 
     return {
+        "active": "1",
         "mode_level": mode_level,
         "mission_status": mission_status,
+        "progress_count": f"{pass_count}/4",
         "mission_1": mission1_text,
         "mission_2": mission2_text,
         "mission_3": mission3_text,
