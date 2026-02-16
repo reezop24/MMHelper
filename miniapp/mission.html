@@ -51,20 +51,28 @@
 
     .tab-btn {
       margin: 0;
-      border: 1px solid #2f5493;
+      border: 1px solid #3f6eb8;
       border-radius: 10px;
       padding: 10px;
-      background: rgba(8, 26, 56, 0.85);
-      color: #d3e5ff;
+      background: linear-gradient(180deg, rgba(16, 41, 84, 0.95), rgba(9, 26, 56, 0.92));
+      color: #d7e8ff;
       font-size: 14px;
       font-weight: 700;
       cursor: pointer;
     }
 
-    .tab-btn.active {
-      border-color: #8ec0ff;
-      box-shadow: 0 0 0 1px rgba(142, 192, 255, 0.3) inset;
-      color: #fff;
+    #normalModeBtn.active {
+      border-color: #8cc7ff;
+      box-shadow: 0 0 0 1px rgba(140, 199, 255, 0.34) inset;
+      background: linear-gradient(180deg, rgba(33, 91, 169, 0.96), rgba(22, 65, 128, 0.94));
+      color: #ffffff;
+    }
+
+    #advancedModeBtn.active {
+      border-color: #ffd088;
+      box-shadow: 0 0 0 1px rgba(255, 208, 136, 0.34) inset;
+      background: linear-gradient(180deg, rgba(173, 103, 28, 0.96), rgba(125, 73, 21, 0.94));
+      color: #fff7eb;
     }
 
     .level-toggle {
@@ -143,11 +151,6 @@
     }
 
     @media (max-width: 640px) {
-      .summary,
-      .tabs {
-        grid-template-columns: 1fr;
-      }
-
       .summary {
         gap: 6px;
         padding: 10px;
@@ -156,6 +159,11 @@
       .summary-item {
         font-size: 12.5px;
         line-height: 1.25;
+      }
+
+      .tab-btn {
+        font-size: 13px;
+        padding: 9px 8px;
       }
     }
   </style>

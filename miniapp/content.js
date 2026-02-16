@@ -116,7 +116,7 @@ window.MMHELPER_CONTENT = {
     "Kau kena maintain prestasi dan disiplin untuk complete mission satu per satu.",
     "",
     "Pilih mode dulu, lepas tu start mission."
-  ].join("\\n"),
+  ].join("\n"),
   missionRunningIntro: "Mission tengah berjalan. Fokus maintain consistency sampai complete.",
 
   missionNormalLabel: "Normal Mode",
@@ -132,19 +132,19 @@ window.MMHELPER_CONTENT = {
   missionLevel1Items: [
     {
       title: "Mission 1 : Honest Log",
-      desc: "User wajib kemaskini aktiviti dalam MM Helper selama 14 hari berturut termasuk hari tiada trade. Kalau ada hari tak update, kira gagal."
+      desc: "Untuk 14 hari berturut, kau wajib update MM Helper setiap hari termasuk hari tak trade. Kalau ada sehari tak update, mission ni jatuh fail."
     },
     {
       title: "Mission 2 : Honest Grow",
-      desc: "User wajib kemaskini aktiviti trading setiap hari minimum 14 hari berturut termasuk hari tiada trade dan wajib ada transaksi tabung minimum 2 kali dalam tempoh ni."
+      desc: "Selama minimum 14 hari berturut, update aktiviti trading setiap hari termasuk no-trade day, dan dalam tempoh sama pastikan ada sekurang-kurangnya 2 transaksi tabung."
     },
     {
       title: "Mission 3 : Respect Max Loss",
-      desc: "Tak langgar daily max loss limit selama 30 hari berturut. Daily max loss ikut nilai yang user isi masa Initial Setup."
+      desc: "Kau kena jaga disiplin supaya tak langgar had daily max loss selama 30 hari berturut. Had ni ikut setting yang kau isi masa Initial Setup."
     },
     {
       title: "Mission 4 : Double UP",
-      desc: "Capai ROI 100% dari grow target yang user pilih masa Set New Goal."
+      desc: "Capai pertumbuhan 100% daripada jarak target grow yang kau set masa Set New Goal. Fokus konsisten, bukan pecut tanpa plan."
     }
   ],
 
