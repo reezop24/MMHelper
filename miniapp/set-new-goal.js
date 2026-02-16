@@ -23,7 +23,6 @@
 
   var name = params.get("name") || "-";
   var currentBalance = Number(params.get("current_balance_usd") || 0);
-  var capital = Number(params.get("capital_usd") || 0);
   var savedDate = params.get("saved_date") || "-";
   var tabungStartDate = params.get("tabung_start_date") || "-";
   var missionStatus = params.get("mission_status") || "-";
@@ -36,7 +35,6 @@
 
   document.getElementById("summaryName").textContent = name;
   document.getElementById("summaryBalance").textContent = formatUsd(currentBalance);
-  document.getElementById("summaryCapital").textContent = formatUsd(capital);
   document.getElementById("summaryDate").textContent = savedDate;
   document.getElementById("summaryTabungStartDate").textContent = tabungStartDate;
   document.getElementById("summaryMissionStatus").textContent = missionStatus;

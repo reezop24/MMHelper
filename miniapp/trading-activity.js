@@ -41,7 +41,6 @@
   var tabungStartDate = params.get("tabung_start_date") || "-";
   var totalBalance = Number(params.get("total_balance_usd") || 0);
   var tabungBalance = Number(params.get("tabung_balance_usd") || 0);
-  var capital = Number(params.get("capital_usd") || 0);
   var weeklyPerformance = Number(params.get("weekly_performance_usd") || 0);
   var monthlyPerformance = Number(params.get("monthly_performance_usd") || 0);
 
@@ -50,7 +49,6 @@
   document.getElementById("summaryBalance").textContent = formatUsd(currentBalance);
   document.getElementById("summaryTotalBalance").textContent = formatUsd(totalBalance);
   document.getElementById("summaryTabungBalance").textContent = formatUsd(tabungBalance);
-  document.getElementById("summaryCapitalTotal").textContent = formatUsd(capital);
   document.getElementById("summaryWeeklyPerformance").textContent = formatPnl(weeklyPerformance);
   document.getElementById("summaryMonthlyPerformance").textContent = formatPnl(monthlyPerformance);
   document.getElementById("summaryDate").textContent = savedDate;

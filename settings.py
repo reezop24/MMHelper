@@ -73,7 +73,6 @@ def _build_activity_query(
     current_profit_usd: float,
     total_balance_usd: float,
     tabung_balance_usd: float,
-    capital_usd: float,
     weekly_performance_usd: float,
     monthly_performance_usd: float,
 ) -> str:
@@ -87,7 +86,6 @@ def _build_activity_query(
             "current_profit_usd": f"{current_profit_usd:.2f}",
             "total_balance_usd": f"{total_balance_usd:.2f}",
             "tabung_balance_usd": f"{tabung_balance_usd:.2f}",
-            "capital_usd": f"{capital_usd:.2f}",
             "weekly_performance_usd": f"{weekly_performance_usd:.2f}",
             "monthly_performance_usd": f"{monthly_performance_usd:.2f}",
         }
@@ -103,7 +101,6 @@ def get_withdrawal_activity_webapp_url(
     current_profit_usd: float,
     total_balance_usd: float,
     tabung_balance_usd: float,
-    capital_usd: float,
     weekly_performance_usd: float,
     monthly_performance_usd: float,
 ) -> str:
@@ -117,7 +114,6 @@ def get_withdrawal_activity_webapp_url(
         current_profit_usd=current_profit_usd,
         total_balance_usd=total_balance_usd,
         tabung_balance_usd=tabung_balance_usd,
-        capital_usd=capital_usd,
         weekly_performance_usd=weekly_performance_usd,
         monthly_performance_usd=monthly_performance_usd,
     )
@@ -133,7 +129,6 @@ def get_deposit_activity_webapp_url(
     current_profit_usd: float,
     total_balance_usd: float,
     tabung_balance_usd: float,
-    capital_usd: float,
     weekly_performance_usd: float,
     monthly_performance_usd: float,
 ) -> str:
@@ -147,7 +142,6 @@ def get_deposit_activity_webapp_url(
         current_profit_usd=current_profit_usd,
         total_balance_usd=total_balance_usd,
         tabung_balance_usd=tabung_balance_usd,
-        capital_usd=capital_usd,
         weekly_performance_usd=weekly_performance_usd,
         monthly_performance_usd=monthly_performance_usd,
     )
@@ -163,7 +157,6 @@ def get_trading_activity_webapp_url(
     current_profit_usd: float,
     total_balance_usd: float,
     tabung_balance_usd: float,
-    capital_usd: float,
     weekly_performance_usd: float,
     monthly_performance_usd: float,
 ) -> str:
@@ -177,7 +170,6 @@ def get_trading_activity_webapp_url(
         current_profit_usd=current_profit_usd,
         total_balance_usd=total_balance_usd,
         tabung_balance_usd=tabung_balance_usd,
-        capital_usd=capital_usd,
         weekly_performance_usd=weekly_performance_usd,
         monthly_performance_usd=monthly_performance_usd,
     )
@@ -187,7 +179,6 @@ def get_trading_activity_webapp_url(
 def get_set_new_goal_webapp_url(
     name: str,
     current_balance_usd: float,
-    capital_usd: float,
     saved_date: str,
     tabung_start_date: str,
     mission_status: str,
@@ -201,7 +192,6 @@ def get_set_new_goal_webapp_url(
         {
             "name": name,
             "current_balance_usd": f"{current_balance_usd:.2f}",
-            "capital_usd": f"{capital_usd:.2f}",
             "saved_date": saved_date,
             "tabung_start_date": tabung_start_date,
             "mission_status": mission_status,
@@ -217,7 +207,6 @@ def get_set_new_goal_webapp_url(
 def get_project_grow_mission_webapp_url(
     name: str,
     current_balance_usd: float,
-    capital_usd: float,
     saved_date: str,
     target_balance_usd: float,
     target_days: int,
@@ -234,7 +223,6 @@ def get_project_grow_mission_webapp_url(
         {
             "name": name,
             "current_balance_usd": f"{current_balance_usd:.2f}",
-            "capital_usd": f"{capital_usd:.2f}",
             "saved_date": saved_date,
             "target_balance_usd": f"{target_balance_usd:.2f}",
             "target_days": str(target_days),
@@ -256,7 +244,6 @@ def get_tabung_progress_webapp_url(
     tabung_start_date: str,
     tabung_balance_usd: float,
     grow_target_usd: float,
-    capital_target_usd: float,
     days_left: int,
     days_left_label: str,
     grow_progress_pct: float,
@@ -271,7 +258,6 @@ def get_tabung_progress_webapp_url(
             "tabung_start_date": tabung_start_date,
             "tabung_balance_usd": f"{tabung_balance_usd:.2f}",
             "grow_target_usd": f"{grow_target_usd:.2f}",
-            "capital_target_usd": f"{capital_target_usd:.2f}",
             "days_left": str(max(0, int(days_left))),
             "days_left_label": days_left_label,
             "grow_progress_pct": f"{grow_progress_pct:.2f}",

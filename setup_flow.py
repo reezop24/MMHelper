@@ -36,7 +36,6 @@ from storage import (
     get_balance_adjustment_rules,
     can_open_project_grow_mission,
     can_reset_initial_capital,
-    get_capital_usd,
     get_current_balance_usd,
     get_current_profit_usd,
     get_initial_setup_summary,
@@ -144,7 +143,6 @@ def _build_project_grow_keyboard_for_user(user_id: int):
     mission_url = get_project_grow_mission_webapp_url(
         name=summary["name"],
         current_balance_usd=current_balance,
-        capital_usd=get_capital_usd(user_id),
         saved_date=summary["saved_date"],
         target_balance_usd=goal_summary["target_balance_usd"],
         target_days=goal_summary["target_days"],
@@ -160,7 +158,6 @@ def _build_project_grow_keyboard_for_user(user_id: int):
     set_new_goal_url = get_set_new_goal_webapp_url(
         name=summary["name"],
         current_balance_usd=current_balance,
-        capital_usd=get_capital_usd(user_id),
         saved_date=summary["saved_date"],
         tabung_start_date=tabung_start_date,
         mission_status=mission_status,
@@ -176,7 +173,6 @@ def _build_project_grow_keyboard_for_user(user_id: int):
         tabung_start_date=tabung_start_date,
         tabung_balance_usd=tabung_progress["tabung_balance_usd"],
         grow_target_usd=tabung_progress["grow_target_usd"],
-        capital_target_usd=tabung_progress["capital_target_usd"],
         days_left=tabung_progress["days_left"],
         days_left_label=tabung_progress["days_left_label"],
         grow_progress_pct=tabung_progress["grow_progress_pct"],
@@ -199,7 +195,6 @@ def _build_account_activity_keyboard_for_user(user_id: int):
     current_profit = get_current_profit_usd(user_id)
     total_balance = get_total_balance_usd(user_id)
     tabung_balance = get_tabung_balance_usd(user_id)
-    capital = get_capital_usd(user_id)
     weekly_performance = get_weekly_performance_usd(user_id)
     monthly_performance = get_monthly_performance_usd(user_id)
 
@@ -212,7 +207,6 @@ def _build_account_activity_keyboard_for_user(user_id: int):
         "current_profit_usd": current_profit,
         "total_balance_usd": total_balance,
         "tabung_balance_usd": tabung_balance,
-        "capital_usd": capital,
         "weekly_performance_usd": weekly_performance,
         "monthly_performance_usd": monthly_performance,
     }

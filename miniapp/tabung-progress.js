@@ -27,7 +27,6 @@
 
   var tabungBalance = Number(params.get("tabung_balance_usd") || 0);
   var growTarget = Number(params.get("grow_target_usd") || 0);
-  var capitalTarget = Number(params.get("capital_target_usd") || 0);
   var daysLeftLabel = params.get("days_left_label") || "-";
   var growProgressPct = Number(params.get("grow_progress_pct") || 0);
   var weeklyGrow = Number(params.get("weekly_grow_usd") || 0);
@@ -39,7 +38,6 @@
 
   document.getElementById("tabungBalance").textContent = formatUsd(tabungBalance);
   document.getElementById("growTarget").textContent = formatUsd(growTarget);
-  document.getElementById("capitalTarget").textContent = formatUsd(capitalTarget);
   document.getElementById("daysLeftLabel").textContent = daysLeftLabel;
   document.getElementById("growProgress").textContent = growProgressPct.toFixed(0) + "%";
   document.getElementById("weeklyGrow").textContent = formatPnl(weeklyGrow);

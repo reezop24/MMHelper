@@ -531,10 +531,6 @@ def get_tabung_balance_usd(user_id: int) -> float:
     return 0.0
 
 
-def get_capital_usd(user_id: int) -> float:
-    return get_total_balance_usd(user_id)
-
-
 def get_current_balance_usd(user_id: int) -> float:
     total_balance = _get_account_flow_balance_usd(user_id)
     current_profit = get_current_profit_usd(user_id)
@@ -676,7 +672,6 @@ def get_tabung_progress_summary(user_id: int) -> dict[str, Any]:
     return {
         "tabung_balance_usd": tabung_balance,
         "grow_target_usd": remaining_grow_target,
-        "capital_target_usd": target_balance,
         "days_left": days_left,
         "days_left_label": days_left_label,
         "grow_progress_pct": grow_progress_pct,
