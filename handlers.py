@@ -33,6 +33,7 @@ from menu import (
 from settings import (
     get_deposit_activity_webapp_url,
     get_initial_capital_reset_webapp_url,
+    get_notification_setting_webapp_url,
     get_project_grow_mission_webapp_url,
     get_set_new_goal_webapp_url,
     get_trading_activity_webapp_url,
@@ -87,6 +88,15 @@ def _build_mm_setting_keyboard_for_user(user_id: int):
         can_reset=can_reset_initial_capital(user_id),
     )
     return mm_helper_setting_keyboard(reset_url)
+
+
+def _build_admin_panel_keyboard_for_user(user_id: int):
+    summary = get_initial_setup_summary(user_id)
+    notification_url = get_notification_setting_webapp_url(
+        name=summary["name"],
+        saved_date=summary["saved_date"],
+    )
+    return admin_panel_keyboard(notification_url)
 
 
 def _build_account_activity_keyboard_for_user(user_id: int):
@@ -243,7 +253,7 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
             context,
             message.chat_id,
             ADMIN_PANEL_OPENED_TEXT,
-            reply_markup=admin_panel_keyboard(),
+            reply_markup=_build_admin_panel_keyboard_for_user(user.id),
             parse_mode="Markdown",
         )
         return
@@ -278,7 +288,7 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
             context,
             message.chat_id,
             NOTIFICATION_SETTING_OPENED_TEXT,
-            reply_markup=admin_panel_keyboard(),
+            reply_markup=_build_admin_panel_keyboard_for_user(user.id),
             parse_mode="Markdown",
         )
         return

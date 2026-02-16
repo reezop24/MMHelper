@@ -123,10 +123,15 @@ def project_grow_keyboard(
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
 
-def admin_panel_keyboard() -> ReplyKeyboardMarkup:
+def admin_panel_keyboard(notification_setting_url: str) -> ReplyKeyboardMarkup:
     rows = [
         [SUBMENU_ADMIN_BUTTON_BETA_RESET],
-        [SUBMENU_ADMIN_BUTTON_NOTIFICATION_SETTING],
+        [
+            KeyboardButton(
+                SUBMENU_ADMIN_BUTTON_NOTIFICATION_SETTING,
+                web_app=WebAppInfo(url=notification_setting_url),
+            )
+        ],
         [SUBMENU_MM_BUTTON_BACK_MAIN],
     ]
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)

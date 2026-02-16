@@ -7,10 +7,18 @@ import json
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from menu import account_activity_keyboard, main_menu_keyboard, mm_helper_setting_keyboard, project_grow_keyboard
+from menu import (
+    account_activity_keyboard,
+    admin_panel_keyboard,
+    is_admin_user,
+    main_menu_keyboard,
+    mm_helper_setting_keyboard,
+    project_grow_keyboard,
+)
 from settings import (
     get_deposit_activity_webapp_url,
     get_initial_capital_reset_webapp_url,
+    get_notification_setting_webapp_url,
     get_project_grow_mission_webapp_url,
     get_set_new_goal_webapp_url,
     get_trading_activity_webapp_url,
@@ -38,6 +46,7 @@ from storage import (
     get_monthly_performance_usd,
     reset_project_grow_goal,
     reset_project_grow_mission,
+    save_notification_settings,
     save_user_setup_section,
     start_project_grow_mission,
 )
@@ -46,6 +55,7 @@ from texts import (
     DEPOSIT_ACTIVITY_SAVED_TEXT,
     INITIAL_CAPITAL_RESET_SUCCESS_TEXT,
     MM_HELPER_SETTING_OPENED_TEXT,
+    NOTIFICATION_SETTING_SAVED_TEXT,
     PROJECT_GROW_OPENED_TEXT,
     MISSION_RESET_TEXT,
     MISSION_STARTED_TEXT,
@@ -149,6 +159,15 @@ def _build_mm_setting_keyboard_for_user(user_id: int):
         can_reset=can_reset_initial_capital(user_id),
     )
     return mm_helper_setting_keyboard(reset_url)
+
+
+def _build_admin_panel_keyboard_for_user(user_id: int):
+    summary = get_initial_setup_summary(user_id)
+    notification_url = get_notification_setting_webapp_url(
+        name=summary["name"],
+        saved_date=summary["saved_date"],
+    )
+    return admin_panel_keyboard(notification_url)
 
 
 async def _handle_initial_setup(payload: dict, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -538,6 +557,64 @@ async def _handle_mm_setting_back_to_menu(update: Update, context: ContextTypes.
     )
 
 
+async def _handle_admin_panel_back_to_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    user = update.effective_user
+    if not user:
+        return
+
+    if not is_admin_user(user.id):
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Akses ditolak.",
+            reply_markup=main_menu_keyboard(user.id),
+        )
+        return
+
+    await send_screen(
+        context,
+        message.chat_id,
+        "Admin Panel _dibuka_.",
+        reply_markup=_build_admin_panel_keyboard_for_user(user.id),
+        parse_mode="Markdown",
+    )
+
+
+async def _handle_notification_settings_save(payload: dict, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    user = update.effective_user
+    if not user:
+        return
+
+    if not is_admin_user(user.id):
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Akses ditolak.",
+            reply_markup=main_menu_keyboard(user.id),
+        )
+        return
+
+    ok = save_notification_settings(user.id, payload)
+    if not ok:
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Gagal simpan notification setting. Semak input dan cuba lagi.",
+            reply_markup=_build_admin_panel_keyboard_for_user(user.id),
+        )
+        return
+
+    await send_screen(
+        context,
+        message.chat_id,
+        NOTIFICATION_SETTING_SAVED_TEXT,
+        reply_markup=_build_admin_panel_keyboard_for_user(user.id),
+        parse_mode="Markdown",
+    )
+
+
 async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     if not message or not message.web_app_data:
@@ -596,6 +673,14 @@ async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if payload_type == "mm_setting_back_to_menu":
         await _handle_mm_setting_back_to_menu(update, context)
+        return
+
+    if payload_type == "admin_panel_back_to_menu":
+        await _handle_admin_panel_back_to_menu(update, context)
+        return
+
+    if payload_type == "notification_settings_save":
+        await _handle_notification_settings_save(payload, update, context)
         return
 
     await send_screen(

@@ -224,3 +224,14 @@ def get_project_grow_mission_webapp_url(
         }
     )
     return f"{page}?{query}"
+
+
+def get_notification_setting_webapp_url(name: str, saved_date: str) -> str:
+    page = f"{_miniapp_base_url()}/notification-setting.html"
+    query = urlencode(
+        {
+            "name": name,
+            "saved_date": saved_date,
+        }
+    )
+    return f"{page}?{query}"
