@@ -579,6 +579,86 @@ def get_monthly_profit_loss_usd(user_id: int) -> float:
     return get_monthly_performance_usd(user_id)
 
 
+def _record_datetime_myt(record: dict[str, Any]) -> datetime | None:
+    tzinfo = malaysia_now().tzinfo
+    saved_at = record.get("saved_at")
+    if isinstance(saved_at, str) and saved_at.strip():
+        try:
+            dt = datetime.fromisoformat(saved_at.strip())
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=tzinfo)
+            return dt.astimezone(tzinfo)
+        except ValueError:
+            pass
+
+    saved_date = str(record.get("saved_date") or "").strip()
+    saved_time = str(record.get("saved_time") or "00:00:00").strip() or "00:00:00"
+    if saved_date:
+        try:
+            dt = datetime.fromisoformat(f"{saved_date}T{saved_time}")
+            return dt.replace(tzinfo=tzinfo)
+        except ValueError:
+            return None
+    return None
+
+
+def _build_transaction_history_entry(source: str, record: dict[str, Any]) -> dict[str, Any] | None:
+    dt = _record_datetime_myt(record)
+    if dt is None:
+        return None
+
+    label_map = {
+        "deposit_activity": "Deposit",
+        "withdrawal_activity": "Withdrawal",
+        "trading_activity": "Trading",
+        "balance_adjustment": "Adjustment",
+        "tabung": "Tabung",
+    }
+    source_key = source if source in label_map else "transaction"
+    amount = _to_float(record.get("amount_usd", 0.0))
+    mode = str(record.get("mode") or "").lower()
+
+    if source_key == "withdrawal_activity":
+        amount = -abs(amount)
+    elif source_key in {"trading_activity", "balance_adjustment"}:
+        amount = _record_net_usd(record)
+
+    return {
+        "ts": dt.isoformat(),
+        "date": dt.strftime("%Y-%m-%d"),
+        "time": dt.strftime("%H:%M"),
+        "source": source_key,
+        "label": label_map[source_key],
+        "mode": mode,
+        "amount_usd": round(amount, 2),
+    }
+
+
+def get_transaction_history_records(user_id: int, days: int, limit: int = 100) -> list[dict[str, Any]]:
+    max_items = max(1, min(int(limit), 100))
+    day_window = max(1, int(days))
+    end_date = malaysia_now().date()
+    start_date = end_date - timedelta(days=day_window - 1)
+
+    rows: list[dict[str, Any]] = []
+    for section_name in ("deposit_activity", "withdrawal_activity", "trading_activity", "balance_adjustment"):
+        for record in _iter_section_records_between(user_id, section_name, start_date, end_date):
+            item = _build_transaction_history_entry(section_name, record)
+            if item is not None:
+                rows.append(item)
+
+    for record in _tabung_records_since(user_id, start_date):
+        rec_date = _record_date_myt(record)
+        if rec_date is None or rec_date > end_date:
+            continue
+        item = _build_transaction_history_entry("tabung", record)
+        if item is not None:
+            rows.append(item)
+
+    rows.sort(key=lambda r: str(r.get("ts") or ""), reverse=True)
+    return rows[:max_items]
+
+
 def has_any_transactions(user_id: int) -> bool:
     rollup = _get_user_rollup(user_id)
     if (

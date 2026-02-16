@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Transaction History</title>
+  <link rel="stylesheet" href="global.css" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 16px;
+      background: rgba(6, 20, 47, 0.55);
+      border: 1px solid var(--border-input);
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .summary-item {
+      font-size: 14px;
+      color: #dce8ff;
+    }
+
+    .summary-item strong {
+      color: #fff;
+    }
+
+    .tab-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .tab-btn {
+      margin: 0;
+      width: 100%;
+      border: 1px solid rgba(79, 126, 194, 0.6);
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #dce8ff;
+      background: rgba(8, 30, 62, 0.8);
+    }
+
+    .tab-btn.active {
+      border-color: rgba(113, 177, 255, 0.95);
+      background: linear-gradient(90deg, #2569bf 0%, #2f89ff 100%);
+      color: #fff;
+    }
+
+    .list-wrap {
+      border: 1px solid rgba(83, 127, 193, 0.45);
+      border-radius: 12px;
+      background: rgba(6, 20, 46, 0.78);
+      overflow: hidden;
+    }
+
+    .list-head {
+      display: grid;
+      grid-template-columns: 1.2fr 0.9fr 1fr 0.9fr;
+      gap: 8px;
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(83, 127, 193, 0.45);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: #bdd3f7;
+    }
+
+    .tx-row {
+      display: grid;
+      grid-template-columns: 1.2fr 0.9fr 1fr 0.9fr;
+      gap: 8px;
+      padding: 10px 12px;
+      border-bottom: 1px solid rgba(83, 127, 193, 0.25);
+      font-size: 13px;
+      color: #f3f8ff;
+      align-items: center;
+    }
+
+    .tx-row:last-child {
+      border-bottom: 0;
+    }
+
+    .source {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 700;
+      border: 1px solid rgba(131, 169, 228, 0.45);
+      background: rgba(22, 48, 92, 0.8);
+      color: #dceaff;
+      width: fit-content;
+    }
+
+    .amount-positive {
+      color: #8df8b1;
+      font-weight: 700;
+    }
+
+    .amount-negative {
+      color: #ff9ea8;
+      font-weight: 700;
+    }
+
+    .empty {
+      padding: 20px 12px;
+      color: #bdd0ef;
+      text-align: center;
+      font-size: 14px;
+    }
+
+    .helper {
+      margin: 10px 2px 0;
+      color: #bcd0ee;
+      font-size: 12px;
+    }
+
+    .form-actions {
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 10px;
+    }
+
+    .back-btn {
+      margin: 0;
+      width: auto;
+      min-width: 170px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid #496ea9;
+      background: rgba(12, 34, 71, 0.9);
+      color: #e7f0ff;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    @media (max-width: 640px) {
+      .summary {
+        gap: 6px;
+        padding: 10px;
+      }
+
+      .summary-item {
+        font-size: 12.5px;
+        line-height: 1.25;
+      }
+
+      .list-head,
+      .tx-row {
+        grid-template-columns: 1fr 0.9fr 1fr;
+      }
+
+      .list-head span:nth-child(3),
+      .tx-row span:nth-child(3) {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="top-nav">
+      <button id="topBackBtn" type="button" class="top-back-btn">← Back</button>
+    </div>
+
+    <header class="hero">
+      <img class="logo" src="logo.png" alt="MM HELPER Logo" />
+      <h1>Transaction History</h1>
+      <p>Semak rekod transaksi 7 hari atau 30 hari terakhir.</p>
+    </header>
+
+    <section class="summary">
+      <div class="summary-item"><strong>Name:</strong> <span id="summaryName">-</span></div>
+      <div class="summary-item"><strong>Tarikh mula:</strong> <span id="summaryDate">-</span></div>
+    </section>
+
+    <section class="card">
+      <div class="tab-row">
+        <button id="tab7" class="tab-btn active" type="button">Last 7 days</button>
+        <button id="tab30" class="tab-btn" type="button">Last 30 days</button>
+      </div>
+
+      <div class="list-wrap">
+        <div class="list-head">
+          <span>Date & Time</span>
+          <span>Type</span>
+          <span>Mode</span>
+          <span>Amount</span>
+        </div>
+        <div id="txList"></div>
+      </div>
+
+      <p class="helper">Paparan maksimum 100 transaksi.</p>
+
+      <div class="form-actions">
+        <button id="backToReportsBtn" type="button" class="back-btn">⬅️ Back to Records & Reports</button>
+      </div>
+      <p id="formStatus" class="status" aria-live="polite"></p>
+    </section>
+  </main>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="transaction-history.js"></script>
+</body>
+</html>

@@ -14,6 +14,7 @@ from menu import (
     main_menu_keyboard,
     mm_helper_setting_keyboard,
     project_grow_keyboard,
+    records_reports_keyboard,
 )
 from settings import (
     get_balance_adjustment_webapp_url,
@@ -23,6 +24,7 @@ from settings import (
     get_project_grow_mission_webapp_url,
     get_set_new_goal_webapp_url,
     get_tabung_progress_webapp_url,
+    get_transaction_history_webapp_url,
     get_trading_activity_webapp_url,
     get_withdrawal_activity_webapp_url,
 )
@@ -46,6 +48,7 @@ from storage import (
     get_tabung_progress_summary,
     get_tabung_start_date,
     get_total_balance_usd,
+    get_transaction_history_records,
     get_weekly_performance_usd,
     get_monthly_performance_usd,
     has_project_grow_goal,
@@ -62,6 +65,7 @@ from texts import (
     MM_HELPER_SETTING_OPENED_TEXT,
     NOTIFICATION_SETTING_SAVED_TEXT,
     PROJECT_GROW_OPENED_TEXT,
+    STATISTIC_OPENED_TEXT,
     MISSION_RESET_TEXT,
     MISSION_STARTED_TEXT,
     SET_NEW_GOAL_RESET_TEXT,
@@ -251,6 +255,17 @@ def _build_admin_panel_keyboard_for_user(user_id: int):
         saved_date=summary["saved_date"],
     )
     return admin_panel_keyboard(notification_url)
+
+
+def _build_records_reports_keyboard_for_user(user_id: int):
+    summary = get_initial_setup_summary(user_id)
+    tx_history_url = get_transaction_history_webapp_url(
+        name=summary["name"],
+        saved_date=summary["saved_date"],
+        records_7d=get_transaction_history_records(user_id, days=7, limit=100),
+        records_30d=get_transaction_history_records(user_id, days=30, limit=100),
+    )
+    return records_reports_keyboard(tx_history_url)
 
 
 async def _handle_initial_setup(payload: dict, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -711,6 +726,21 @@ async def _handle_admin_panel_back_to_menu(update: Update, context: ContextTypes
     )
 
 
+async def _handle_records_reports_back_to_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    user = update.effective_user
+    if not user:
+        return
+
+    await send_screen(
+        context,
+        message.chat_id,
+        STATISTIC_OPENED_TEXT,
+        reply_markup=_build_records_reports_keyboard_for_user(user.id),
+        parse_mode="Markdown",
+    )
+
+
 async def _handle_notification_settings_save(payload: dict, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     user = update.effective_user
@@ -811,6 +841,10 @@ async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if payload_type == "admin_panel_back_to_menu":
         await _handle_admin_panel_back_to_menu(update, context)
+        return
+
+    if payload_type == "records_reports_back_to_menu":
+        await _handle_records_reports_back_to_menu(update, context)
         return
 
     if payload_type == "notification_settings_save":

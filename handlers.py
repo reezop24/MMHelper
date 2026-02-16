@@ -24,12 +24,16 @@ from menu import (
     SUBMENU_PROJECT_BUTTON_SET_NEW_GOAL,
     SUBMENU_PROJECT_BUTTON_TABUNG_PROGRESS,
     SUBMENU_PROJECT_BUTTON_TABUNG_PROGRESS_LOCKED,
+    SUBMENU_STAT_BUTTON_MONTHLY_REPORTS,
+    SUBMENU_STAT_BUTTON_TRANSACTION_HISTORY,
+    SUBMENU_STAT_BUTTON_WEEKLY_REPORTS,
     admin_panel_keyboard,
     account_activity_keyboard,
     is_admin_user,
     main_menu_keyboard,
     mm_helper_setting_keyboard,
     project_grow_keyboard,
+    records_reports_keyboard,
 )
 from settings import (
     get_balance_adjustment_webapp_url,
@@ -39,6 +43,7 @@ from settings import (
     get_project_grow_mission_webapp_url,
     get_set_new_goal_webapp_url,
     get_tabung_progress_webapp_url,
+    get_transaction_history_webapp_url,
     get_trading_activity_webapp_url,
     get_withdrawal_activity_webapp_url,
 )
@@ -57,6 +62,7 @@ from storage import (
     get_project_grow_mission_status_text,
     get_tabung_start_date,
     get_tabung_progress_summary,
+    get_transaction_history_records,
     get_tabung_balance_usd,
     get_total_balance_usd,
     get_weekly_performance_usd,
@@ -81,6 +87,9 @@ from texts import (
     SYSTEM_INFO_OPENED_TEXT,
     TABUNG_OPENED_TEXT,
     TABUNG_PROGRESS_OPENED_TEXT,
+    TRANSACTION_HISTORY_OPENED_TEXT,
+    WEEKLY_REPORTS_OPENED_TEXT,
+    MONTHLY_REPORTS_OPENED_TEXT,
 )
 from ui import clear_last_screen, send_screen
 from welcome import start
@@ -215,6 +224,17 @@ def _build_account_summary_text(user_id: int) -> str:
         )
 
     return "\n".join(lines)
+
+
+def _build_records_reports_keyboard_for_user(user_id: int):
+    summary = get_initial_setup_summary(user_id)
+    tx_history_url = get_transaction_history_webapp_url(
+        name=summary["name"],
+        saved_date=summary["saved_date"],
+        records_7d=get_transaction_history_records(user_id, days=7, limit=100),
+        records_30d=get_transaction_history_records(user_id, days=30, limit=100),
+    )
+    return records_reports_keyboard(tx_history_url)
 
 
 def _build_project_grow_keyboard_for_user(user_id: int):
@@ -380,7 +400,7 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
             context,
             message.chat_id,
             STATISTIC_OPENED_TEXT,
-            reply_markup=main_menu_keyboard(user.id),
+            reply_markup=_build_records_reports_keyboard_for_user(user.id),
             parse_mode="Markdown",
         )
         return
@@ -442,6 +462,34 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
             _build_account_summary_text(user.id),
             reply_markup=_build_account_activity_keyboard_for_user(user.id),
             parse_mode="Markdown",
+        )
+        return
+
+    if text == SUBMENU_STAT_BUTTON_TRANSACTION_HISTORY:
+        await send_screen(
+            context,
+            message.chat_id,
+            TRANSACTION_HISTORY_OPENED_TEXT,
+            reply_markup=_build_records_reports_keyboard_for_user(user.id),
+            parse_mode="Markdown",
+        )
+        return
+
+    if text == SUBMENU_STAT_BUTTON_WEEKLY_REPORTS:
+        await send_screen(
+            context,
+            message.chat_id,
+            WEEKLY_REPORTS_OPENED_TEXT,
+            reply_markup=_build_records_reports_keyboard_for_user(user.id),
+        )
+        return
+
+    if text == SUBMENU_STAT_BUTTON_MONTHLY_REPORTS:
+        await send_screen(
+            context,
+            message.chat_id,
+            MONTHLY_REPORTS_OPENED_TEXT,
+            reply_markup=_build_records_reports_keyboard_for_user(user.id),
         )
         return
 

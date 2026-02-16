@@ -8,7 +8,7 @@ MAIN_MENU_BUTTON_MM_SETTING = "⚙️ MM Helper Setting"
 MAIN_MENU_BUTTON_RISK = "🧮 Risk Calculator"
 MAIN_MENU_BUTTON_ACCOUNT_ACTIVITY = "📒 Account Activity"
 MAIN_MENU_BUTTON_PROJECT_GROW = "📈 Project Grow"
-MAIN_MENU_BUTTON_STATISTIC = "📊 Statistic"
+MAIN_MENU_BUTTON_STATISTIC = "📊 Records & Reports"
 MAIN_MENU_BUTTON_EXTRA = "🧰 Extra"
 MAIN_MENU_BUTTON_ADMIN_PANEL = "🛡️ Admin Panel"
 
@@ -32,6 +32,10 @@ SUBMENU_PROJECT_BUTTON_ACHIEVEMENT = "🏆 Achievement"
 
 SUBMENU_ADMIN_BUTTON_BETA_RESET = "🧪 BETA RESET"
 SUBMENU_ADMIN_BUTTON_NOTIFICATION_SETTING = "🔔 Notification Setting"
+
+SUBMENU_STAT_BUTTON_TRANSACTION_HISTORY = "🧾 Transaction History"
+SUBMENU_STAT_BUTTON_WEEKLY_REPORTS = "📆 Weekly Reports"
+SUBMENU_STAT_BUTTON_MONTHLY_REPORTS = "🗓️ Monthly Reports"
 
 BASE_MAIN_MENU_ROWS = [
     [MAIN_MENU_BUTTON_MM_SETTING, MAIN_MENU_BUTTON_RISK],
@@ -150,6 +154,21 @@ def admin_panel_keyboard(notification_setting_url: str) -> ReplyKeyboardMarkup:
                 web_app=WebAppInfo(url=notification_setting_url),
             )
         ],
+        [SUBMENU_MM_BUTTON_BACK_MAIN],
+    ]
+    return ReplyKeyboardMarkup(rows, resize_keyboard=True)
+
+
+def records_reports_keyboard(transaction_history_url: str) -> ReplyKeyboardMarkup:
+    rows = [
+        [
+            KeyboardButton(
+                SUBMENU_STAT_BUTTON_TRANSACTION_HISTORY,
+                web_app=WebAppInfo(url=transaction_history_url),
+            )
+        ],
+        [SUBMENU_STAT_BUTTON_WEEKLY_REPORTS],
+        [SUBMENU_STAT_BUTTON_MONTHLY_REPORTS],
         [SUBMENU_MM_BUTTON_BACK_MAIN],
     ]
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)

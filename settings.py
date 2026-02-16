@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from urllib.parse import urlencode
 
@@ -274,6 +275,24 @@ def get_notification_setting_webapp_url(name: str, saved_date: str) -> str:
         {
             "name": name,
             "saved_date": saved_date,
+        }
+    )
+    return f"{page}?{query}"
+
+
+def get_transaction_history_webapp_url(
+    name: str,
+    saved_date: str,
+    records_7d: list[dict[str, object]],
+    records_30d: list[dict[str, object]],
+) -> str:
+    page = f"{_miniapp_base_url()}/transaction-history.html"
+    query = urlencode(
+        {
+            "name": name,
+            "saved_date": saved_date,
+            "records_7d": json.dumps(records_7d, separators=(",", ":")),
+            "records_30d": json.dumps(records_30d, separators=(",", ":")),
         }
     )
     return f"{page}?{query}"
