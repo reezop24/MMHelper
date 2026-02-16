@@ -146,6 +146,46 @@
       font-size: 13px;
     }
 
+    .running-actions {
+      margin-top: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .back-btn {
+      margin: 0;
+      width: auto;
+      min-width: 150px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid #496ea9;
+      background: rgba(12, 34, 71, 0.9);
+      color: #e7f0ff;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .reset-link-btn {
+      margin: 0;
+      width: auto;
+      border: 0;
+      padding: 3px 2px;
+      background: transparent;
+      color: #b3c6e6;
+      font-size: 11px;
+      font-weight: 600;
+      text-decoration: underline;
+      text-underline-offset: 2px;
+      opacity: 0.7;
+    }
+
+    .reset-link-btn:hover {
+      opacity: 1;
+      color: #d0dcf0;
+    }
+
     .hidden {
       display: none;
     }
@@ -223,6 +263,11 @@
       <p class="meta"><strong>Target Grow:</strong> USD <span id="runningTargetBalance">0.00</span></p>
       <p class="meta"><strong>Target Tempoh:</strong> <span id="runningTargetLabel">-</span></p>
       <p class="meta"><strong>Tabung Balance:</strong> USD <span id="runningTabungBalance">0.00</span></p>
+      <div class="running-actions">
+        <button id="backToMenuBtn" type="button" class="back-btn">⬅️ Back to Menu</button>
+        <button id="resetMissionBtn" type="button" class="reset-link-btn">Reset Mission</button>
+      </div>
+      <p id="runningStatus" class="status" aria-live="polite"></p>
     </section>
   </main>
 

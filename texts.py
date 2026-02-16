@@ -68,6 +68,7 @@ TABUNG_PROGRESS_OPENED_TEXT = "Tabung Progress _dibuka_."
 ACHIEVEMENT_OPENED_TEXT = "Achievement _dibuka_."
 SET_NEW_GOAL_SAVED_TEXT = "Set New Goal _dikemas kini_. Mission akan menyusul."
 MISSION_STARTED_TEXT = "Mission _diaktifkan_. Jaga konsisten dan update ikut flow."
+MISSION_RESET_TEXT = "Mission _direset_. Kau boleh start semula bila ready."
 STATISTIC_OPENED_TEXT = "Statistic _dibuka_."
 EXTRA_OPENED_TEXT = "Extra _dibuka_."
 

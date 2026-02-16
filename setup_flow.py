@@ -18,12 +18,14 @@ from storage import (
     can_reset_initial_capital,
     get_current_balance_usd,
     get_current_profit_usd,
+    reset_project_grow_mission,
     save_user_setup_section,
     start_project_grow_mission,
 )
 from texts import (
     DEPOSIT_ACTIVITY_SAVED_TEXT,
     INITIAL_CAPITAL_RESET_SUCCESS_TEXT,
+    MISSION_RESET_TEXT,
     MISSION_STARTED_TEXT,
     SET_NEW_GOAL_SAVED_TEXT,
     SETUP_SAVED_TEXT,
@@ -325,6 +327,31 @@ async def _handle_project_grow_mission_start(payload: dict, update: Update, cont
     )
 
 
+async def _handle_project_grow_mission_reset(payload: dict, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    user = update.effective_user
+    if not user:
+        return
+
+    confirm_reset = str(payload.get("confirm_reset") or "0").strip()
+    if confirm_reset != "1":
+        await send_screen(context, message.chat_id, "❌ Reset mission dibatalkan.")
+        return
+
+    ok = reset_project_grow_mission(user.id)
+    if not ok:
+        await send_screen(context, message.chat_id, "❌ Mission belum aktif atau reset gagal.")
+        return
+
+    await send_screen(
+        context,
+        message.chat_id,
+        MISSION_RESET_TEXT,
+        reply_markup=main_menu_keyboard(),
+        parse_mode="Markdown",
+    )
+
+
 async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     if not message or not message.web_app_data:
@@ -363,6 +390,10 @@ async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if payload_type == "project_grow_mission_start":
         await _handle_project_grow_mission_start(payload, update, context)
+        return
+
+    if payload_type == "project_grow_mission_reset":
+        await _handle_project_grow_mission_reset(payload, update, context)
         return
 
     await send_screen(

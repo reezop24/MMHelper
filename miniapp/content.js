@@ -124,6 +124,10 @@ window.MMHELPER_CONTENT = {
   missionStartNormalBtn: "🚀 Start Mission (Normal)",
   missionStartAdvancedBtn: "🚀 Start Mission (Advanced)",
   missionRunningBadge: "Mission Active",
+  missionBackToMenuBtn: "⬅️ Back to Menu",
+  missionResetConfirmText: "Reset mission sekarang? Progress mission semasa akan dipadam.",
+  missionResetCancelledText: "Reset mission dibatalkan.",
+  missionResetPreviewText: "Preview mode: reset mission hanya berfungsi bila buka dari Telegram.",
 
   missionLevel1Title: "Level 1",
   missionLevel2Title: "Level 2 (Akan Datang)",

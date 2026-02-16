@@ -473,6 +473,22 @@ def start_project_grow_mission(user_id: int, mode: str) -> bool:
     return True
 
 
+def reset_project_grow_mission(user_id: int) -> bool:
+    db = load_db()
+    user = db.get("users", {}).get(str(user_id))
+    if not user:
+        return False
+
+    sections = user.setdefault("sections", {})
+    if "project_grow_mission" not in sections:
+        return False
+
+    sections.pop("project_grow_mission", None)
+    user["updated_at"] = malaysia_now().isoformat()
+    save_db(db)
+    return True
+
+
 def reset_all_data() -> None:
     save_db(_default_db())
 

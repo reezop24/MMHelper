@@ -40,6 +40,9 @@
   var lockedCard = document.getElementById("lockedCard");
   var beforeLayer = document.getElementById("beforeStartLayer");
   var runningLayer = document.getElementById("runningLayer");
+  var backToMenuBtn = document.getElementById("backToMenuBtn");
+  var resetMissionBtn = document.getElementById("resetMissionBtn");
+  var runningStatus = document.getElementById("runningStatus");
 
   var normalModeBtn = document.getElementById("normalModeBtn");
   var advancedModeBtn = document.getElementById("advancedModeBtn");
@@ -121,6 +124,7 @@
     document.getElementById("runningTargetBalance").textContent = formatUsd(targetBalance);
     document.getElementById("runningTargetLabel").textContent = targetLabel || "-";
     document.getElementById("runningTabungBalance").textContent = formatUsd(tabungBalance);
+    backToMenuBtn.textContent = content.missionBackToMenuBtn || "⬅️ Back to Menu";
   }
 
   if (!canOpen) {
@@ -131,6 +135,38 @@
 
   if (missionActive) {
     renderRunning();
+
+    backToMenuBtn.addEventListener("click", function () {
+      if (tg) {
+        tg.close();
+        return;
+      }
+      window.history.back();
+    });
+
+    resetMissionBtn.addEventListener("click", function () {
+      var confirmed = window.confirm(
+        content.missionResetConfirmText || "Reset mission sekarang? Progress mission semasa akan dipadam."
+      );
+      if (!confirmed) {
+        runningStatus.textContent = content.missionResetCancelledText || "Reset mission dibatalkan.";
+        return;
+      }
+
+      var payload = {
+        type: "project_grow_mission_reset",
+        confirm_reset: 1
+      };
+
+      if (tg) {
+        tg.sendData(JSON.stringify(payload));
+        tg.close();
+        return;
+      }
+
+      runningStatus.textContent = content.missionResetPreviewText || "Preview mode: reset mission hanya berfungsi bila buka dari Telegram.";
+    });
+
     return;
   }
 
