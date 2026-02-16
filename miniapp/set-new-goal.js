@@ -124,8 +124,10 @@
 
   if (hasGoal) {
     configuredLayer.classList.remove("hidden");
+    form.classList.add("hidden");
   } else {
     form.classList.remove("hidden");
+    configuredLayer.classList.add("hidden");
   }
 
   updateGrowTargetHint(Number((targetBalanceInput.value || "").trim()), currentBalance, growTargetHint);
