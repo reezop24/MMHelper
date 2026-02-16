@@ -253,6 +253,7 @@ def get_project_grow_mission_webapp_url(
 def get_tabung_progress_webapp_url(
     name: str,
     saved_date: str,
+    tabung_start_date: str,
     tabung_balance_usd: float,
     grow_target_usd: float,
     capital_target_usd: float,
@@ -267,6 +268,7 @@ def get_tabung_progress_webapp_url(
         {
             "name": name,
             "saved_date": saved_date,
+            "tabung_start_date": tabung_start_date,
             "tabung_balance_usd": f"{tabung_balance_usd:.2f}",
             "grow_target_usd": f"{grow_target_usd:.2f}",
             "capital_target_usd": f"{capital_target_usd:.2f}",

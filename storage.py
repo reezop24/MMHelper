@@ -877,12 +877,12 @@ def get_mission_progress_summary(user_id: int) -> dict[str, str]:
         mission3_status = "in progress"
     mission3_text = f"Mission 3 : {mission3_status} {min(mission3_days, 30)}/30"
 
-    # Mission 4: capai 100% daripada grow target.
+    # Mission 4: capai 100% grow target melalui amount yang disimpan dalam tabung.
     goal = get_project_grow_goal_summary(user_id)
     baseline_balance = _to_float(goal.get("current_balance_usd"))
     target_balance = _to_float(goal.get("target_balance_usd"))
     grow_target = max(target_balance - baseline_balance, 0.0)
-    achieved = max(get_current_balance_usd(user_id) - baseline_balance, 0.0)
+    achieved = max(get_tabung_balance_usd(user_id), 0.0)
     mission4_pct = 0.0 if grow_target <= 0 else min((achieved / grow_target) * 100.0, 100.0)
     mission4_pass = mission4_pct >= 100 and grow_target > 0
     if mission4_pass:
@@ -1036,18 +1036,90 @@ def reset_project_grow_goal(user_id: int) -> bool:
         return False
 
     sections = user.setdefault("sections", {})
+    has_goal = "project_grow_goal" in sections
+    has_mission = "project_grow_mission" in sections
+    if not has_goal and not has_mission:
+        return False
+
     changed = False
-    if "project_grow_goal" in sections:
+    now = malaysia_now()
+    saved_at_iso = now.isoformat()
+    saved_date = now.strftime("%Y-%m-%d")
+    saved_time = now.strftime("%H:%M:%S")
+
+    transfer_amount = max(get_tabung_balance_usd(user_id), 0.0)
+    if transfer_amount > 0:
+        record = {
+            "mode": "project_grow_goal_reset_transfer",
+            "amount_usd": float(transfer_amount),
+            "net_usd": float(transfer_amount),
+            "saved_at": saved_at_iso,
+            "saved_date": saved_date,
+            "saved_time": saved_time,
+            "timezone": "Asia/Kuala_Lumpur",
+        }
+        _append_monthly_record(user_id, "balance_adjustment", record, now.date())
+
+        adjustment_section = sections.setdefault(
+            "balance_adjustment",
+            {
+                "section": "balance_adjustment",
+                "user_id": user_id,
+                "telegram_name": user.get("telegram_name") or str(user_id),
+                "saved_at": saved_at_iso,
+                "saved_date": saved_date,
+                "saved_time": saved_time,
+                "timezone": "Asia/Kuala_Lumpur",
+                "data": {"record_count": 0},
+            },
+        )
+        adjustment_data = adjustment_section.setdefault("data", {})
+        adjustment_data["record_count"] = _to_int(adjustment_data.get("record_count")) + 1
+        adjustment_section["saved_at"] = saved_at_iso
+        adjustment_section["saved_date"] = saved_date
+        adjustment_section["saved_time"] = saved_time
+        adjustment_section["timezone"] = "Asia/Kuala_Lumpur"
+
+        tabung_section = sections.get("tabung", {})
+        if isinstance(tabung_section, dict):
+            tabung_data = tabung_section.setdefault("data", {})
+            records = tabung_data.setdefault("records", [])
+            if isinstance(records, list):
+                records.append(
+                    {
+                        "mode": "project_grow_goal_reset_transfer_out",
+                        "amount_usd": -float(transfer_amount),
+                        "balance_after_usd": 0.0,
+                        "saved_at": saved_at_iso,
+                        "saved_date": saved_date,
+                        "saved_time": saved_time,
+                        "timezone": "Asia/Kuala_Lumpur",
+                    }
+                )
+            tabung_data["balance_usd"] = 0.0
+            tabung_section["saved_at"] = saved_at_iso
+            tabung_section["saved_date"] = saved_date
+            tabung_section["saved_time"] = saved_time
+            tabung_section["timezone"] = "Asia/Kuala_Lumpur"
+
+        _bump_rollup(
+            user,
+            saved_at_iso=saved_at_iso,
+            balance_adjustment_delta=float(transfer_amount),
+            balance_adjustment_count=1,
+        )
+
+    if has_goal:
         sections.pop("project_grow_goal", None)
         changed = True
-    if "project_grow_mission" in sections:
+    if has_mission:
         sections.pop("project_grow_mission", None)
         changed = True
 
     if not changed:
         return False
 
-    user["updated_at"] = malaysia_now().isoformat()
+    user["updated_at"] = saved_at_iso
     save_core_db(db)
     return True
 

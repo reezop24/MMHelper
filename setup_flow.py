@@ -66,7 +66,6 @@ from texts import (
     MISSION_RESET_TEXT,
     MISSION_STARTED_TEXT,
     SET_NEW_GOAL_RESET_TEXT,
-    SET_NEW_GOAL_SAVED_TEXT,
     SETUP_SAVED_TEXT,
     TRADING_ACTIVITY_SAVED_TEXT,
     WITHDRAWAL_ACTIVITY_SAVED_TEXT,
@@ -120,6 +119,17 @@ def _build_trading_saved_text(user_id: int, mode: str, amount_usd: float) -> str
     )
 
 
+def _build_set_new_goal_saved_text(user_id: int, target_balance_usd: float, unlock_amount_usd: float, target_label: str) -> str:
+    return (
+        "Set New Goal berjaya disimpan ✅\n\n"
+        f"Target capital baru kau: **{_usd(target_balance_usd)}** ({target_label}).\n"
+        f"Kau unlock masuk tabung: **{_usd(unlock_amount_usd)}**.\n\n"
+        f"Current Balance sekarang: **{_usd(get_current_balance_usd(user_id))}**.\n"
+        f"Baki tabung sekarang: **{_usd(get_tabung_balance_usd(user_id))}**.\n"
+        f"{_weekly_pl_line(user_id)}"
+    )
+
+
 def _build_project_grow_keyboard_for_user(user_id: int):
     summary = get_initial_setup_summary(user_id)
     goal_summary = get_project_grow_goal_summary(user_id)
@@ -163,6 +173,7 @@ def _build_project_grow_keyboard_for_user(user_id: int):
     tabung_progress_url = get_tabung_progress_webapp_url(
         name=summary["name"],
         saved_date=summary["saved_date"],
+        tabung_start_date=tabung_start_date,
         tabung_balance_usd=tabung_progress["tabung_balance_usd"],
         grow_target_usd=tabung_progress["grow_target_usd"],
         capital_target_usd=tabung_progress["capital_target_usd"],
@@ -543,7 +554,7 @@ async def _handle_set_new_goal(payload: dict, update: Update, context: ContextTy
     await send_screen(
         context,
         message.chat_id,
-        SET_NEW_GOAL_SAVED_TEXT,
+        _build_set_new_goal_saved_text(user.id, target_balance_usd, unlock_amount_usd, target_label),
         reply_markup=main_menu_keyboard(user.id),
         parse_mode="Markdown",
     )

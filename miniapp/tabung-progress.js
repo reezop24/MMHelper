@@ -35,6 +35,7 @@
 
   document.getElementById("summaryName").textContent = params.get("name") || "-";
   document.getElementById("summaryDate").textContent = params.get("saved_date") || "-";
+  document.getElementById("summaryTabungStartDate").textContent = params.get("tabung_start_date") || "-";
 
   document.getElementById("tabungBalance").textContent = formatUsd(tabungBalance);
   document.getElementById("growTarget").textContent = formatUsd(growTarget);

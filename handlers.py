@@ -262,6 +262,7 @@ def _build_project_grow_keyboard_for_user(user_id: int):
     tabung_progress_url = get_tabung_progress_webapp_url(
         name=summary["name"],
         saved_date=summary["saved_date"],
+        tabung_start_date=tabung_start_date,
         tabung_balance_usd=tabung_progress["tabung_balance_usd"],
         grow_target_usd=tabung_progress["grow_target_usd"],
         capital_target_usd=tabung_progress["capital_target_usd"],
