@@ -60,7 +60,7 @@
   var finalPrompt = document.getElementById("finalPrompt");
 
   introText.textContent = content.tradingIntro || "";
-  finalPrompt.textContent = content.tradingFinalPrompt || "";
+  finalPrompt.textContent = (content.getTradingFinalPrompt || function () { return ""; })("");
 
   var stepMode = document.getElementById("stepMode");
   var stepAmount = document.getElementById("stepAmount");
@@ -135,6 +135,7 @@
 
     modePrompt.textContent = (content.getTradingModePrompt || function () { return ""; })(mode);
     amountPrompt.textContent = (content.getTradingAmountPrompt || function () { return ""; })(mode);
+    finalPrompt.textContent = (content.getTradingFinalPrompt || function () { return ""; })(mode);
 
     statusEl.textContent = "";
     amountInput.focus();

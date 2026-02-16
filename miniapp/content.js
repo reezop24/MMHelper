@@ -75,5 +75,23 @@ window.MMHELPER_CONTENT = {
     return "Jumlah loss (USD)";
   },
 
-  tradingFinalPrompt: "Cek semua kalau dah betul , tekan submit"
+  getTradingFinalPrompt: function (mode) {
+    if (mode === "loss") {
+      return [
+        "Cek semua kalau dah betul, tekan submit.",
+        "",
+        "Loss ni waktu paling sesuai untuk kau upgrade skill. Kalau nak naikkan lagi level trading, boleh cari Reezo."
+      ].join("\n");
+    }
+
+    if (mode === "profit") {
+      return [
+        "Cek semua kalau dah betul, tekan submit.",
+        "",
+        "Waktu profit ni kena extra hati-hati, ujian memang banyak. Pastikan duit withdraw kau betul-betul masuk. Kalau nak proses laju dan clear, boleh cuba broker AMarkets."
+      ].join("\n");
+    }
+
+    return "Cek semua kalau dah betul, tekan submit.";
+  }
 };
