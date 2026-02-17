@@ -36,6 +36,25 @@
       margin-top: 8px;
     }
 
+    .inline-logo {
+      display: inline-block;
+      height: 20px;
+      width: auto;
+      vertical-align: middle;
+      margin: 0 4px;
+      border-radius: 4px;
+    }
+
+    .inline-logo.reezo {
+      height: 22px;
+    }
+
+    .inline-logo.amarkets {
+      height: 18px;
+      background: rgba(255, 255, 255, 0.94);
+      padding: 2px 4px;
+    }
+
     .bottom-actions {
       margin-top: 12px;
     }
@@ -70,7 +89,12 @@
       <span class="version-badge">Version: V1.0 (beta release)</span>
       <p>MM HELPER dibina untuk bantu trader urus duit dengan lebih tersusun melalui rekod aktiviti, kawalan risiko, tracking grow target, dan disiplin harian.</p>
       <p>Objektif utama bot ni ialah bagi struktur money management yang clear supaya user boleh kawal emosi, jaga modal, dan trade dengan data yang lebih teratur.</p>
-      <p>Bot ni dibangunkan oleh <strong>Reezo</strong> dengan usahasama broker <strong>AMarkets</strong>.</p>
+      <p>
+        Bot ni dibangunkan oleh
+        <img class="inline-logo reezo" src="reezo.png" alt="Reezo" />
+        dengan usahasama broker
+        <img class="inline-logo amarkets" src="amarketslogo.png" alt="AMarkets" />.
+      </p>
       <p id="status" class="status" aria-live="polite"></p>
     </section>
 
