@@ -897,6 +897,10 @@ def has_reached_daily_target_today(user_id: int) -> bool:
     return _is_daily_target_hit_now(user_id)
 
 
+def is_daily_target_hit_now(user_id: int) -> bool:
+    return _is_daily_target_hit_now(user_id)
+
+
 def mark_daily_target_reached_today(user_id: int) -> bool:
     db = load_core_db()
     user = db.get("users", {}).get(str(user_id))

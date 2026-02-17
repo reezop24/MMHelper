@@ -33,7 +33,7 @@ from storage import (
     get_tabung_balance_usd,
     get_total_balance_usd,
     get_weekly_performance_usd,
-    has_reached_daily_target_today,
+    is_daily_target_hit_now,
     has_initial_setup,
     has_tnc_accepted,
     reset_project_grow_goal,
@@ -540,7 +540,7 @@ async def _handle_trading_activity_update(payload: dict, update: Update, context
         )
         return
 
-    if has_reached_daily_target_today(user_id):
+    if is_daily_target_hit_now(user_id):
         response_text = _build_trading_daily_target_hit_text(user_id, mode, amount_usd)
     else:
         response_text = _build_trading_saved_text(user_id, mode, amount_usd)
