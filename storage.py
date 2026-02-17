@@ -1941,6 +1941,30 @@ def apply_initial_capital_reset(user_id: int, new_initial_capital: float) -> boo
     return True
 
 
+def reset_user_all_settings(user_id: int) -> bool:
+    db = load_core_db()
+    users = db.get("users", {})
+    if not isinstance(users, dict):
+        return False
+
+    removed = users.pop(str(user_id), None)
+    if removed is None:
+        return False
+    save_core_db(db)
+
+    for month_key in _iter_activity_month_keys():
+        monthly_db = _load_activity_db(month_key)
+        month_users = monthly_db.get("users", {})
+        if not isinstance(month_users, dict):
+            continue
+        if str(user_id) not in month_users:
+            continue
+        month_users.pop(str(user_id), None)
+        _save_activity_db(month_key, monthly_db)
+
+    return True
+
+
 def get_balance_adjustment_rules(user_id: int) -> dict[str, Any]:
     today = malaysia_now().date()
     month_start, month_end = _month_range(today)

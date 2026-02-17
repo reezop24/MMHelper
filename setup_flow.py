@@ -24,10 +24,8 @@ from storage import (
     add_withdrawal_activity,
     apply_balance_adjustment,
     apply_project_grow_unlock_to_tabung,
-    apply_initial_capital_reset,
     apply_tabung_update_action,
     can_open_project_grow_mission,
-    can_reset_initial_capital,
     get_current_balance_usd,
     get_current_profit_usd,
     get_tabung_balance_usd,
@@ -41,10 +39,10 @@ from storage import (
     save_notification_settings,
     save_user_setup_section,
     start_project_grow_mission,
+    reset_user_all_settings,
 )
 from texts import (
     ACCOUNT_ACTIVITY_OPENED_TEXT,
-    INITIAL_CAPITAL_RESET_SUCCESS_TEXT,
     MAIN_MENU_OPENED_TEXT,
     MM_HELPER_SETTING_OPENED_TEXT,
     NOTIFICATION_SETTING_SAVED_TEXT,
@@ -54,7 +52,8 @@ from texts import (
     MISSION_STARTED_TEXT,
     SET_NEW_GOAL_RESET_TEXT,
 )
-from ui import send_screen
+from ui import clear_last_screen, send_screen
+from welcome import start
 
 
 def _usd(value: float) -> str:
@@ -380,28 +379,17 @@ async def _handle_initial_setup(payload: dict, update: Update, context: ContextT
 async def _handle_initial_capital_reset(payload: dict, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     user_id = update.effective_user.id
-
-    if not can_reset_initial_capital(user_id):
+    confirm = bool(payload.get("confirm_reset_all"))
+    if not confirm:
         await send_screen(
             context,
             message.chat_id,
-            "❌ Reset tak dibenarkan sebab dah ada rekod transaksi.",
+            "❌ Sila sahkan dulu untuk reset semua setting.",
             reply_markup=_build_mm_setting_keyboard_for_user(user_id),
         )
         return
 
-    try:
-        new_initial_capital = float(payload.get("new_initial_capital_usd"))
-    except (TypeError, ValueError):
-        await send_screen(
-            context,
-            message.chat_id,
-            "❌ Nilai baru modal tak sah.",
-            reply_markup=_build_mm_setting_keyboard_for_user(user_id),
-        )
-        return
-
-    ok = apply_initial_capital_reset(user_id, new_initial_capital)
+    ok = reset_user_all_settings(user_id)
     if not ok:
         await send_screen(
             context,
@@ -411,12 +399,9 @@ async def _handle_initial_capital_reset(payload: dict, update: Update, context: 
         )
         return
 
-    await send_screen(
-        context,
-        message.chat_id,
-        INITIAL_CAPITAL_RESET_SUCCESS_TEXT,
-        reply_markup=_build_mm_setting_keyboard_for_user(user_id),
-    )
+    await clear_last_screen(context, message.chat_id)
+    context.user_data.clear()
+    await start(update, context)
 
 
 async def _handle_balance_adjustment(payload: dict, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

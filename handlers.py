@@ -55,7 +55,6 @@ from settings import (
 from storage import (
     get_balance_adjustment_rules,
     can_open_project_grow_mission,
-    can_reset_initial_capital,
     get_current_balance_usd,
     get_current_profit_usd,
     get_initial_setup_summary,
@@ -115,7 +114,7 @@ def _build_mm_setting_keyboard_for_user(user_id: int):
         initial_capital=summary["initial_capital_usd"],
         current_balance=get_current_balance_usd(user_id),
         saved_date=summary["saved_date"],
-        can_reset=can_reset_initial_capital(user_id),
+        can_reset=True,
     )
     balance_adjustment_url = get_balance_adjustment_webapp_url(
         name=summary["name"],

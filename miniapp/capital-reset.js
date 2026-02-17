@@ -20,8 +20,8 @@
   var form = document.getElementById("resetForm");
   var topBackBtn = document.getElementById("topBackBtn");
   var submitBtn = document.getElementById("submitBtn");
-  var disabledNote = document.getElementById("disabledNote");
   var statusEl = document.getElementById("formStatus");
+  var confirmResetAll = document.getElementById("confirmResetAll");
 
   topBackBtn.addEventListener("click", function () {
     var payload = { type: "mm_setting_back_to_menu" };
@@ -35,34 +35,22 @@
     statusEl.textContent = "Preview mode: buka dari Telegram untuk kembali ke MM Helper Setting.";
   });
 
-  if (!canReset) {
-    submitBtn.disabled = true;
-    disabledNote.hidden = false;
-  }
-
-  function getNewCapital() {
-    var raw = (document.getElementById("newInitialCapital").value || "").trim();
-    if (!raw) return NaN;
-    return Number(raw);
-  }
-
   form.addEventListener("submit", function (event) {
     event.preventDefault();
 
     if (!canReset) {
-      statusEl.textContent = "Reset tak dibenarkan untuk akaun ni.";
+      statusEl.textContent = "Reset tak dibenarkan untuk akaun ni sekarang.";
       return;
     }
 
-    var newInitialCapital = getNewCapital();
-    if (Number.isNaN(newInitialCapital) || newInitialCapital <= 0) {
-      statusEl.textContent = "Isi jumlah baru yang valid dulu.";
+    if (!confirmResetAll.checked) {
+      statusEl.textContent = "Sila tick pengesahan dulu sebelum reset.";
       return;
     }
 
     var payload = {
       type: "initial_capital_reset",
-      new_initial_capital_usd: newInitialCapital
+      confirm_reset_all: true
     };
 
     if (tg) {

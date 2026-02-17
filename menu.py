@@ -14,7 +14,7 @@ MAIN_MENU_BUTTON_STATISTIC = "📊 Records & Reports"
 MAIN_MENU_BUTTON_EXTRA = "🧰 Extra"
 MAIN_MENU_BUTTON_ADMIN_PANEL = "🛡️ Admin Panel"
 
-SUBMENU_MM_BUTTON_INITIAL_CAPITAL_RESET = "💸 Initial Capital Reset"
+SUBMENU_MM_BUTTON_INITIAL_CAPITAL_RESET = "♻️ Reset All Setting"
 SUBMENU_MM_BUTTON_CORRECTION = "⚖️ Balance Adjustment"
 SUBMENU_MM_BUTTON_SYSTEM_INFO = "ℹ️ System Info"
 SUBMENU_MM_BUTTON_BACK_MAIN = "⬅️ Back to Main Menu"
