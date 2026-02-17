@@ -63,12 +63,7 @@
     tabVerification.classList.toggle("active", !isNew);
   }
 
-  function backToMainMenu() {
-    if (activeView !== "home") {
-      showView("home");
-      return;
-    }
-
+  function sendToMainMenu() {
     var payload = { type: "sidebot_back_to_main_menu" };
 
     if (tg) {
@@ -82,6 +77,14 @@
     }
 
     statusEl.textContent = "Preview mode: buka dari Telegram untuk guna butang back.";
+  }
+
+  function backToPreviousMenu() {
+    if (activeView !== "home") {
+      showView("home");
+      return;
+    }
+    sendToMainMenu();
   }
 
   function sendChoice(choice) {
@@ -103,8 +106,8 @@
     statusEl.textContent = "Preview mode: pilihan direkod -> " + choice;
   }
 
-  topBackBtn.addEventListener("click", backToMainMenu);
-  bottomBackBtn.addEventListener("click", backToMainMenu);
+  topBackBtn.addEventListener("click", backToPreviousMenu);
+  bottomBackBtn.addEventListener("click", sendToMainMenu);
 
   btnHomeNewRegistration.addEventListener("click", function () {
     showView("new_registration");
