@@ -37,6 +37,9 @@ CB_BETA_RESET_CANCEL = "ADMIN_BETA_RESET_CANCEL"
 CB_VERIF_APPROVE = "VERIF_APPROVE"
 CB_VERIF_PENDING = "VERIF_PENDING"
 CB_VERIF_REJECT = "VERIF_REJECT"
+CB_VERIF_REQUEST_DEPOSIT = "VERIF_REQUEST_DEPOSIT"
+CB_USER_DEPOSIT_DONE = "USER_DEPOSIT_DONE"
+CB_USER_DEPOSIT_CANCEL = "USER_DEPOSIT_CANCEL"
 
 ADMIN_USER_IDS = {627116869}
 STATE_PATH = Path(__file__).with_name("sidebot_state.json")
@@ -154,6 +157,7 @@ def store_verification_submission(
         "phone_number": phone_number,
         "submitted_at": datetime.now(timezone.utc).isoformat(),
         "status": "pending",
+        "admin_group_message_id": None,
     }
 
     user_obj["telegram_username"] = telegram_username or ""
@@ -175,6 +179,20 @@ def verification_action_keyboard(submission_id: str) -> InlineKeyboardMarkup:
                 InlineKeyboardButton("✅ Approve", callback_data=f"{CB_VERIF_APPROVE}:{submission_id}"),
                 InlineKeyboardButton("⏳ Pending", callback_data=f"{CB_VERIF_PENDING}:{submission_id}"),
                 InlineKeyboardButton("❌ Reject", callback_data=f"{CB_VERIF_REJECT}:{submission_id}"),
+            ],
+            [
+                InlineKeyboardButton("💸 Request Deposit", callback_data=f"{CB_VERIF_REQUEST_DEPOSIT}:{submission_id}")
+            ],
+        ]
+    )
+
+
+def user_deposit_keyboard(submission_id: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton("✅ Deposit Selesai", callback_data=f"{CB_USER_DEPOSIT_DONE}:{submission_id}"),
+                InlineKeyboardButton("❌ Batal", callback_data=f"{CB_USER_DEPOSIT_CANCEL}:{submission_id}"),
             ]
         ]
     )
@@ -214,6 +232,92 @@ def update_submission_status(submission_id: str, status: str, reviewer_id: int) 
 
     save_state(state)
     return item
+
+
+def get_submission(submission_id: str) -> dict | None:
+    state = load_state()
+    submissions = state.get("verification_submissions", {})
+    if not isinstance(submissions, dict):
+        return None
+    item = submissions.get(submission_id)
+    if not isinstance(item, dict):
+        return None
+    return item
+
+
+def update_submission_fields(submission_id: str, fields: dict) -> dict | None:
+    state = load_state()
+    submissions = state.setdefault("verification_submissions", {})
+    if not isinstance(submissions, dict):
+        return None
+
+    item = submissions.get(submission_id)
+    if not isinstance(item, dict):
+        return None
+
+    item.update(fields)
+
+    user_id = item.get("user_id")
+    users = state.setdefault("users", {})
+    user_obj = users.get(str(user_id), {})
+    if isinstance(user_obj, dict):
+        latest = user_obj.get("latest_verification")
+        if isinstance(latest, dict) and latest.get("submission_id") == submission_id:
+            latest.update(fields)
+        history = user_obj.get("verification_history", [])
+        if isinstance(history, list):
+            for row in history:
+                if isinstance(row, dict) and row.get("submission_id") == submission_id:
+                    row.update(fields)
+                    break
+
+    save_state(state)
+    return item
+
+
+def render_admin_submission_text(item: dict) -> str:
+    status_text = str(item.get("status") or "pending").upper()
+    user_id = item.get("user_id")
+    username = item.get("telegram_username") or "-"
+    username_text = f"@{username}" if username != "-" else "-"
+    deposit_text = "Ya" if bool(item.get("has_deposit_100")) else "Belum"
+    return (
+        "🆕 Pendaftaran Baru (Verification Submit)\n\n"
+        f"Submission ID: {item.get('submission_id')}\n"
+        f"User ID: {user_id}\n"
+        f"Username: {username_text}\n"
+        f"Nama: {item.get('full_name')}\n"
+        f"Wallet ID: {item.get('wallet_id')}\n"
+        f"Deposit USD100: {deposit_text}\n"
+        f"No Telefon: {item.get('phone_number')}\n"
+        f"Status: {status_text}"
+    )
+
+
+async def send_submission_to_admin_group(context: ContextTypes.DEFAULT_TYPE, item: dict) -> None:
+    admin_group_id = get_admin_group_id()
+    if not admin_group_id:
+        return
+    sent = await context.bot.send_message(
+        chat_id=admin_group_id,
+        text=render_admin_submission_text(item),
+        reply_markup=verification_action_keyboard(str(item.get("submission_id"))),
+    )
+    update_submission_fields(str(item.get("submission_id")), {"admin_group_message_id": sent.message_id})
+
+
+async def refresh_admin_submission_message(context: ContextTypes.DEFAULT_TYPE, submission_id: str) -> None:
+    admin_group_id = get_admin_group_id()
+    item = get_submission(submission_id)
+    if not admin_group_id or not item:
+        return
+    old_message_id = item.get("admin_group_message_id")
+    if isinstance(old_message_id, int):
+        try:
+            await context.bot.delete_message(chat_id=admin_group_id, message_id=old_message_id)
+        except Exception:
+            logger.exception("Failed to delete old admin verification message")
+    await send_submission_to_admin_group(context, item)
 
 
 def is_admin_user(user_id: int | None) -> bool:
@@ -339,6 +443,35 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
             CB_VERIF_PENDING: "pending",
             CB_VERIF_REJECT: "rejected",
         }
+        if action == CB_VERIF_REQUEST_DEPOSIT:
+            item = update_submission_fields(
+                submission_id=submission_id,
+                fields={
+                    "status": "request_deposit",
+                    "reviewed_at": datetime.now(timezone.utc).isoformat(),
+                    "reviewed_by": query.from_user.id,
+                },
+            )
+            if not item:
+                await query.message.reply_text("❌ Rekod submission tak jumpa atau dah dipadam.")
+                return
+            user_id = item.get("user_id")
+            if isinstance(user_id, int):
+                try:
+                    await context.bot.send_message(
+                        chat_id=user_id,
+                        text=(
+                            "⚠️ Admin minta anda lengkapkan deposit USD100 dahulu.\n"
+                            "Bila dah selesai, tekan butang `Deposit Selesai` di bawah."
+                        ),
+                        reply_markup=user_deposit_keyboard(submission_id),
+                    )
+                except Exception:
+                    logger.exception("Failed to notify user for deposit request")
+            await refresh_admin_submission_message(context, submission_id)
+            await query.message.reply_text(f"✅ Request deposit dihantar kepada user untuk submission {submission_id}.")
+            return
+
         status = action_status_map.get(action)
         if not status:
             return
@@ -354,6 +487,58 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
             "rejected": "REJECTED",
         }.get(status, status.upper())
         await query.message.reply_text(f"✅ Status submission {submission_id} ditetapkan kepada {status_label}.")
+        return
+
+
+async def handle_user_deposit_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    if not query:
+        return
+
+    await query.answer()
+    if ":" not in str(query.data):
+        return
+
+    action, submission_id = str(query.data).split(":", 1)
+    item = get_submission(submission_id)
+    if not item:
+        await query.message.reply_text("❌ Rekod submission tak jumpa.")
+        return
+
+    user_id = item.get("user_id")
+    if query.from_user.id != user_id:
+        await query.message.reply_text("❌ Butang ini bukan untuk anda.")
+        return
+
+    if action == CB_USER_DEPOSIT_CANCEL:
+        try:
+            await query.edit_message_reply_markup(reply_markup=None)
+        except Exception:
+            pass
+        await query.message.reply_text("Baik, status deposit anda kekal belum selesai.")
+        return
+
+    if action == CB_USER_DEPOSIT_DONE:
+        updated = update_submission_fields(
+            submission_id=submission_id,
+            fields={
+                "has_deposit_100": True,
+                "status": "pending",
+                "deposit_completed_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+        if not updated:
+            await query.message.reply_text("❌ Rekod submission tak jumpa.")
+            return
+        try:
+            await query.edit_message_reply_markup(reply_markup=None)
+        except Exception:
+            pass
+        await refresh_admin_submission_message(context, submission_id)
+        await query.message.reply_text(
+            "✅ Deposit selesai direkod.\n"
+            "Permohonan anda dihantar semula kepada admin untuk semakan."
+        )
         return
 
 
@@ -480,26 +665,10 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
         deposit_text = "Ya" if has_deposit_100 else "Belum"
         submission_id = str(saved.get("submission_id") or "-")
 
-        admin_group_id = get_admin_group_id()
-        if admin_group_id:
-            try:
-                await context.bot.send_message(
-                    chat_id=admin_group_id,
-                    text=(
-                        "🆕 Pendaftaran Baru (Verification Submit)\n\n"
-                        f"Submission ID: {submission_id}\n"
-                        f"User ID: {user.id}\n"
-                        f"Username: @{user.username if user.username else '-'}\n"
-                        f"Nama: {full_name}\n"
-                        f"Wallet ID: {wallet_id}\n"
-                        f"Deposit USD100: {deposit_text}\n"
-                        f"No Telefon: {phone_number}\n"
-                        "Status: PENDING"
-                    ),
-                    reply_markup=verification_action_keyboard(submission_id),
-                )
-            except Exception:
-                logger.exception("Failed to send verification notification to admin group")
+        try:
+            await send_submission_to_admin_group(context, saved)
+        except Exception:
+            logger.exception("Failed to send verification notification to admin group")
 
         await message.reply_text(
             "✅ Pengesahan diterima.\n"
@@ -512,6 +681,12 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
             f"Telefon: {phone_number}",
             reply_markup=main_menu_keyboard(user.id),
         )
+        if not has_deposit_100:
+            await message.reply_text(
+                "⏳ Status semasa: deposit USD100 masih belum lengkap.\n"
+                "Lepas deposit, tekan `Deposit Selesai` untuk hantar semakan semula.",
+                reply_markup=user_deposit_keyboard(submission_id),
+            )
         return
 
     await message.reply_text("ℹ️ Miniapp demo diterima.", reply_markup=main_menu_keyboard(user.id))
@@ -531,9 +706,10 @@ def main() -> None:
     app.add_handler(
         CallbackQueryHandler(
             handle_admin_callback,
-            pattern=f"^({CB_BETA_RESET_CONFIRM}|{CB_BETA_RESET_CANCEL}|{CB_VERIF_APPROVE}|{CB_VERIF_PENDING}|{CB_VERIF_REJECT}).*",
+            pattern=f"^({CB_BETA_RESET_CONFIRM}|{CB_BETA_RESET_CANCEL}|{CB_VERIF_APPROVE}|{CB_VERIF_PENDING}|{CB_VERIF_REJECT}|{CB_VERIF_REQUEST_DEPOSIT}).*",
         )
     )
+    app.add_handler(CallbackQueryHandler(handle_user_deposit_callback, pattern=f"^({CB_USER_DEPOSIT_DONE}|{CB_USER_DEPOSIT_CANCEL}).*"))
     app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp_data))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     app.run_polling()
