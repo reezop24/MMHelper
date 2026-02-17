@@ -126,6 +126,12 @@
       background: rgba(37, 21, 24, 0.92);
     }
 
+    .ib-verify-btn {
+      border: 1px solid #f59e0b;
+      background: linear-gradient(90deg, #f59e0b 0%, #f97316 100%);
+      color: #2e1400;
+    }
+
     .placeholder-tag {
       display: inline-block;
       margin-top: 10px;
@@ -384,9 +390,20 @@
         </div>
 
         <div id="panelIbGuideMobile" class="hidden">
-          <p>Placeholder guide penukaran IB untuk versi mobile.</p>
-          <p>Langkah demi langkah untuk aplikasi telefon akan dimasukkan pada step seterusnya.</p>
-          <span class="placeholder-tag">Placeholder: IB Guide Mobile</span>
+          <ul class="feature-list">
+            <li>Buka aplikasi AMarkets, tekan MORE (bucu kanan bawah sekiranya anda pengguna iPhone).</li>
+            <li>Profile.</li>
+            <li>Affiliate Group.</li>
+            <li>Masukkan IB code: <strong>REEZO24</strong> dan submit request.</li>
+            <li>Kembali ke bot Reezo Admin dan tekan butang Pengesahan Penukaran IB.</li>
+          </ul>
+          <p>Sila rujuk gambar di bawah.</p>
+          <div class="guide-images">
+            <img class="guide-image" src="app1.jpg" alt="Panduan App Version 1" />
+            <img class="guide-image" src="app2.jpg" alt="Panduan App Version 2" />
+            <img class="guide-image" src="app3.jpg" alt="Panduan App Version 3" />
+            <img class="guide-image" src="app4.jpg" alt="Panduan App Version 4" />
+          </div>
         </div>
       </div>
 
@@ -398,7 +415,7 @@
       </div>
 
       <div class="inline-actions">
-        <button id="btnGoIbVerification" type="button" class="back-btn">➡️ Pengesahan Penukaran IB</button>
+        <button id="btnGoIbVerification" type="button" class="back-btn ib-verify-btn">➡️ Pengesahan Penukaran IB</button>
         <button id="btnBackFromIbTransfer" type="button" class="back-btn">⬅️ Back to Pilihan</button>
       </div>
     </section>
