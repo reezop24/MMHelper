@@ -1711,6 +1711,11 @@ def reset_project_grow_goal(user_id: int) -> bool:
 
 
 def reset_all_data() -> None:
+    if CORE_DB_PATH.exists():
+        try:
+            CORE_DB_PATH.unlink()
+        except OSError:
+            pass
     save_core_db(_default_core_db())
     if LEGACY_DB_PATH.exists():
         try:
@@ -1718,7 +1723,7 @@ def reset_all_data() -> None:
         except OSError:
             pass
     if ACTIVITY_DB_DIR.exists():
-        for path in ACTIVITY_DB_DIR.glob(f"{ACTIVITY_FILE_PREFIX}*.json"):
+        for path in ACTIVITY_DB_DIR.rglob("*.json"):
             try:
                 path.unlink()
             except OSError:
