@@ -33,6 +33,8 @@ from storage import (
     get_tabung_balance_usd,
     get_total_balance_usd,
     get_weekly_performance_usd,
+    has_initial_setup,
+    has_tnc_accepted,
     reset_project_grow_goal,
     reset_project_grow_mission,
     save_notification_settings,
@@ -152,6 +154,26 @@ def _build_set_new_goal_saved_text(user_id: int, target_balance_usd: float, unlo
 
 async def _handle_initial_setup(payload: dict, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
+    user = update.effective_user
+    if not user:
+        return
+
+    if has_initial_setup(user.id):
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Akaun kau dah didaftarkan. Initial setup tak perlu diulang.",
+            reply_markup=main_menu_keyboard(user.id),
+        )
+        return
+
+    if not has_tnc_accepted(user.id):
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Sila accept T&C dulu melalui /start sebelum buat initial setup.",
+        )
+        return
 
     name = (payload.get("name") or "").strip()
     if not name:
@@ -160,9 +182,7 @@ async def _handle_initial_setup(payload: dict, update: Update, context: ContextT
 
     try:
         initial_capital = float(payload.get("initial_capital_usd"))
-        risk_per_trade = float(payload.get("risk_per_trade_pct"))
-        max_daily_loss = float(payload.get("max_daily_loss_pct"))
-        daily_profit_target = float(payload.get("daily_profit_target_pct"))
+        target_balance_usd = float(payload.get("target_balance_usd"))
     except (TypeError, ValueError):
         await send_screen(context, message.chat_id, "❌ Nombor ada yang pelik. Check balik input.")
         return
@@ -171,23 +191,51 @@ async def _handle_initial_setup(payload: dict, update: Update, context: ContextT
         await send_screen(context, message.chat_id, "❌ Modal kena lebih dari 0, baru game start.")
         return
 
-    numeric_values = [risk_per_trade, max_daily_loss, daily_profit_target]
-    if any(v <= 0 for v in numeric_values):
-        await send_screen(context, message.chat_id, "❌ Value % kena lebih dari 0 boss.")
+    if target_balance_usd <= initial_capital:
+        await send_screen(context, message.chat_id, "❌ Target Capital kena lebih tinggi dari modal permulaan.")
         return
 
-    telegram_name = (update.effective_user.full_name or "").strip() or str(update.effective_user.id)
+    target_days_raw = str(payload.get("target_days") or "").strip()
+    target_label = str(payload.get("target_label") or "").strip()
+    if target_days_raw not in {"30", "90", "180"}:
+        await send_screen(context, message.chat_id, "❌ Tempoh target tak sah.")
+        return
+    target_days = int(target_days_raw)
+    if not target_label:
+        if target_days == 90:
+            target_label = "3 bulan"
+        elif target_days == 180:
+            target_label = "6 bulan"
+        else:
+            target_label = "30 hari"
+
+    telegram_name = (user.full_name or "").strip() or str(user.id)
 
     save_user_setup_section(
-        user_id=update.effective_user.id,
+        user_id=user.id,
         telegram_name=telegram_name,
         section="initial_setup",
         payload={
             "name": name,
             "initial_capital_usd": initial_capital,
-            "risk_per_trade_pct": risk_per_trade,
-            "max_daily_loss_pct": max_daily_loss,
-            "daily_profit_target_pct": daily_profit_target,
+            # Kept as defaults for compatibility with existing mission logic.
+            "risk_per_trade_pct": 1.0,
+            "max_daily_loss_pct": 5.0,
+            "daily_profit_target_pct": 2.0,
+        },
+    )
+
+    save_user_setup_section(
+        user_id=user.id,
+        telegram_name=telegram_name,
+        section="project_grow_goal",
+        payload={
+            "target_balance_usd": float(target_balance_usd),
+            "unlock_amount_usd": 0.0,
+            "minimum_target_usd": float(initial_capital),
+            "current_balance_usd": float(initial_capital),
+            "target_days": target_days,
+            "target_label": target_label,
         },
     )
 
@@ -778,6 +826,9 @@ async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE
     message = update.effective_message
     if not message or not message.web_app_data:
         return
+    user = update.effective_user
+    if not user:
+        return
 
     try:
         payload = json.loads(message.web_app_data.data)
@@ -786,6 +837,32 @@ async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
 
     payload_type = payload.get("type")
+
+    if payload_type != "setup_profile" and not has_initial_setup(user.id):
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Akaun belum siap daftar. Guna /start dan lengkapkan T&C + Initial Setup dulu.",
+        )
+        return
+
+    if payload_type == "setup_profile" and has_initial_setup(user.id):
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Initial setup dah lengkap. Teruskan guna menu utama.",
+            reply_markup=main_menu_keyboard(user.id),
+        )
+        return
+
+    if payload_type == "setup_profile" and not has_tnc_accepted(user.id):
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Sila accept T&C dulu melalui /start.",
+        )
+        return
+
     if payload_type == "setup_profile":
         await _handle_initial_setup(payload, update, context)
         return

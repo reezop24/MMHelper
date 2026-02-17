@@ -70,6 +70,7 @@ from storage import (
     get_weekly_performance_usd,
     get_weekly_profit_loss_usd,
     has_project_grow_goal,
+    has_initial_setup,
     is_project_grow_goal_reached,
     reset_all_data,
 )
@@ -336,6 +337,10 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
 
     text = message.text.strip()
+
+    if not has_initial_setup(user.id):
+        await start(update, context)
+        return
 
     if text == MAIN_MENU_BUTTON_ADMIN_PANEL:
         if not is_admin_user(user.id):

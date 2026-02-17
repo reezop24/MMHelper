@@ -12,7 +12,7 @@ from telegram.ext import ContextTypes
 
 from menu import main_menu_keyboard
 from settings import get_setup_webapp_url
-from storage import has_initial_setup
+from storage import has_initial_setup, has_tnc_accepted, save_tnc_acceptance
 from texts import DECLINED_TEXT, RETURNING_USER_TEXT, TNC_TEXT, WHY_MM_HELPER_TEXT
 from ui import send_screen
 
@@ -59,6 +59,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
         return
 
+    if has_tnc_accepted(user.id):
+        await send_screen(
+            context,
+            chat.id,
+            WHY_MM_HELPER_TEXT,
+            reply_markup=_initial_setup_keyboard(),
+        )
+        return
+
     await send_screen(
         context,
         chat.id,
@@ -76,6 +85,12 @@ async def handle_tnc_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if query.data == TNC_ACCEPT:
         context.user_data["tnc_accepted"] = True
+        telegram_name = (update.effective_user.full_name or "").strip() if update.effective_user else ""
+        save_tnc_acceptance(
+            user_id=query.from_user.id,
+            telegram_name=telegram_name or str(query.from_user.id),
+            accepted=True,
+        )
         try:
             await query.message.delete()
         except Exception:
@@ -89,6 +104,12 @@ async def handle_tnc_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
 
     context.user_data["tnc_accepted"] = False
+    telegram_name = (update.effective_user.full_name or "").strip() if update.effective_user else ""
+    save_tnc_acceptance(
+        user_id=query.from_user.id,
+        telegram_name=telegram_name or str(query.from_user.id),
+        accepted=False,
+    )
     try:
         await query.message.delete()
     except Exception:

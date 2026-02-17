@@ -425,6 +425,52 @@ def has_initial_setup(user_id: int) -> bool:
     return bool(sections.get("initial_setup"))
 
 
+def has_tnc_accepted(user_id: int) -> bool:
+    db = load_core_db()
+    user = db.get("users", {}).get(str(user_id), {})
+    sections = user.get("sections", {})
+    tnc_section = sections.get("tnc_acceptance", {})
+    tnc_data = tnc_section.get("data", {}) if isinstance(tnc_section, dict) else {}
+    return bool(tnc_data.get("accepted"))
+
+
+def save_tnc_acceptance(user_id: int, telegram_name: str, accepted: bool) -> None:
+    now = malaysia_now()
+    saved_at_iso = now.isoformat()
+    saved_date = now.strftime("%Y-%m-%d")
+    saved_time = now.strftime("%H:%M:%S")
+
+    db = load_core_db()
+    users = db.setdefault("users", {})
+    user_key = str(user_id)
+    user_obj = users.setdefault(
+        user_key,
+        {
+            "user_id": user_id,
+            "telegram_name": telegram_name,
+            "sections": {},
+        },
+    )
+
+    user_obj["user_id"] = user_id
+    user_obj["telegram_name"] = telegram_name
+    user_obj["updated_at"] = saved_at_iso
+
+    sections = user_obj.setdefault("sections", {})
+    sections["tnc_acceptance"] = {
+        "section": "tnc_acceptance",
+        "user_id": user_id,
+        "telegram_name": telegram_name,
+        "saved_at": saved_at_iso,
+        "saved_date": saved_date,
+        "saved_time": saved_time,
+        "timezone": "Asia/Kuala_Lumpur",
+        "data": {"accepted": bool(accepted)},
+    }
+
+    save_core_db(db)
+
+
 def get_initial_setup_summary(user_id: int) -> dict[str, Any]:
     db = load_core_db()
     user = db.get("users", {}).get(str(user_id), {})
@@ -1726,12 +1772,15 @@ def get_balance_adjustment_rules(user_id: int) -> dict[str, Any]:
     today = malaysia_now().date()
     month_start, month_end = _month_range(today)
     window_start = month_end - timedelta(days=6)
-    # Temporary bypass: allow testing outside last-7-days window.
-    window_open = True
-    month_key = _month_key_from_date(today)
-    monthly_db = _load_activity_db(month_key)
-    used_records = _get_activity_records_from_db(monthly_db, user_id, "balance_adjustment")
-    used_this_month = len(used_records) > 0
+    window_open = window_start <= today <= month_end
+
+    used_count = 0
+    for record in _iter_section_records_between(user_id, "balance_adjustment", month_start, month_end):
+        mode = str(record.get("mode") or "").strip().lower()
+        if mode in {"add", "subtract"}:
+            used_count += 1
+    used_this_month = used_count > 0
+
     can_adjust = window_open and not used_this_month
     return {
         "can_adjust": can_adjust,
