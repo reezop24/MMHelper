@@ -85,6 +85,33 @@
       border-color: #f59e0b;
     }
 
+    .subtabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin: 10px 0 12px;
+    }
+
+    .subtab-btn {
+      margin: 0;
+      width: 100%;
+      border: 1px solid #744147;
+      border-radius: 10px;
+      padding: 7px 10px;
+      background: rgba(37, 21, 24, 0.92);
+      color: #f6e7ea;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1.2;
+      text-align: center;
+    }
+
+    .subtab-btn.active {
+      background: linear-gradient(90deg, #f59e0b 0%, #f97316 100%);
+      color: #2e1400;
+      border-color: #f59e0b;
+    }
+
     .placeholder-tag {
       display: inline-block;
       margin-top: 10px;
@@ -305,9 +332,27 @@
 
       <div id="panelIbTransfer">
         <h2 class="section-title">Penukaran IB (Pelanggan sedia ada AMarkets)</h2>
-        <div class="tabs">
-          <button id="tabIbGuideWeb" type="button" class="tab-btn active">Guide Web Version</button>
-          <button id="tabIbGuideMobile" type="button" class="tab-btn">Guide Mobile Version</button>
+
+        <p>Untuk mendapatkan akses NEXT Member melalui penukaran IB sila ikuti langkah berikut.</p>
+        <ul class="feature-list">
+          <li>Buat permohonan penukaran IB menggunakan dashboard AMarkets di ruangan Affiliate Group dengan masukkan IB code: <strong>REEZO20</strong> (panduan bergambar sila lihat di bawah).</li>
+          <li>Deposit minimum USD 100 diperlukan untuk pengaktifan kali pertama.</li>
+          <li>Selepas pendaftaran dan deposit dibuat, anda perlu membuat pengesahan dengan menekan butang Pengesahan Penukaran IB.</li>
+          <li>Akses NEXT Member akan diaktifkan selepas pengesahan selesai.</li>
+        </ul>
+
+        <p><strong>Tempoh & Polisi Akses</strong></p>
+        <ul class="feature-list">
+          <li>Akses diberikan selama 45 hari dan akan diperbaharui secara automatik selagi akaun kekal aktif.</li>
+          <li>Akses akan ditarik secara automatik sekiranya akaun tidak aktif selepas tamat tempoh.</li>
+          <li>Akses boleh ditarik serta-merta sekiranya berlaku pengeluaran dana selepas deposit tanpa sebarang aktiviti dagangan.</li>
+        </ul>
+
+        <p>Sila pastikan anda memahami syarat di atas sebelum meneruskan pendaftaran.</p>
+
+        <div class="subtabs">
+          <button id="tabIbGuideWeb" type="button" class="subtab-btn active">Panduan Web Version</button>
+          <button id="tabIbGuideMobile" type="button" class="subtab-btn">Panduan App Version</button>
         </div>
 
         <div id="panelIbGuideWeb">
@@ -331,7 +376,7 @@
       </div>
 
       <div class="inline-actions">
-        <button id="btnGoIbVerification" type="button" class="back-btn">➡️ Ke Pengesahan</button>
+        <button id="btnGoIbVerification" type="button" class="back-btn">➡️ Pengesahan Penukaran IB</button>
         <button id="btnBackFromIbTransfer" type="button" class="back-btn">⬅️ Back to Pilihan</button>
       </div>
     </section>
