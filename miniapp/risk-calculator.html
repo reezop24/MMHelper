@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Risk Calculator XAUUSD</title>
+  <link rel="stylesheet" href="global.css" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .result-card {
+      margin-top: 14px;
+      border: 1px solid rgba(95, 145, 215, 0.45);
+      border-radius: 12px;
+      background: rgba(8, 26, 55, 0.78);
+      padding: 12px;
+    }
+
+    .result-title {
+      margin: 0 0 8px;
+      color: #f4f9ff;
+      font-size: 14px;
+    }
+
+    .result-line {
+      margin: 0;
+      color: #d8e6ff;
+      font-size: 14px;
+      line-height: 1.35;
+    }
+
+    .result-line + .result-line {
+      margin-top: 7px;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="top-nav">
+      <button id="topBackBtn" type="button" class="top-back-btn">← Back</button>
+    </div>
+
+    <header class="hero">
+      <img class="logo" src="logo.png" alt="MM HELPER Logo" />
+      <h1>Risk Calculator</h1>
+      <p>Kiraan awal untuk XAUUSD sahaja.</p>
+    </header>
+
+    <form id="riskForm" class="card">
+      <div class="field">
+        <label class="question" for="accountBalance"><strong>1. Modal semasa</strong></label>
+        <div class="with-prefix with-suffix">
+          <span class="affix">USD</span>
+          <input id="accountBalance" type="number" inputmode="decimal" min="0" step="0.01" placeholder="Contoh: 500" required />
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="question" for="riskPercent"><strong>2. Risk per setup (%)</strong></label>
+        <div class="with-suffix">
+          <input id="riskPercent" type="number" inputmode="decimal" min="0.1" step="0.1" placeholder="Contoh: 1" required />
+          <span class="affix">%</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="question" for="zoneSize"><strong>3. Saiz zon / SL (USD)</strong></label>
+        <p class="hint"><em>Contoh zon 3.5 bermaksud jarak SL 3.5 dollar pada XAUUSD.</em></p>
+        <div class="with-prefix with-suffix">
+          <span class="affix">USD</span>
+          <input id="zoneSize" type="number" inputmode="decimal" min="0.1" step="0.1" placeholder="Contoh: 3.5" required />
+        </div>
+      </div>
+
+      <button type="submit">🧮 Kira Lot</button>
+      <p id="status" class="status" aria-live="polite"></p>
+    </form>
+
+    <section class="result-card">
+      <p class="result-title"><strong>Output (XAUUSD)</strong></p>
+      <p class="result-line">Risk USD per setup: <strong>USD <span id="riskUsd">0.00</span></strong></p>
+      <p class="result-line">Cadangan lot size: <strong><span id="lotSize">0.00</span> lot</strong></p>
+      <p class="result-line">Anggaran floating @ zon penuh: <strong>USD <span id="floatingFull">0.00</span></strong></p>
+      <p class="result-line">Anggaran floating @ separuh zon: <strong>USD <span id="floatingHalf">0.00</span></strong></p>
+      <p class="hint"><em>Andaian kiraan: 1.00 lot XAUUSD ≈ USD 100 per pergerakan harga USD 1.00.</em></p>
+    </section>
+  </main>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="risk-calculator.js"></script>
+</body>
+</html>

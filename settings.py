@@ -21,6 +21,10 @@ def _miniapp_base_url() -> str:
     return base
 
 
+def get_risk_calculator_webapp_url() -> str:
+    return f"{_miniapp_base_url()}/risk-calculator.html"
+
+
 def get_initial_capital_reset_webapp_url(
     name: str,
     initial_capital: float,

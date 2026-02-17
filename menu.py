@@ -2,6 +2,8 @@
 
 from telegram import KeyboardButton, ReplyKeyboardMarkup, WebAppInfo
 
+from settings import get_risk_calculator_webapp_url
+
 ADMIN_USER_IDS = {627116869}
 
 MAIN_MENU_BUTTON_MM_SETTING = "⚙️ MM Helper Setting"
@@ -49,7 +51,17 @@ def is_admin_user(user_id: int | None) -> bool:
 
 
 def main_menu_keyboard(user_id: int | None = None) -> ReplyKeyboardMarkup:
-    rows = [list(row) for row in BASE_MAIN_MENU_ROWS]
+    rows = [
+        [
+            MAIN_MENU_BUTTON_MM_SETTING,
+            KeyboardButton(
+                MAIN_MENU_BUTTON_RISK,
+                web_app=WebAppInfo(url=get_risk_calculator_webapp_url()),
+            ),
+        ],
+        [MAIN_MENU_BUTTON_ACCOUNT_ACTIVITY, MAIN_MENU_BUTTON_PROJECT_GROW],
+        [MAIN_MENU_BUTTON_STATISTIC, MAIN_MENU_BUTTON_EXTRA],
+    ]
     if is_admin_user(user_id):
         rows.append([MAIN_MENU_BUTTON_ADMIN_PANEL])
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
