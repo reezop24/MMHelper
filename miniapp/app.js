@@ -25,7 +25,12 @@
 
   function getNumberValue(id) {
     var raw = (document.getElementById(id).value || "").trim();
-    var normalized = raw.replace(/%/g, "").trim();
+    var normalized = raw
+      .replace(/usd/gi, "")
+      .replace(/\$/g, "")
+      .replace(/,/g, "")
+      .replace(/%/g, "")
+      .trim();
     if (!normalized) return NaN;
     return Number(normalized);
   }
