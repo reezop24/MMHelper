@@ -197,10 +197,14 @@ def _build_tabung_saved_text(user_id: int, action: str, amount_usd: float) -> st
 
 
 def _build_set_new_goal_saved_text(user_id: int, target_balance_usd: float, unlock_amount_usd: float, target_label: str) -> str:
+    if unlock_amount_usd >= 10:
+        unlock_line = f"Kau unlock mission dengan simpanan awal tabung: **{_usd(unlock_amount_usd)}**."
+    else:
+        unlock_line = "Mission belum unlock lagi (minimum unlock mission USD 10). Tabung masih boleh guna seperti biasa."
     return (
         "Set New Goal berjaya disimpan ✅\n\n"
         f"Target capital baru kau: **{_usd(target_balance_usd)}** ({target_label}).\n"
-        f"Kau unlock masuk tabung: **{_usd(unlock_amount_usd)}**.\n\n"
+        f"{unlock_line}\n\n"
         f"Current Balance sekarang: **{_usd(get_current_balance_usd(user_id))}**.\n"
         f"Baki tabung sekarang: **{_usd(get_tabung_balance_usd(user_id))}**.\n"
         f"{_weekly_pl_line(user_id)}"
@@ -628,21 +632,21 @@ async def _handle_set_new_goal(payload: dict, update: Update, context: ContextTy
         return
 
     try:
-        unlock_amount_usd = float(payload.get("unlock_amount_usd"))
+        unlock_amount_usd = float(payload.get("unlock_amount_usd") or 0.0)
     except (TypeError, ValueError):
         await send_screen(
             context,
             message.chat_id,
-            "❌ Nilai unlock mission/tabung tak sah.",
+            "❌ Nilai unlock mission tak sah.",
             reply_markup=_build_project_grow_keyboard_for_user(user.id),
         )
         return
 
-    if unlock_amount_usd < 10:
+    if unlock_amount_usd < 0:
         await send_screen(
             context,
             message.chat_id,
-            "❌ Nilai unlock minimum USD 10.",
+            "❌ Nilai unlock mission tak boleh negatif.",
             reply_markup=_build_project_grow_keyboard_for_user(user.id),
         )
         return
@@ -690,7 +694,8 @@ async def _handle_set_new_goal(payload: dict, update: Update, context: ContextTy
             "target_label": target_label,
         },
     )
-    apply_project_grow_unlock_to_tabung(user.id, unlock_amount_usd)
+    if unlock_amount_usd >= 10:
+        apply_project_grow_unlock_to_tabung(user.id, unlock_amount_usd)
 
     await send_screen(
         context,

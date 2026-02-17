@@ -274,7 +274,7 @@
 
       <div class="field">
         <p id="unlockPrompt" class="prompt"></p>
-        <p class="target-hint">Untuk unlock mission dan tabung, isi minimum USD 10.</p>
+        <p class="target-hint">Untuk unlock mission, isi minimum USD 10. Kalau belum ready, boleh isi 0 (tabung tetap boleh guna).</p>
         <div class="with-prefix with-suffix">
           <span class="affix">USD</span>
           <input
@@ -282,16 +282,15 @@
             name="unlock_amount_usd"
             type="number"
             inputmode="decimal"
-            min="10"
+            min="0"
             step="0.01"
-            placeholder="Minimum 10"
-            required
+            placeholder="Contoh: 0 atau 10"
           />
         </div>
       </div>
 
       <p id="finalPrompt" class="prompt"></p>
-      <button id="submitBtn" type="submit">✅ Save Goal & Unlock Tabung</button>
+      <button id="submitBtn" type="submit">✅ Save Goal</button>
       <div class="form-actions">
         <button id="backToMenuBtn" type="button" class="ghost-btn">⬅️ Back to Project Grow</button>
       </div>

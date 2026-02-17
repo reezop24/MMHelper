@@ -111,7 +111,7 @@ window.MMHELPER_CONTENT = {
   setNewGoalCurrentTabungStartPrefix: "Tarikh mula tabung",
   setNewGoalMissionStatusPrefix: "Mission status",
   setNewGoalTargetPrompt: "Target masa untuk capai sasaran",
-  setNewGoalUnlockPrompt: "Unlock Mission & Tabung (minimum USD 10). Jumlah ni akan ditolak terus dari Current Balance kau.",
+  setNewGoalUnlockPrompt: "Unlock Mission (minimum USD 10, optional). Jumlah ni akan ditolak terus dari Current Balance bila kau unlock.",
   setNewGoalFinalPrompt: "Bila dah yakin, submit. Lepas ni kita sambung flow mission.",
   setNewGoalBackToMenuBtn: "⬅️ Back to Project Grow",
   setNewGoalResetBtn: "Reset New Goal",

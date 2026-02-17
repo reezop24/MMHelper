@@ -319,8 +319,8 @@
       return;
     }
 
-    if (Number.isNaN(unlockAmount) || unlockAmount < 10) {
-      formStatusEl.textContent = "Untuk unlock, nilai minimum ialah USD 10.";
+    if (Number.isNaN(unlockAmount) || unlockAmount < 0) {
+      formStatusEl.textContent = "Nilai unlock mission tak boleh negatif.";
       return;
     }
 
