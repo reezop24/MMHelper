@@ -102,10 +102,10 @@
     perSetupRiskUsdEl.textContent = formatUsd(perSetupRiskUsd);
 
     if (dailyRiskPct > 5) {
-      recommendationStatusEl.textContent = "Kiraan guna 22 hari trading sebulan. Cadangan ni agak agresif, pertimbangkan tempoh lebih panjang.";
+      recommendationStatusEl.textContent = "Cadangan ni agak agresif, pertimbangkan tempoh lebih panjang.";
       return;
     }
-    recommendationStatusEl.textContent = "Kiraan guna 22 hari trading sebulan (Isnin-Jumaat) dengan andaian 2 setup sehari.";
+    recommendationStatusEl.textContent = "Cadangan ini guna andaian 2 setup sehari.";
   }
 
   function updateGrowTargetPreview() {
