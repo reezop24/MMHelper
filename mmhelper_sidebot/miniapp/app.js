@@ -8,6 +8,7 @@
   var statusEl = document.getElementById("status");
   var topBackBtn = document.getElementById("topBackBtn");
   var bottomBackBtn = document.getElementById("bottomBackBtn");
+  var bottomPrevBtn = document.getElementById("bottomPrevBtn");
 
   var homeView = document.getElementById("homeView");
   var newRegistrationView = document.getElementById("newRegistrationView");
@@ -29,6 +30,10 @@
 
   var activeView = "home";
 
+  function updateBottomPrevState() {
+    bottomPrevBtn.classList.toggle("hidden", activeView === "home");
+  }
+
   function showView(name) {
     homeView.classList.add("hidden");
     newRegistrationView.classList.add("hidden");
@@ -38,21 +43,25 @@
     if (name === "new_registration") {
       newRegistrationView.classList.remove("hidden");
       activeView = name;
+      updateBottomPrevState();
       return;
     }
     if (name === "ib_transfer") {
       ibTransferView.classList.remove("hidden");
       activeView = name;
+      updateBottomPrevState();
       return;
     }
     if (name === "under_ib_reezo") {
       underIbReezoView.classList.remove("hidden");
       activeView = name;
+      updateBottomPrevState();
       return;
     }
 
     homeView.classList.remove("hidden");
     activeView = "home";
+    updateBottomPrevState();
   }
 
   function openTab(tabName) {
@@ -108,6 +117,7 @@
 
   topBackBtn.addEventListener("click", backToPreviousMenu);
   bottomBackBtn.addEventListener("click", sendToMainMenu);
+  bottomPrevBtn.addEventListener("click", backToPreviousMenu);
 
   btnHomeNewRegistration.addEventListener("click", function () {
     showView("new_registration");
