@@ -2150,6 +2150,61 @@ def save_notification_settings(user_id: int, payload: dict[str, Any]) -> bool:
     return True
 
 
+def stop_all_notification_settings(user_id: int) -> bool:
+    db = load_core_db()
+    user = db.get("users", {}).get(str(user_id))
+    if not isinstance(user, dict):
+        return False
+
+    now = malaysia_now()
+    saved_at_iso = now.isoformat()
+    saved_date = now.strftime("%Y-%m-%d")
+    saved_time = now.strftime("%H:%M:%S")
+
+    sections = user.setdefault("sections", {})
+    sections["notification_settings"] = {
+        "section": "notification_settings",
+        "user_id": user_id,
+        "telegram_name": user.get("telegram_name") or str(user_id),
+        "saved_at": saved_at_iso,
+        "saved_date": saved_date,
+        "saved_time": saved_time,
+        "timezone": "Asia/Kuala_Lumpur",
+        "data": {
+            "manual_push": {
+                "enabled": False,
+                "date": "",
+                "time": "",
+                "message": "",
+            },
+            "daily_notification": {
+                "enabled": False,
+                "times_per_day": 1,
+                "times": [],
+                "preset_message": "",
+            },
+            "report_notification": {
+                "enabled": False,
+                "weekly_remind_date": "",
+                "monthly_remind_date": "",
+            },
+            "maintenance_notification": {
+                "enabled": False,
+                "start_date": "",
+                "start_time": "",
+                "end_date": "",
+                "end_time": "",
+                "message": "",
+            },
+            "runtime": {},
+        },
+    }
+
+    user["updated_at"] = saved_at_iso
+    save_core_db(db)
+    return True
+
+
 def get_notification_settings(user_id: int) -> dict[str, Any]:
     db = load_core_db()
     user = db.get("users", {}).get(str(user_id), {})

@@ -15,6 +15,7 @@ from menu import (
     MAIN_MENU_BUTTON_STATISTIC,
     SUBMENU_ADMIN_BUTTON_BETA_RESET,
     SUBMENU_ADMIN_BUTTON_NOTIFICATION_SETTING,
+    SUBMENU_ADMIN_BUTTON_STOP_ALL_NOTIFICATION,
     SUBMENU_ACCOUNT_BUTTON_SUMMARY,
     SUBMENU_ACCOUNT_BUTTON_TABUNG,
     SUBMENU_MM_BUTTON_BACK_MAIN,
@@ -79,6 +80,7 @@ from storage import (
     is_project_grow_goal_reached,
     list_registered_user_logs,
     reset_all_data,
+    stop_all_notification_settings,
 )
 from texts import (
     ACCOUNT_ACTIVITY_OPENED_TEXT,
@@ -481,6 +483,34 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
             NOTIFICATION_SETTING_OPENED_TEXT,
             reply_markup=_build_admin_panel_keyboard_for_user(user.id),
             parse_mode="Markdown",
+        )
+        return
+
+    if text == SUBMENU_ADMIN_BUTTON_STOP_ALL_NOTIFICATION:
+        if not is_admin_user(user.id):
+            await send_screen(
+                context,
+                message.chat_id,
+                "❌ Akses ditolak.",
+                reply_markup=main_menu_keyboard(user.id),
+            )
+            return
+
+        ok = stop_all_notification_settings(user.id)
+        if not ok:
+            await send_screen(
+                context,
+                message.chat_id,
+                "❌ Gagal stop notification. Cuba lagi.",
+                reply_markup=_build_admin_panel_keyboard_for_user(user.id),
+            )
+            return
+
+        await send_screen(
+            context,
+            message.chat_id,
+            "✅ Semua notification dah dihentikan. User takkan terima mesej lagi sehingga admin set notification baru.",
+            reply_markup=_build_admin_panel_keyboard_for_user(user.id),
         )
         return
 
