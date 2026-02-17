@@ -45,6 +45,7 @@ from storage import (
 from texts import (
     ACCOUNT_ACTIVITY_OPENED_TEXT,
     INITIAL_CAPITAL_RESET_SUCCESS_TEXT,
+    MAIN_MENU_OPENED_TEXT,
     MM_HELPER_SETTING_OPENED_TEXT,
     NOTIFICATION_SETTING_SAVED_TEXT,
     PROJECT_GROW_OPENED_TEXT,
@@ -926,6 +927,21 @@ async def _handle_records_reports_back_to_menu(update: Update, context: ContextT
     )
 
 
+async def _handle_risk_calculator_back_to_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    user = update.effective_user
+    if not user:
+        return
+
+    await send_screen(
+        context,
+        message.chat_id,
+        MAIN_MENU_OPENED_TEXT,
+        reply_markup=main_menu_keyboard(user.id),
+        parse_mode="Markdown",
+    )
+
+
 async def _handle_notification_settings_save(payload: dict, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     user = update.effective_user
@@ -1063,6 +1079,10 @@ async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if payload_type == "records_reports_back_to_menu":
         await _handle_records_reports_back_to_menu(update, context)
+        return
+
+    if payload_type == "risk_calculator_back_to_menu":
+        await _handle_risk_calculator_back_to_menu(update, context)
         return
 
     if payload_type == "notification_settings_save":

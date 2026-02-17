@@ -13,6 +13,7 @@
   var form = document.getElementById("riskForm");
   var statusEl = document.getElementById("status");
   var backBtn = document.getElementById("topBackBtn");
+  var bottomBackBtn = document.getElementById("bottomBackBtn");
   var tabInputBtn = document.getElementById("tabInputBtn");
   var tabBalanceBtn = document.getElementById("tabBalanceBtn");
   var resultInputCard = document.getElementById("resultInputCard");
@@ -148,13 +149,22 @@
     document.getElementById("floatingHalf" + suffix).textContent = f2(result.floatingHalf);
   }
 
-  backBtn.addEventListener("click", function () {
+  function backToMainMenu() {
+    var payload = { type: "risk_calculator_back_to_menu" };
     if (tg) {
+      try {
+        tg.sendData(JSON.stringify(payload));
+      } catch (err) {
+        // no-op
+      }
       tg.close();
       return;
     }
-    statusEl.textContent = "Preview mode: back hanya aktif dalam Telegram.";
-  });
+    statusEl.textContent = "Preview mode: buka dari Telegram untuk kembali ke Main Menu.";
+  }
+
+  backBtn.addEventListener("click", backToMainMenu);
+  bottomBackBtn.addEventListener("click", backToMainMenu);
 
   tabInputBtn.addEventListener("click", function () {
     setTab("input");
