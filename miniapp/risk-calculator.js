@@ -72,8 +72,8 @@
       return;
     }
 
-    // XAUUSD assumptions: contract size=100, pip size=0.01 (1 lot ~= USD 1 per pip).
-    var pipSize = 0.01;
+    // XAUUSD assumptions: contract size=100, pip size=0.10 (1 lot ~= USD 10 per pip).
+    var pipSize = 0.10;
     var zone = zonePips * pipSize;
     var riskUsd = balance * (riskPct / 100);
     var usdPerLotAtZone = zone * 100;
