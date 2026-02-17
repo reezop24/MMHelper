@@ -5,21 +5,16 @@
     tg.expand();
   }
 
+  var params = new URLSearchParams(window.location.search);
+  var liveBalance = Number(params.get("current_balance_usd") || 0);
+
   var form = document.getElementById("riskForm");
   var statusEl = document.getElementById("status");
   var backBtn = document.getElementById("topBackBtn");
-  var riskUsdEl = document.getElementById("riskUsd");
-  var lotSizeEl = document.getElementById("lotSize");
-  var selectedLayerLabelEl = document.getElementById("selectedLayerLabel");
-  var lotPerSelectedLayerEl = document.getElementById("lotPerSelectedLayer");
-  var lotPerTwoLayerEl = document.getElementById("lotPerTwoLayer");
-  var lotPerThreeLayerEl = document.getElementById("lotPerThreeLayer");
-  var zoneUsdEl = document.getElementById("zoneUsd");
-  var usedMarginEl = document.getElementById("usedMargin");
-  var maxLossBeforeStopOutEl = document.getElementById("maxLossBeforeStopOut");
-  var maxMoveBeforeStopOutEl = document.getElementById("maxMoveBeforeStopOut");
-  var floatingFullEl = document.getElementById("floatingFull");
-  var floatingHalfEl = document.getElementById("floatingHalf");
+  var tabInputBtn = document.getElementById("tabInputBtn");
+  var tabBalanceBtn = document.getElementById("tabBalanceBtn");
+  var resultInputCard = document.getElementById("resultInputCard");
+  var resultBalanceCard = document.getElementById("resultBalanceCard");
 
   function n(id) {
     return Number((document.getElementById(id).value || "").trim());
@@ -30,11 +25,71 @@
   }
 
   function floorToStep(value, step) {
-    var n = Number(value || 0);
-    if (!Number.isFinite(n) || n <= 0) return 0;
+    var base = Number(value || 0);
+    if (!Number.isFinite(base) || base <= 0) return 0;
     var s = Number(step || 0);
     if (!Number.isFinite(s) || s <= 0) return 0;
-    return Math.floor((n + 1e-12) / s) * s;
+    return Math.floor((base + 1e-12) / s) * s;
+  }
+
+  function setTab(tabName) {
+    var showInput = tabName === "input";
+    resultInputCard.classList.toggle("hidden", !showInput);
+    resultBalanceCard.classList.toggle("hidden", showInput);
+    tabInputBtn.classList.toggle("active", showInput);
+    tabBalanceBtn.classList.toggle("active", !showInput);
+  }
+
+  function calculate(balance, riskPct, zonePips, layerCount, entryPrice, leverage, stopOutPct) {
+    var pipSize = 0.10;
+    var contractSize = 100;
+    var zone = zonePips * pipSize;
+    var riskUsd = balance * (riskPct / 100);
+    var usdPerLotAtZone = zone * contractSize;
+    var rawLot = usdPerLotAtZone > 0 ? riskUsd / usdPerLotAtZone : 0;
+    var lot = floorToStep(rawLot, 0.01);
+    var lotPerSelectedLayer = floorToStep(lot / layerCount, 0.01);
+    var lotPerTwoLayer = floorToStep(lot / 2, 0.01);
+    var lotPerThreeLayer = floorToStep(lot / 3, 0.01);
+
+    var usedMargin = (entryPrice * contractSize * lot) / leverage;
+    var stopOutEquity = usedMargin * (stopOutPct / 100);
+    var maxLossBeforeStopOut = Math.max(balance - stopOutEquity, 0);
+    var maxMoveBeforeStopOut = lot > 0 ? maxLossBeforeStopOut / (lot * contractSize) : 0;
+    var floatingFull = lot * zone * contractSize;
+    var floatingHalf = lot * (zone / 2) * contractSize;
+
+    return {
+      lot: lot,
+      riskUsd: riskUsd,
+      lotPerSelectedLayer: lotPerSelectedLayer,
+      lotPerTwoLayer: lotPerTwoLayer,
+      lotPerThreeLayer: lotPerThreeLayer,
+      zoneUsd: zone,
+      usedMargin: usedMargin,
+      maxLossBeforeStopOut: maxLossBeforeStopOut,
+      maxMoveBeforeStopOut: maxMoveBeforeStopOut,
+      floatingFull: floatingFull,
+      floatingHalf: floatingHalf,
+    };
+  }
+
+  function render(result, suffix, layerCount, balanceValue) {
+    if (suffix === "Live") {
+      document.getElementById("liveBalance").textContent = f2(balanceValue);
+    }
+    document.getElementById("riskUsd" + suffix).textContent = f2(result.riskUsd);
+    document.getElementById("lotSize" + suffix).textContent = f2(result.lot);
+    document.getElementById("selectedLayerLabel" + suffix).textContent = String(layerCount);
+    document.getElementById("lotPerSelectedLayer" + suffix).textContent = f2(result.lotPerSelectedLayer);
+    document.getElementById("lotPerTwoLayer" + suffix).textContent = f2(result.lotPerTwoLayer);
+    document.getElementById("lotPerThreeLayer" + suffix).textContent = f2(result.lotPerThreeLayer);
+    document.getElementById("zoneUsd" + suffix).textContent = f2(result.zoneUsd);
+    document.getElementById("usedMargin" + suffix).textContent = f2(result.usedMargin);
+    document.getElementById("maxLossBeforeStopOut" + suffix).textContent = f2(result.maxLossBeforeStopOut);
+    document.getElementById("maxMoveBeforeStopOut" + suffix).textContent = f2(result.maxMoveBeforeStopOut);
+    document.getElementById("floatingFull" + suffix).textContent = f2(result.floatingFull);
+    document.getElementById("floatingHalf" + suffix).textContent = f2(result.floatingHalf);
   }
 
   backBtn.addEventListener("click", function () {
@@ -43,6 +98,14 @@
       return;
     }
     statusEl.textContent = "Preview mode: back hanya aktif dalam Telegram.";
+  });
+
+  tabInputBtn.addEventListener("click", function () {
+    setTab("input");
+  });
+
+  tabBalanceBtn.addEventListener("click", function () {
+    setTab("balance");
   });
 
   form.addEventListener("submit", function (event) {
@@ -68,8 +131,8 @@
       statusEl.textContent = "Saiz zon/SL (pips) kena lebih dari 0.";
       return;
     }
-    if (Number.isNaN(layerCount) || layerCount <= 0) {
-      statusEl.textContent = "Layer tak sah.";
+    if (Number.isNaN(layerCount) || layerCount <= 0 || layerCount > 10) {
+      statusEl.textContent = "Layer tak sah. Pilih 1 hingga 10.";
       return;
     }
     if (Number.isNaN(entryPrice) || entryPrice <= 0) {
@@ -85,49 +148,25 @@
       return;
     }
 
-    // XAUUSD assumptions: contract size=100, pip size=0.10 (1 lot ~= USD 10 per pip).
-    var pipSize = 0.10;
-    var zone = zonePips * pipSize;
-    var riskUsd = balance * (riskPct / 100);
-    var usdPerLotAtZone = zone * 100;
-    var rawLot = usdPerLotAtZone > 0 ? riskUsd / usdPerLotAtZone : 0;
-    var lot = floorToStep(rawLot, 0.01);
-    var lotPerSelectedLayer = floorToStep(lot / layerCount, 0.01);
-    var lotPerTwoLayer = floorToStep(lot / 2, 0.01);
-    var lotPerThreeLayer = floorToStep(lot / 3, 0.01);
+    var inputResult = calculate(balance, riskPct, zonePips, layerCount, entryPrice, leverage, stopOutPct);
+    render(inputResult, "", layerCount, balance);
 
-    // Margin model: used margin = (entry price * contract size * lot) / leverage.
-    var contractSize = 100;
-    var usedMargin = (entryPrice * contractSize * lot) / leverage;
-    var stopOutEquity = usedMargin * (stopOutPct / 100);
-    var maxLossBeforeStopOut = Math.max(balance - stopOutEquity, 0);
-    var maxMoveBeforeStopOut = lot > 0 ? maxLossBeforeStopOut / (lot * contractSize) : 0;
-
-    var floatingFull = lot * zone * 100;
-    var floatingHalf = lot * (zone / 2) * 100;
-
-    riskUsdEl.textContent = f2(riskUsd);
-    lotSizeEl.textContent = f2(lot);
-    selectedLayerLabelEl.textContent = String(layerCount);
-    lotPerSelectedLayerEl.textContent = f2(lotPerSelectedLayer);
-    lotPerTwoLayerEl.textContent = f2(lotPerTwoLayer);
-    lotPerThreeLayerEl.textContent = f2(lotPerThreeLayer);
-    zoneUsdEl.textContent = f2(zone);
-    usedMarginEl.textContent = f2(usedMargin);
-    maxLossBeforeStopOutEl.textContent = f2(maxLossBeforeStopOut);
-    maxMoveBeforeStopOutEl.textContent = f2(maxMoveBeforeStopOut);
-    floatingFullEl.textContent = f2(floatingFull);
-    floatingHalfEl.textContent = f2(floatingHalf);
-
-    if (lot <= 0) {
+    if (inputResult.lot <= 0) {
       statusEl.textContent = "Lot terlalu kecil selepas pembundaran 0.01. Naikkan risk% atau kecilkan zon.";
       return;
     }
 
-    if (floatingFull > maxLossBeforeStopOut && maxLossBeforeStopOut > 0) {
-      statusEl.textContent = "Amaran: loss zon penuh melebihi kapasiti akaun sebelum stop-out. Kecilkan lot atau zon.";
+    if (Number.isFinite(liveBalance) && liveBalance > 0) {
+      var liveResult = calculate(liveBalance, riskPct, zonePips, layerCount, entryPrice, leverage, stopOutPct);
+      render(liveResult, "Live", layerCount, liveBalance);
+      if (inputResult.floatingFull > inputResult.maxLossBeforeStopOut && inputResult.maxLossBeforeStopOut > 0) {
+        statusEl.textContent = "Amaran: loss zon penuh (tab input) melebihi kapasiti sebelum stop-out.";
+        return;
+      }
+      statusEl.textContent = "Kiraan siap untuk dua tab. Lot dibundarkan ke bawah ikut step 0.01.";
       return;
     }
-    statusEl.textContent = "Kiraan siap (per setup). Lot dibundarkan ke bawah ikut step 0.01.";
+
+    statusEl.textContent = "Kiraan tab input siap. Tab current balance perlukan data balance user aktif.";
   });
 })();

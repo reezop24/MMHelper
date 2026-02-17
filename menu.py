@@ -51,12 +51,21 @@ def is_admin_user(user_id: int | None) -> bool:
 
 
 def main_menu_keyboard(user_id: int | None = None) -> ReplyKeyboardMarkup:
+    risk_url = get_risk_calculator_webapp_url()
+    if user_id is not None:
+        try:
+            from storage import get_current_balance_usd
+
+            risk_url = get_risk_calculator_webapp_url(current_balance_usd=get_current_balance_usd(user_id))
+        except Exception:
+            risk_url = get_risk_calculator_webapp_url()
+
     rows = [
         [
             MAIN_MENU_BUTTON_MM_SETTING,
             KeyboardButton(
                 MAIN_MENU_BUTTON_RISK,
-                web_app=WebAppInfo(url=get_risk_calculator_webapp_url()),
+                web_app=WebAppInfo(url=risk_url),
             ),
         ],
         [MAIN_MENU_BUTTON_ACCOUNT_ACTIVITY, MAIN_MENU_BUTTON_PROJECT_GROW],

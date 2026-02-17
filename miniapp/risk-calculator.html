@@ -57,6 +57,32 @@
       font-weight: 800;
       letter-spacing: 0.2px;
     }
+
+    .tab-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .tab-btn {
+      border: 1px solid #4f78b7;
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: rgba(16, 48, 95, 0.6);
+      color: #d8e6ff;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .tab-btn.active {
+      background: rgba(36, 86, 158, 0.95);
+      color: #fff;
+    }
+
+    .hidden {
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -105,6 +131,11 @@
           <option value="3">3 layer</option>
           <option value="4">4 layer</option>
           <option value="5">5 layer</option>
+          <option value="6">6 layer</option>
+          <option value="7">7 layer</option>
+          <option value="8">8 layer</option>
+          <option value="9">9 layer</option>
+          <option value="10">10 layer</option>
         </select>
       </div>
 
@@ -143,7 +174,12 @@
       <p id="status" class="status" aria-live="polite"></p>
     </form>
 
-    <section class="result-card">
+    <div class="tab-row">
+      <button id="tabInputBtn" type="button" class="tab-btn active">Output: Modal Input</button>
+      <button id="tabBalanceBtn" type="button" class="tab-btn">Output: Current Balance</button>
+    </div>
+
+    <section id="resultInputCard" class="result-card">
       <p class="result-title"><strong>Output per setup (XAUUSD)</strong></p>
       <p class="result-line">Risk USD per setup: <strong class="risk-value">USD <span id="riskUsd">0.00</span></strong></p>
       <p class="result-line">Cadangan lot size: <strong><span id="lotSize" class="lot-value">0.00</span> lot</strong></p>
@@ -157,6 +193,23 @@
       <p class="result-line">Anggaran floating @ zon penuh: <strong class="risk-value">USD <span id="floatingFull">0.00</span></strong></p>
       <p class="result-line">Anggaran floating @ separuh zon: <strong class="risk-value">USD <span id="floatingHalf">0.00</span></strong></p>
       <p class="hint"><em>Andaian kiraan: contract size XAUUSD = 100, 1 pip = 0.10, maka 1.00 lot ≈ USD 10 per pip.</em></p>
+    </section>
+
+    <section id="resultBalanceCard" class="result-card hidden">
+      <p class="result-title"><strong>Output ikut Current Balance Sebenar</strong></p>
+      <p class="result-line">Current Balance: <strong>USD <span id="liveBalance">0.00</span></strong></p>
+      <p class="result-line">Risk USD per setup: <strong class="risk-value">USD <span id="riskUsdLive">0.00</span></strong></p>
+      <p class="result-line">Cadangan lot size: <strong><span id="lotSizeLive" class="lot-value">0.00</span> lot</strong></p>
+      <p class="result-line">Lot per layer (<span id="selectedLayerLabelLive">1</span> layer): <strong><span id="lotPerSelectedLayerLive">0.00</span> lot/layer</strong></p>
+      <p class="result-line">Rujukan 2 layer: <strong><span id="lotPerTwoLayerLive">0.00</span> lot/layer</strong></p>
+      <p class="result-line">Rujukan 3 layer: <strong><span id="lotPerThreeLayerLive">0.00</span> lot/layer</strong></p>
+      <p class="result-line">Zon setara harga: <strong>USD <span id="zoneUsdLive">0.00</span></strong></p>
+      <p class="result-line">Used margin anggaran: <strong>USD <span id="usedMarginLive">0.00</span></strong></p>
+      <p class="result-line">Loss max sebelum stop-out: <strong class="risk-value">USD <span id="maxLossBeforeStopOutLive">0.00</span></strong></p>
+      <p class="result-line">Jarak harga max sebelum stop-out: <strong class="risk-value">USD <span id="maxMoveBeforeStopOutLive">0.00</span></strong></p>
+      <p class="result-line">Anggaran floating @ zon penuh: <strong class="risk-value">USD <span id="floatingFullLive">0.00</span></strong></p>
+      <p class="result-line">Anggaran floating @ separuh zon: <strong class="risk-value">USD <span id="floatingHalfLive">0.00</span></strong></p>
+      <p class="hint"><em>Kiraan guna current balance sebenar user dari sistem.</em></p>
     </section>
   </main>
 

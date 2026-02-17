@@ -21,8 +21,12 @@ def _miniapp_base_url() -> str:
     return base
 
 
-def get_risk_calculator_webapp_url() -> str:
-    return f"{_miniapp_base_url()}/risk-calculator.html"
+def get_risk_calculator_webapp_url(current_balance_usd: float | None = None) -> str:
+    page = f"{_miniapp_base_url()}/risk-calculator.html"
+    if current_balance_usd is None:
+        return page
+    query = urlencode({"current_balance_usd": f"{float(current_balance_usd):.2f}"})
+    return f"{page}?{query}"
 
 
 def get_initial_capital_reset_webapp_url(
