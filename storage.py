@@ -723,6 +723,18 @@ def apply_tabung_update_action(user_id: int, action: str, amount_usd: float) -> 
     if action == "save":
         if amount > current_balance:
             return False, f"Current Balance tak cukup. Baki sekarang USD {current_balance:.2f}."
+        floor_balance = get_current_balance_floor_usd(user_id, now.date())
+        max_save_allowed = current_balance - floor_balance
+        if amount > max_save_allowed:
+            if max_save_allowed <= 0:
+                return False, (
+                    f"Simpanan ke tabung tak dibenarkan sekarang. "
+                    f"Current Balance minimum yang perlu kekal ialah USD {floor_balance:.2f}."
+                )
+            return False, (
+                f"Simpanan melebihi had. Maksimum simpanan sekarang USD {max_save_allowed:.2f} "
+                f"(minimum Current Balance perlu kekal USD {floor_balance:.2f})."
+            )
         new_balance = current_tabung_balance + amount
         records.append(
             {
@@ -829,6 +841,43 @@ def _month_range(reference_date: date) -> tuple[date, date]:
     next_month = (first_day.replace(day=28) + timedelta(days=4)).replace(day=1)
     last_day = next_month - timedelta(days=1)
     return first_day, last_day
+
+
+def _sum_amount_usd_between(user_id: int, section_name: str, start_date: date, end_date: date) -> float:
+    total = 0.0
+    for record in _iter_section_records_between(user_id, section_name, start_date, end_date):
+        total += _to_float(record.get("amount_usd", 0.0))
+    return total
+
+
+def _sum_net_usd_between(user_id: int, section_name: str, start_date: date, end_date: date) -> float:
+    total = 0.0
+    for record in _iter_section_records_between(user_id, section_name, start_date, end_date):
+        total += _record_net_usd(record)
+    return total
+
+
+def get_current_balance_floor_usd(user_id: int, reference_date: date | None = None) -> float:
+    ref_date = reference_date or malaysia_now().date()
+    month_start, month_end = _month_range(ref_date)
+    current_balance = get_current_balance_usd(user_id)
+
+    monthly_deposit = _sum_amount_usd_between(user_id, "deposit_activity", month_start, month_end)
+    monthly_withdrawal = _sum_amount_usd_between(user_id, "withdrawal_activity", month_start, month_end)
+    monthly_trading_net = _sum_net_usd_between(user_id, "trading_activity", month_start, month_end)
+    monthly_adjustment_net = _sum_net_usd_between(user_id, "balance_adjustment", month_start, month_end)
+
+    # Carry-forward = balance at start of current month.
+    month_start_balance = (
+        current_balance
+        - monthly_deposit
+        + monthly_withdrawal
+        - monthly_trading_net
+        - monthly_adjustment_net
+    )
+
+    # Floor only reduced by withdrawal activity, never by balance adjustment.
+    return month_start_balance - monthly_withdrawal
 
 
 def _trading_days_by_target_days(target_days: int) -> int:
