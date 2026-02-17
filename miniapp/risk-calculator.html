@@ -64,9 +64,9 @@
 
       <div class="field">
         <label class="question" for="zonePips"><strong>3. Saiz zon / SL (pips)</strong></label>
-        <p class="hint"><em>Contoh 350 pips pada XAUUSD (andaian 1 pip = 0.10).</em></p>
+        <p class="hint"><em>Contoh 10 pips pada XAUUSD (andaian 1 pip = 0.10).</em></p>
         <div class="with-suffix">
-          <input id="zonePips" type="number" inputmode="decimal" min="1" step="1" placeholder="Contoh: 350" required />
+          <input id="zonePips" type="number" inputmode="decimal" min="1" step="1" placeholder="Contoh: 10" required />
           <span class="affix">pips</span>
         </div>
       </div>
@@ -89,10 +89,16 @@
 
       <div class="field">
         <label class="question" for="stopOutPct"><strong>6. Stop-out level (%)</strong></label>
-        <p class="hint"><em>Default kebanyakan broker sekitar 20%. Ubah ikut broker kau.</em></p>
+        <p class="hint"><em>Kebanyakan user memang sekitar 30%, tapi tetap check broker sendiri untuk pengesahan.</em></p>
         <div class="with-suffix">
-          <input id="stopOutPct" type="number" inputmode="decimal" min="1" step="1" value="20" required />
-          <span class="affix">%</span>
+          <select id="stopOutPct" required>
+            <option value="0">0%</option>
+            <option value="10">10%</option>
+            <option value="20">20%</option>
+            <option value="30" selected>30%</option>
+            <option value="40">40%</option>
+            <option value="50">50%</option>
+          </select>
         </div>
       </div>
 

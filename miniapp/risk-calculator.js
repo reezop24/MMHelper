@@ -67,8 +67,8 @@
       statusEl.textContent = "Leverage tak sah.";
       return;
     }
-    if (Number.isNaN(stopOutPct) || stopOutPct <= 0 || stopOutPct >= 100) {
-      statusEl.textContent = "Stop-out % mesti antara 1 hingga 99.";
+    if (Number.isNaN(stopOutPct) || stopOutPct < 0 || stopOutPct > 50) {
+      statusEl.textContent = "Stop-out % mesti antara 0 hingga 50.";
       return;
     }
 
