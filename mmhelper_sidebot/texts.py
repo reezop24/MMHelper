@@ -26,3 +26,9 @@ DECLINED_TEXT = (
 )
 
 MAIN_MENU_TEXT = "✅ Terima kasih. Sila pilih menu di bawah untuk teruskan."
+ADMIN_PANEL_TEXT = "🛡️ Admin Panel dibuka.\nPilih tindakan di bawah."
+BETA_RESET_PROMPT_TEXT = (
+    "⚠️ BETA RESET akan padam semua data sidebot dan reset user dari awal.\n\n"
+    "Teruskan?"
+)
+BETA_RESET_DONE_TEXT = "✅ BETA RESET selesai. Semua data dah direset."
