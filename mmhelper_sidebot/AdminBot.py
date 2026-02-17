@@ -14,6 +14,7 @@ from telegram import (
     ReplyKeyboardRemove,
     ReplyKeyboardMarkup,
     Update,
+    WebAppInfo,
 )
 from telegram.ext import ApplicationBuilder, CallbackQueryHandler, CommandHandler, ContextTypes, MessageHandler, filters
 
@@ -66,6 +67,11 @@ def get_token() -> str:
     if not token:
         raise RuntimeError("Set SIDEBOT_TOKEN in mmhelper_sidebot/.env")
     return token
+
+
+def get_register_next_webapp_url() -> str:
+    url = (os.getenv("SIDEBOT_REGISTER_WEBAPP_URL") or "").strip()
+    return url
 
 
 def load_state() -> dict:
@@ -122,8 +128,14 @@ def tnc_keyboard() -> InlineKeyboardMarkup:
 
 
 def main_menu_keyboard(user_id: int | None) -> ReplyKeyboardMarkup:
+    register_url = get_register_next_webapp_url()
+    if register_url:
+        register_button = KeyboardButton(MENU_DAFTAR_NEXT_MEMBER, web_app=WebAppInfo(url=register_url))
+    else:
+        register_button = KeyboardButton(MENU_DAFTAR_NEXT_MEMBER)
+
     rows = [
-        [KeyboardButton(MENU_DAFTAR_NEXT_MEMBER)],
+        [register_button],
         [KeyboardButton(MENU_BELI_EVIDEO26)],
         [KeyboardButton(MENU_ALL_PRODUCT_PREVIEW)],
     ]
@@ -236,6 +248,13 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         await message.reply_text(ADMIN_PANEL_TEXT, reply_markup=admin_panel_keyboard())
         return
 
+    if text == MENU_DAFTAR_NEXT_MEMBER:
+        if get_register_next_webapp_url():
+            await message.reply_text("Buka miniapp melalui butang web app pada menu.")
+            return
+        await message.reply_text("Miniapp URL belum diset. Isi SIDEBOT_REGISTER_WEBAPP_URL dalam .env dulu.")
+        return
+
     if text == MENU_BETA_RESET:
         if not is_admin_user(user.id):
             await message.reply_text("❌ Akses ditolak.", reply_markup=main_menu_keyboard(user.id))
@@ -249,6 +268,30 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
 
 
+async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    user = update.effective_user
+    if not message or not message.web_app_data or not user:
+        return
+
+    try:
+        payload = json.loads(message.web_app_data.data)
+    except json.JSONDecodeError:
+        await message.reply_text("❌ Data miniapp tak sah. Cuba buka semula.")
+        return
+
+    payload_type = str(payload.get("type") or "").strip()
+    if payload_type == "sidebot_back_to_main_menu":
+        if has_tnc_accepted(user.id):
+            await message.reply_text(MAIN_MENU_TEXT, reply_markup=main_menu_keyboard(user.id))
+            return
+        await message.reply_text("Sila baca dan setuju TnC dulu.", reply_markup=ReplyKeyboardRemove())
+        await message.reply_text(TNC_TEXT, reply_markup=tnc_keyboard())
+        return
+
+    await message.reply_text("ℹ️ Miniapp demo diterima.", reply_markup=main_menu_keyboard(user.id))
+
+
 def main() -> None:
     logging.basicConfig(
         level=logging.INFO,
@@ -260,6 +303,7 @@ def main() -> None:
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(handle_tnc_callback, pattern=f"^({TNC_ACCEPT}|{TNC_DECLINE})$"))
     app.add_handler(CallbackQueryHandler(handle_admin_callback, pattern=f"^({CB_BETA_RESET_CONFIRM}|{CB_BETA_RESET_CANCEL})$"))
+    app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp_data))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     app.run_polling()
 

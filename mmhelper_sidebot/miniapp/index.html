@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Daftar NEXT Member</title>
+  <link rel="stylesheet" href="global.css" />
+  <style>
+    .preview-card p {
+      margin: 0;
+      line-height: 1.45;
+      color: #d7f0ff;
+    }
+
+    .preview-card p + p {
+      margin-top: 8px;
+    }
+
+    .bottom-actions {
+      margin-top: 12px;
+    }
+
+    .back-btn {
+      margin: 0;
+      width: auto;
+      min-width: 210px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid #4b9ea3;
+      background: rgba(13, 54, 60, 0.9);
+      color: #e8fbff;
+      font-size: 13px;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="top-nav">
+      <button id="topBackBtn" type="button" class="top-back-btn">← Back</button>
+    </div>
+
+    <header class="hero">
+      <img class="logo" src="logo.png" alt="NEXT Admin Bot Logo" />
+      <h1>Daftar NEXT Member</h1>
+      <p>Miniapp preview (kosong) untuk semak tema global admin bot.</p>
+    </header>
+
+    <section class="card preview-card">
+      <p>Ini template awal miniapp. Struktur top back + bottom back ikut konsep MM HELPER.</p>
+      <p>Tema dikekalkan dengan logo sedia ada, cuma background dan palet warna dah ditukar untuk bot admin.</p>
+      <p id="status" class="status" aria-live="polite"></p>
+    </section>
+
+    <div class="bottom-actions">
+      <button id="bottomBackBtn" type="button" class="back-btn">⬅️ Back to Main Menu</button>
+    </div>
+  </main>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

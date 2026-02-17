@@ -1,0 +1,137 @@
+:root {
+  --bg: #0b1015;
+  --panel: #111e2a;
+  --panel-soft: #173042;
+  --text: #edf6ff;
+  --muted: #b4c9da;
+  --accent-main: #1fbf8f;
+  --accent-main-2: #22d3a2;
+  --border-card: #2d6f74;
+  --border-input: #3f8b93;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background:
+    radial-gradient(circle at top right, #19434f 0%, rgba(25, 67, 79, 0) 38%),
+    radial-gradient(circle at top left, #122735 0%, rgba(18, 39, 53, 0) 34%),
+    linear-gradient(180deg, #090e13 0%, var(--bg) 100%);
+  color: var(--text);
+  position: relative;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: url("reezo.png");
+  background-repeat: no-repeat;
+  background-position: center 58%;
+  background-size: min(70vw, 520px);
+  opacity: 0.045;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+  position: relative;
+  z-index: 1;
+}
+
+.top-nav {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 8px;
+}
+
+.top-back-btn {
+  margin: 0;
+  width: auto;
+  min-width: 0;
+  border: 1px solid rgba(137, 201, 209, 0.55);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #e8fcff;
+  background: rgba(14, 54, 71, 0.9);
+  line-height: 1;
+}
+
+.hero {
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.logo {
+  width: 152px;
+  height: 152px;
+  object-fit: contain;
+  margin: 0 auto 12px;
+  display: block;
+  filter: drop-shadow(0 7px 16px rgba(0, 0, 0, 0.45));
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: 32px;
+  color: #ffffff;
+}
+
+.hero p {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
+.card {
+  background: linear-gradient(160deg, var(--panel) 0%, var(--panel-soft) 100%);
+  border: 1px solid var(--border-card);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.38),
+    0 0 0 1px rgba(45, 111, 116, 0.24) inset;
+}
+
+button {
+  margin-top: 22px;
+  width: 100%;
+  border: 0;
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #062018;
+  background: linear-gradient(90deg, var(--accent-main) 0%, var(--accent-main-2) 100%);
+}
+
+.status {
+  min-height: 22px;
+  margin: 10px 0 0;
+  color: #bee8de;
+}
+
+@media (max-width: 640px) {
+  .logo {
+    width: 124px;
+    height: 124px;
+  }
+
+  .hero h1 {
+    font-size: 27px;
+  }
+
+  .top-back-btn {
+    font-size: 12px;
+    padding: 7px 11px;
+  }
+}
