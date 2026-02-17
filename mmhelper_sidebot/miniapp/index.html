@@ -112,6 +112,20 @@
       border-color: #f59e0b;
     }
 
+    .guide-images {
+      margin-top: 12px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .guide-image {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid #744147;
+      display: block;
+      background: rgba(37, 21, 24, 0.92);
+    }
+
     .placeholder-tag {
       display: inline-block;
       margin-top: 10px;
@@ -356,9 +370,17 @@
         </div>
 
         <div id="panelIbGuideWeb">
-          <p>Placeholder guide penukaran IB untuk versi web.</p>
-          <p>Langkah demi langkah untuk desktop/browser akan dimasukkan pada step seterusnya.</p>
-          <span class="placeholder-tag">Placeholder: IB Guide Web</span>
+          <ul class="feature-list">
+            <li>Buka dashboard AMarkets (Website) anda dan klik profile.</li>
+            <li>Klik pada My Partner.</li>
+            <li>Masukkan IB code: <strong>REEZO24</strong> dan submit request.</li>
+            <li>Kembali ke bot Reezo Admin dan tekan butang Pengesahan Penukaran IB.</li>
+          </ul>
+          <p>Sila rujuk gambar di bawah.</p>
+          <div class="guide-images">
+            <img class="guide-image" src="web1.jpg" alt="Panduan Web Version 1" />
+            <img class="guide-image" src="web2.jpg" alt="Panduan Web Version 2" />
+          </div>
         </div>
 
         <div id="panelIbGuideMobile" class="hidden">
