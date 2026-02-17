@@ -316,10 +316,6 @@ async def _handle_initial_setup(payload: dict, update: Update, context: ContextT
             target_label = "30 hari"
 
     telegram_name = (user.full_name or "").strip() or str(user.id)
-    save_mode = str(payload.get("save_mode") or "basic").strip().lower()
-    if save_mode not in {"basic", "with_recommendation"}:
-        save_mode = "basic"
-
     save_user_setup_section(
         user_id=user.id,
         telegram_name=telegram_name,
@@ -348,19 +344,18 @@ async def _handle_initial_setup(payload: dict, update: Update, context: ContextT
         },
     )
 
-    if save_mode == "with_recommendation":
-        recommendation_data = _build_setup_recommendation(initial_capital, target_balance_usd, target_days)
-        recommendation_data["save_mode"] = save_mode
-        recommendation_data["initial_capital_usd"] = float(initial_capital)
-        recommendation_data["target_balance_usd"] = float(target_balance_usd)
-        recommendation_data["target_days"] = int(target_days)
-        recommendation_data["target_label"] = target_label
-        save_user_setup_section(
-            user_id=user.id,
-            telegram_name=telegram_name,
-            section="setup_recommendation",
-            payload=recommendation_data,
-        )
+    recommendation_data = _build_setup_recommendation(initial_capital, target_balance_usd, target_days)
+    recommendation_data["save_mode"] = "with_recommendation"
+    recommendation_data["initial_capital_usd"] = float(initial_capital)
+    recommendation_data["target_balance_usd"] = float(target_balance_usd)
+    recommendation_data["target_days"] = int(target_days)
+    recommendation_data["target_label"] = target_label
+    save_user_setup_section(
+        user_id=user.id,
+        telegram_name=telegram_name,
+        section="setup_recommendation",
+        payload=recommendation_data,
+    )
 
     await send_screen(
         context,

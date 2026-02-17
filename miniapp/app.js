@@ -8,9 +8,6 @@
   var form = document.getElementById("setupForm");
   var statusEl = document.getElementById("formStatus");
   var topBackBtn = document.getElementById("topBackBtn");
-  var saveModeInput = document.getElementById("saveMode");
-  var saveBasicBtn = document.getElementById("saveBasicBtn");
-  var saveWithRecommendationBtn = document.getElementById("saveWithRecommendationBtn");
   var initialCapitalInput = document.getElementById("initial_capital_usd");
   var targetBalanceInput = document.getElementById("target_balance_usd");
   var targetDaysSelect = document.getElementById("target_days");
@@ -160,19 +157,6 @@
     statusEl.textContent = "";
   });
 
-  saveBasicBtn.addEventListener("click", function () {
-    saveModeInput.value = "basic";
-  });
-
-  saveWithRecommendationBtn.addEventListener("click", function () {
-    saveModeInput.value = "with_recommendation";
-    if (typeof form.requestSubmit === "function") {
-      form.requestSubmit();
-      return;
-    }
-    form.dispatchEvent(new Event("submit", { cancelable: true }));
-  });
-
   form.addEventListener("submit", function (event) {
     event.preventDefault();
 
@@ -189,7 +173,7 @@
       target_balance_usd: getNumberValue("target_balance_usd"),
       target_days: Number(targetDaysRaw),
       target_label: targetLabel,
-      save_mode: (saveModeInput.value || "basic").trim()
+      save_mode: "with_recommendation"
     };
 
     if (!payload.name) {
@@ -216,10 +200,6 @@
     if (targetDaysRaw !== "30" && targetDaysRaw !== "90" && targetDaysRaw !== "180") {
       statusEl.textContent = "Pilih tempoh target dulu.";
       return;
-    }
-
-    if (payload.save_mode !== "basic" && payload.save_mode !== "with_recommendation") {
-      payload.save_mode = "basic";
     }
 
     if (tg) {
