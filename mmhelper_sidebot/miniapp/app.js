@@ -11,27 +11,54 @@
   var btnNewRegistration = document.getElementById("btnNewRegistration");
   var btnIbTransfer = document.getElementById("btnIbTransfer");
   var btnUnderIbReezo = document.getElementById("btnUnderIbReezo");
+  var btnBackToChoicesA = document.getElementById("btnBackToChoicesA");
+  var btnBackToChoicesB = document.getElementById("btnBackToChoicesB");
+  var btnBackToChoicesC = document.getElementById("btnBackToChoicesC");
 
-  function sendChoice(choice) {
-    var payload = {
-      type: "next_member_request_type",
-      choice: choice
-    };
+  var homeView = document.getElementById("homeView");
+  var newRegistrationView = document.getElementById("newRegistrationView");
+  var ibTransferView = document.getElementById("ibTransferView");
+  var underIbReezoView = document.getElementById("underIbReezoView");
+  var activeView = "home";
 
-    if (tg) {
-      try {
-        tg.sendData(JSON.stringify(payload));
-      } catch (err) {
-        // no-op
-      }
-      tg.close();
+  function showHome() {
+    homeView.classList.remove("hidden");
+    newRegistrationView.classList.add("hidden");
+    ibTransferView.classList.add("hidden");
+    underIbReezoView.classList.add("hidden");
+    activeView = "home";
+  }
+
+  function showView(viewName) {
+    homeView.classList.add("hidden");
+    newRegistrationView.classList.add("hidden");
+    ibTransferView.classList.add("hidden");
+    underIbReezoView.classList.add("hidden");
+
+    if (viewName === "new_registration") {
+      newRegistrationView.classList.remove("hidden");
+      activeView = "new_registration";
       return;
     }
-
-    statusEl.textContent = "Preview mode: pilihan direkod -> " + choice;
+    if (viewName === "ib_transfer") {
+      ibTransferView.classList.remove("hidden");
+      activeView = "ib_transfer";
+      return;
+    }
+    if (viewName === "under_ib_reezo") {
+      underIbReezoView.classList.remove("hidden");
+      activeView = "under_ib_reezo";
+      return;
+    }
+    showHome();
   }
 
   function backToMainMenu() {
+    if (activeView !== "home") {
+      showHome();
+      return;
+    }
+
     var payload = { type: "sidebot_back_to_main_menu" };
 
     if (tg) {
@@ -51,14 +78,20 @@
   bottomBackBtn.addEventListener("click", backToMainMenu);
 
   btnNewRegistration.addEventListener("click", function () {
-    sendChoice("new_registration_amarkets");
+    showView("new_registration");
   });
 
   btnIbTransfer.addEventListener("click", function () {
-    sendChoice("ib_transfer_existing_amarkets");
+    showView("ib_transfer");
   });
 
   btnUnderIbReezo.addEventListener("click", function () {
-    sendChoice("client_under_ib_reezo");
+    showView("under_ib_reezo");
   });
+
+  btnBackToChoicesA.addEventListener("click", showHome);
+  btnBackToChoicesB.addEventListener("click", showHome);
+  btnBackToChoicesC.addEventListener("click", showHome);
+
+  showHome();
 })();

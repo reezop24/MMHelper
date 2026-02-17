@@ -35,6 +35,10 @@
       gap: 10px;
     }
 
+    .hidden {
+      display: none;
+    }
+
     .choice-btn {
       margin: 0;
       width: 100%;
@@ -93,6 +97,41 @@
       font-size: 13px;
       font-weight: 700;
     }
+
+    .placeholder-head {
+      margin: 0;
+      font-size: 20px;
+      color: #f2fbff;
+    }
+
+    .placeholder-copy {
+      margin-top: 8px;
+      color: #d7f0ff;
+      line-height: 1.5;
+    }
+
+    .placeholder-tag {
+      display: inline-block;
+      margin-top: 10px;
+      border: 1px solid #4b9ea3;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 12px;
+      color: #c8f4ff;
+      background: rgba(14, 62, 73, 0.78);
+    }
+
+    .inline-actions {
+      margin-top: 12px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .inline-actions .back-btn {
+      min-width: 170px;
+      margin-top: 0;
+    }
   </style>
 </head>
 <body>
@@ -106,7 +145,7 @@
       <h1>Daftar NEXT Member</h1>
     </header>
 
-    <section class="card content-card">
+    <section id="homeView" class="card content-card">
       <p>NEXT Member memberi anda akses penuh kepada ekosistem tools dan sistem sokongan yang disediakan, termasuk:</p>
       <ul class="feature-list">
         <li>Akses penuh kepada MM Helper</li>
@@ -142,6 +181,36 @@
       </div>
 
       <p id="status" class="status" aria-live="polite"></p>
+    </section>
+
+    <section id="newRegistrationView" class="card content-card hidden">
+      <h2 class="placeholder-head">Pendaftaran baru AMarkets</h2>
+      <p class="placeholder-copy">Ini placeholder screen untuk flow pendaftaran baru. Seterusnya kita boleh masukkan form penuh ikut requirement.</p>
+      <span class="placeholder-tag">Placeholder: New Registration</span>
+      <div class="inline-actions">
+        <button id="btnBackToChoicesA" type="button" class="back-btn">⬅️ Back to Pilihan</button>
+      </div>
+      <p id="statusA" class="status" aria-live="polite"></p>
+    </section>
+
+    <section id="ibTransferView" class="card content-card hidden">
+      <h2 class="placeholder-head">Penukaran IB (Pelanggan sedia ada)</h2>
+      <p class="placeholder-copy">Ini placeholder screen untuk flow penukaran IB. Nanti kita sambung dengan langkah semakan akaun dan pengesahan dokumen.</p>
+      <span class="placeholder-tag">Placeholder: IB Transfer</span>
+      <div class="inline-actions">
+        <button id="btnBackToChoicesB" type="button" class="back-btn">⬅️ Back to Pilihan</button>
+      </div>
+      <p id="statusB" class="status" aria-live="polite"></p>
+    </section>
+
+    <section id="underIbReezoView" class="card content-card hidden">
+      <h2 class="placeholder-head">Client AMarkets under IB Reezo</h2>
+      <p class="placeholder-copy">Ini placeholder screen untuk flow client under IB Reezo. Nanti kita tambah logic kelayakan dan aliran seterusnya.</p>
+      <span class="placeholder-tag">Placeholder: Under IB Reezo</span>
+      <div class="inline-actions">
+        <button id="btnBackToChoicesC" type="button" class="back-btn">⬅️ Back to Pilihan</button>
+      </div>
+      <p id="statusC" class="status" aria-live="polite"></p>
     </section>
 
     <div class="bottom-actions">
