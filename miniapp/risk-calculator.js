@@ -10,6 +10,9 @@
   var backBtn = document.getElementById("topBackBtn");
   var riskUsdEl = document.getElementById("riskUsd");
   var lotSizeEl = document.getElementById("lotSize");
+  var usedMarginEl = document.getElementById("usedMargin");
+  var maxLossBeforeStopOutEl = document.getElementById("maxLossBeforeStopOut");
+  var maxMoveBeforeStopOutEl = document.getElementById("maxMoveBeforeStopOut");
   var floatingFullEl = document.getElementById("floatingFull");
   var floatingHalfEl = document.getElementById("floatingHalf");
 
@@ -39,6 +42,9 @@
     var balance = n("accountBalance");
     var riskPct = n("riskPercent");
     var zone = n("zoneSize");
+    var entryPrice = n("entryPrice");
+    var leverage = n("leverage");
+    var stopOutPct = n("stopOutPct");
 
     if (Number.isNaN(balance) || balance <= 0) {
       statusEl.textContent = "Modal semasa kena lebih dari 0.";
@@ -52,18 +58,46 @@
       statusEl.textContent = "Saiz zon/SL kena lebih dari 0.";
       return;
     }
+    if (Number.isNaN(entryPrice) || entryPrice <= 0) {
+      statusEl.textContent = "Entry price XAUUSD kena lebih dari 0.";
+      return;
+    }
+    if (Number.isNaN(leverage) || leverage <= 0) {
+      statusEl.textContent = "Leverage tak sah.";
+      return;
+    }
+    if (Number.isNaN(stopOutPct) || stopOutPct <= 0 || stopOutPct >= 100) {
+      statusEl.textContent = "Stop-out % mesti antara 1 hingga 99.";
+      return;
+    }
 
-    // XAUUSD assumption: 1.00 lot moves about USD 100 per USD 1.00 price move.
+    // XAUUSD assumptions: contract size=100, so 1.00 lot ~= USD 100 per USD 1.00 move.
     var riskUsd = balance * (riskPct / 100);
     var usdPerLotAtZone = zone * 100;
     var lot = usdPerLotAtZone > 0 ? riskUsd / usdPerLotAtZone : 0;
+
+    // Margin model: used margin = (entry price * contract size * lot) / leverage.
+    var contractSize = 100;
+    var usedMargin = (entryPrice * contractSize * lot) / leverage;
+    var stopOutEquity = usedMargin * (stopOutPct / 100);
+    var maxLossBeforeStopOut = Math.max(balance - stopOutEquity, 0);
+    var maxMoveBeforeStopOut = lot > 0 ? maxLossBeforeStopOut / (lot * contractSize) : 0;
+
     var floatingFull = lot * zone * 100;
     var floatingHalf = lot * (zone / 2) * 100;
 
     riskUsdEl.textContent = f2(riskUsd);
     lotSizeEl.textContent = f3(lot);
+    usedMarginEl.textContent = f2(usedMargin);
+    maxLossBeforeStopOutEl.textContent = f2(maxLossBeforeStopOut);
+    maxMoveBeforeStopOutEl.textContent = f2(maxMoveBeforeStopOut);
     floatingFullEl.textContent = f2(floatingFull);
     floatingHalfEl.textContent = f2(floatingHalf);
-    statusEl.textContent = "Kiraan siap. Semak balik lot ikut broker min lot/step lot.";
+
+    if (floatingFull > maxLossBeforeStopOut && maxLossBeforeStopOut > 0) {
+      statusEl.textContent = "Amaran: loss zon penuh melebihi kapasiti akaun sebelum stop-out. Kecilkan lot atau zon.";
+      return;
+    }
+    statusEl.textContent = "Kiraan siap (per setup). Semak balik min lot/step lot dan stop-out broker.";
   });
 })();
