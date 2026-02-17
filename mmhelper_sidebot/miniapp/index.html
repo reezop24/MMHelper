@@ -29,25 +29,6 @@
       margin-top: 6px;
     }
 
-    .brand-row {
-      margin-top: 12px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    .brand-logo {
-      display: block;
-      height: 26px;
-      width: auto;
-      object-fit: contain;
-    }
-
-    .brand-logo.amarkets {
-      height: 24px;
-    }
-
     .choice-list {
       margin-top: 14px;
       display: grid;
@@ -78,15 +59,22 @@
       gap: 8px;
     }
 
+    .choice-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
     .choice-logo {
-      height: 16px;
+      height: 14px;
       width: auto;
       object-fit: contain;
       flex-shrink: 0;
     }
 
     .choice-logo.reezo {
-      height: 18px;
+      height: 16px;
     }
 
     .bottom-actions {
@@ -129,21 +117,27 @@
       <p>Semua akses ini disusun dalam satu ekosistem berstruktur bagi memudahkan pembelajaran, penggunaan tools serta penglibatan dalam aktiviti yang berkaitan.</p>
       <p>Sila pilih jenis permohonan di bawah untuk meneruskan.</p>
 
-      <div class="brand-row" aria-label="Brand Partners">
-        <img class="brand-logo reezo" src="reezo.png" alt="Reezo" />
-        <img class="brand-logo amarkets" src="amarketslogo.png" alt="AMarkets" />
-      </div>
-
       <div class="choice-list">
-        <button id="btnNewRegistration" type="button" class="choice-btn">Pendaftaran baru AMarkets</button>
+        <button id="btnNewRegistration" type="button" class="choice-btn with-logo">
+          <span class="choice-label">
+            <span>Pendaftaran baru</span>
+            <img class="choice-logo amarkets" src="amarketslogo.png" alt="AMarkets" />
+          </span>
+        </button>
         <button id="btnIbTransfer" type="button" class="choice-btn with-logo">
-          <img class="choice-logo amarkets" src="amarketslogo.png" alt="AMarkets" />
-          <span>Penukaran IB (Pelanggan sedia ada AMarkets)</span>
+          <span class="choice-label">
+            <span>Penukaran IB (Pelanggan sedia ada</span>
+            <img class="choice-logo amarkets" src="amarketslogo.png" alt="AMarkets" />
+            <span>)</span>
+          </span>
         </button>
         <button id="btnUnderIbReezo" type="button" class="choice-btn with-logo">
-          <img class="choice-logo amarkets" src="amarketslogo.png" alt="AMarkets" />
-          <img class="choice-logo reezo" src="reezo.png" alt="Reezo" />
-          <span>Client AMarkets under IB Reezo</span>
+          <span class="choice-label">
+            <span>Client</span>
+            <img class="choice-logo amarkets" src="amarketslogo.png" alt="AMarkets" />
+            <span>under IB</span>
+            <img class="choice-logo reezo" src="reezo.png" alt="Reezo" />
+          </span>
         </button>
       </div>
 
