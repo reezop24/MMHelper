@@ -434,7 +434,7 @@ def has_tnc_accepted(user_id: int) -> bool:
     return bool(tnc_data.get("accepted"))
 
 
-def save_tnc_acceptance(user_id: int, telegram_name: str, accepted: bool) -> None:
+def save_tnc_acceptance(user_id: int, telegram_name: str, accepted: bool, telegram_username: str = "") -> None:
     now = malaysia_now()
     saved_at_iso = now.isoformat()
     saved_date = now.strftime("%Y-%m-%d")
@@ -454,6 +454,8 @@ def save_tnc_acceptance(user_id: int, telegram_name: str, accepted: bool) -> Non
 
     user_obj["user_id"] = user_id
     user_obj["telegram_name"] = telegram_name
+    if telegram_username:
+        user_obj["telegram_username"] = telegram_username
     user_obj["updated_at"] = saved_at_iso
 
     sections = user_obj.setdefault("sections", {})
@@ -1735,6 +1737,7 @@ def save_user_setup_section(
     telegram_name: str,
     section: str,
     payload: dict[str, Any],
+    telegram_username: str = "",
 ) -> None:
     now = malaysia_now()
     saved_at_iso = now.isoformat()
@@ -1755,6 +1758,8 @@ def save_user_setup_section(
 
     user_obj["user_id"] = user_id
     user_obj["telegram_name"] = telegram_name
+    if telegram_username:
+        user_obj["telegram_username"] = telegram_username
     user_obj["updated_at"] = saved_at_iso
 
     sections = user_obj.setdefault("sections", {})
@@ -2174,6 +2179,55 @@ def list_active_user_ids() -> list[int]:
         except (TypeError, ValueError):
             continue
     return sorted(set(active_ids))
+
+
+def list_registered_user_logs(limit: int = 500) -> list[dict[str, str]]:
+    db = load_core_db()
+    users = db.get("users", {})
+    if not isinstance(users, dict):
+        return []
+
+    rows: list[dict[str, str]] = []
+    for raw_user_id, user_obj in users.items():
+        if not isinstance(user_obj, dict):
+            continue
+        sections = user_obj.get("sections", {})
+        if not isinstance(sections, dict):
+            continue
+        init_section = sections.get("initial_setup", {})
+        if not isinstance(init_section, dict):
+            continue
+        init_data = init_section.get("data", {})
+        if not isinstance(init_data, dict):
+            init_data = {}
+
+        user_id_text = str(user_obj.get("user_id") or raw_user_id)
+        name = str(init_data.get("name") or user_obj.get("telegram_name") or ("User " + user_id_text))
+        telegram_username = str(user_obj.get("telegram_username") or "").strip()
+        if telegram_username and not telegram_username.startswith("@"):
+            telegram_username = "@" + telegram_username
+        if not telegram_username:
+            telegram_username = "-"
+
+        date_text = str(init_section.get("saved_date") or "-")
+        time_text = str(init_section.get("saved_time") or "-")
+
+        rows.append(
+            {
+                "name": name,
+                "user_id": user_id_text,
+                "telegram_username": telegram_username,
+                "registered_at": f"{date_text} {time_text}",
+                "saved_at": str(init_section.get("saved_at") or ""),
+            }
+        )
+
+    rows.sort(key=lambda item: item.get("saved_at", ""), reverse=True)
+    max_items = max(1, min(int(limit), 2000))
+    trimmed = rows[:max_items]
+    for item in trimmed:
+        item.pop("saved_at", None)
+    return trimmed
 
 
 def was_notification_sent(user_id: int, category: str, marker: str) -> bool:

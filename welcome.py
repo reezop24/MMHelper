@@ -90,6 +90,7 @@ async def handle_tnc_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
             user_id=query.from_user.id,
             telegram_name=telegram_name or str(query.from_user.id),
             accepted=True,
+            telegram_username=(query.from_user.username or "").strip(),
         )
         try:
             await query.message.delete()
@@ -109,6 +110,7 @@ async def handle_tnc_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
         user_id=query.from_user.id,
         telegram_name=telegram_name or str(query.from_user.id),
         accepted=False,
+        telegram_username=(query.from_user.username or "").strip(),
     )
     try:
         await query.message.delete()

@@ -1,5 +1,7 @@
 """Text handlers for MM HELPER."""
 
+import json
+
 from telegram import Update
 from telegram.ext import ContextTypes
 
@@ -47,6 +49,7 @@ from settings import (
     get_transaction_history_webapp_url,
     get_trading_activity_webapp_url,
     get_withdrawal_activity_webapp_url,
+    get_user_log_webapp_url,
 )
 from storage import (
     get_balance_adjustment_rules,
@@ -74,6 +77,7 @@ from storage import (
     has_project_grow_goal,
     has_initial_setup,
     is_project_grow_goal_reached,
+    list_registered_user_logs,
     reset_all_data,
 )
 from texts import (
@@ -129,7 +133,9 @@ def _build_admin_panel_keyboard_for_user(user_id: int):
         name=summary["name"],
         saved_date=summary["saved_date"],
     )
-    return admin_panel_keyboard(notification_url)
+    user_logs_json = json.dumps(list_registered_user_logs(), ensure_ascii=False, separators=(",", ":"))
+    user_log_url = get_user_log_webapp_url(user_logs_json)
+    return admin_panel_keyboard(notification_url, user_log_url)
 
 
 def _build_account_activity_keyboard_for_user(user_id: int):

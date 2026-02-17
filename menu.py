@@ -34,6 +34,7 @@ SUBMENU_PROJECT_BUTTON_ACHIEVEMENT = "🏆 Achievement"
 
 SUBMENU_ADMIN_BUTTON_BETA_RESET = "🧪 BETA RESET"
 SUBMENU_ADMIN_BUTTON_NOTIFICATION_SETTING = "🔔 Notification Setting"
+SUBMENU_ADMIN_BUTTON_USER_LOG = "👥 User Log"
 
 SUBMENU_STAT_BUTTON_TRANSACTION_HISTORY = "🧾 Transaction History"
 SUBMENU_STAT_BUTTON_WEEKLY_REPORTS = "📆 Weekly Reports"
@@ -179,13 +180,19 @@ def project_grow_keyboard(
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
 
-def admin_panel_keyboard(notification_setting_url: str) -> ReplyKeyboardMarkup:
+def admin_panel_keyboard(notification_setting_url: str, user_log_url: str) -> ReplyKeyboardMarkup:
     rows = [
         [SUBMENU_ADMIN_BUTTON_BETA_RESET],
         [
             KeyboardButton(
                 SUBMENU_ADMIN_BUTTON_NOTIFICATION_SETTING,
                 web_app=WebAppInfo(url=notification_setting_url),
+            )
+        ],
+        [
+            KeyboardButton(
+                SUBMENU_ADMIN_BUTTON_USER_LOG,
+                web_app=WebAppInfo(url=user_log_url),
             )
         ],
         [SUBMENU_MM_BUTTON_BACK_MAIN],

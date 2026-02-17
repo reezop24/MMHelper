@@ -320,6 +320,7 @@ async def _handle_initial_setup(payload: dict, update: Update, context: ContextT
     save_user_setup_section(
         user_id=user.id,
         telegram_name=telegram_name,
+        telegram_username=(user.username or "").strip(),
         section="initial_setup",
         payload={
             "name": name,
@@ -334,6 +335,7 @@ async def _handle_initial_setup(payload: dict, update: Update, context: ContextT
     save_user_setup_section(
         user_id=user.id,
         telegram_name=telegram_name,
+        telegram_username=(user.username or "").strip(),
         section="project_grow_goal",
         payload={
             "target_balance_usd": float(target_balance_usd),
@@ -354,6 +356,7 @@ async def _handle_initial_setup(payload: dict, update: Update, context: ContextT
     save_user_setup_section(
         user_id=user.id,
         telegram_name=telegram_name,
+        telegram_username=(user.username or "").strip(),
         section="setup_recommendation",
         payload=recommendation_data,
     )
@@ -729,6 +732,7 @@ async def _handle_set_new_goal(payload: dict, update: Update, context: ContextTy
     save_user_setup_section(
         user_id=user.id,
         telegram_name=telegram_name,
+        telegram_username=(user.username or "").strip(),
         section="project_grow_goal",
         payload={
             "target_balance_usd": float(target_balance_usd),
