@@ -60,6 +60,47 @@ def _usd(value: float) -> str:
     return f"USD {float(value):.2f}"
 
 
+def _trading_days_for_target_days(target_days: int) -> int:
+    mapping = {30: 22, 90: 66, 180: 132}
+    return mapping.get(int(target_days), 0)
+
+
+def _build_setup_recommendation(initial_capital: float, target_balance_usd: float, target_days: int) -> dict:
+    trading_days = _trading_days_for_target_days(target_days)
+    if trading_days <= 0 or initial_capital <= 0:
+        return {
+            "trading_days": 0,
+            "daily_target_usd": 0.0,
+            "daily_target_pct": 0.0,
+            "daily_risk_usd": 0.0,
+            "daily_risk_pct": 0.0,
+            "per_setup_risk_usd": 0.0,
+            "per_setup_risk_pct": 0.0,
+            "setups_per_day": 2,
+            "assumption": "22 trading days per month (Mon-Fri)",
+        }
+
+    grow_target_usd = max(float(target_balance_usd) - float(initial_capital), 0.0)
+    daily_target_usd = grow_target_usd / float(trading_days)
+    daily_target_pct = (daily_target_usd / float(initial_capital)) * 100.0
+    daily_risk_pct = daily_target_pct
+    daily_risk_usd = (float(initial_capital) * daily_risk_pct) / 100.0
+    per_setup_risk_pct = daily_risk_pct / 2.0
+    per_setup_risk_usd = daily_risk_usd / 2.0
+
+    return {
+        "trading_days": int(trading_days),
+        "daily_target_usd": float(daily_target_usd),
+        "daily_target_pct": float(daily_target_pct),
+        "daily_risk_usd": float(daily_risk_usd),
+        "daily_risk_pct": float(daily_risk_pct),
+        "per_setup_risk_usd": float(per_setup_risk_usd),
+        "per_setup_risk_pct": float(per_setup_risk_pct),
+        "setups_per_day": 2,
+        "assumption": "22 trading days per month (Mon-Fri)",
+    }
+
+
 def _weekly_pl_line(user_id: int) -> str:
     weekly_pl = float(get_weekly_performance_usd(user_id))
     if weekly_pl > 0:
@@ -215,6 +256,9 @@ async def _handle_initial_setup(payload: dict, update: Update, context: ContextT
             target_label = "30 hari"
 
     telegram_name = (user.full_name or "").strip() or str(user.id)
+    save_mode = str(payload.get("save_mode") or "basic").strip().lower()
+    if save_mode not in {"basic", "with_recommendation"}:
+        save_mode = "basic"
 
     save_user_setup_section(
         user_id=user.id,
@@ -243,6 +287,20 @@ async def _handle_initial_setup(payload: dict, update: Update, context: ContextT
             "target_label": target_label,
         },
     )
+
+    if save_mode == "with_recommendation":
+        recommendation_data = _build_setup_recommendation(initial_capital, target_balance_usd, target_days)
+        recommendation_data["save_mode"] = save_mode
+        recommendation_data["initial_capital_usd"] = float(initial_capital)
+        recommendation_data["target_balance_usd"] = float(target_balance_usd)
+        recommendation_data["target_days"] = int(target_days)
+        recommendation_data["target_label"] = target_label
+        save_user_setup_section(
+            user_id=user.id,
+            telegram_name=telegram_name,
+            section="setup_recommendation",
+            payload=recommendation_data,
+        )
 
     await send_screen(
         context,

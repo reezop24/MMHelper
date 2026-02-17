@@ -92,7 +92,9 @@
         <p id="recommendationStatus" class="hint"><em>Isi modal, target, dan tempoh untuk tengok cadangan.</em></p>
       </section>
 
-      <button id="submitBtn" type="submit">💾 Save Setup</button>
+      <input id="saveMode" name="save_mode" type="hidden" value="basic" />
+      <button id="saveBasicBtn" type="submit">💾 Save Sahaja</button>
+      <button id="saveWithRecommendationBtn" type="button" class="secondary-action-btn">💾 Save + Recommendation</button>
       <p id="formStatus" class="status" aria-live="polite"></p>
     </form>
   </main>

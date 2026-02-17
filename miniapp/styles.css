@@ -45,3 +45,8 @@
 .recommendation-item + .recommendation-item {
   margin-top: 8px;
 }
+
+.secondary-action-btn {
+  margin-top: 10px;
+  background: linear-gradient(90deg, #1e4d8b 0%, #2e73c9 100%);
+}
