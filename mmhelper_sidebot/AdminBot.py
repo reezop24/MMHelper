@@ -240,6 +240,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         if not is_admin_user(user.id):
             await message.reply_text("❌ Akses ditolak.", reply_markup=main_menu_keyboard(user.id))
             return
+        await message.reply_text("Mode pengesahan reset diaktifkan.", reply_markup=ReplyKeyboardRemove())
         await message.reply_text(BETA_RESET_PROMPT_TEXT, reply_markup=beta_reset_keyboard())
         return
 
