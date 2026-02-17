@@ -376,6 +376,15 @@ async def clear_user_deposit_prompt(context: ContextTypes.DEFAULT_TYPE, item: di
         update_submission_fields(str(item.get("submission_id")), {"user_deposit_prompt_message_id": None})
 
 
+async def clear_user_deposit_prompt_by_submission(
+    context: ContextTypes.DEFAULT_TYPE, submission_id: str
+) -> None:
+    item = get_submission(submission_id)
+    if not item:
+        return
+    await clear_user_deposit_prompt(context, item)
+
+
 async def refresh_admin_submission_message(context: ContextTypes.DEFAULT_TYPE, submission_id: str) -> None:
     admin_group_id = get_admin_group_id()
     item = get_submission(submission_id)
@@ -564,12 +573,13 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                     "reviewed_by": query.from_user.id,
                 },
             )
+            await clear_user_deposit_prompt_by_submission(context, submission_id)
             try:
                 await context.bot.send_message(
                     chat_id=user_id,
                     text=(
                         "Akses NEXT Member anda telah ditarik semula oleh admin.\n"
-                        "Jika perlu, sila buat pendaftaran baru."
+                        "Sila hubungi admin untuk maklumat lanjut."
                     ),
                 )
             except Exception:
@@ -590,6 +600,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
 
         target_user_id = updated.get("user_id")
         if isinstance(target_user_id, int):
+            await clear_user_deposit_prompt_by_submission(context, submission_id)
             try:
                 if status == "rejected":
                     await context.bot.send_message(
