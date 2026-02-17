@@ -33,6 +33,7 @@ from storage import (
     get_tabung_balance_usd,
     get_total_balance_usd,
     get_weekly_performance_usd,
+    has_reached_daily_target_today,
     has_initial_setup,
     has_tnc_accepted,
     reset_project_grow_goal,
@@ -140,6 +141,19 @@ def _build_trading_saved_text(user_id: int, mode: str, amount_usd: float) -> str
         f"{_weekly_pl_line(user_id)}\n\n"
         f"Current Balance sekarang: **{_usd(get_current_balance_usd(user_id))}**.\n"
         f"Baki tabung sekarang: **{_usd(get_tabung_balance_usd(user_id))}**."
+    )
+
+
+def _build_trading_daily_target_hit_text(user_id: int, mode: str, amount_usd: float) -> str:
+    mode_label = "profit" if mode == "profit" else "loss"
+    return (
+        "Update trading dah masuk ✅\n\n"
+        f"Trade latest kau: **{mode_label.upper()} {_usd(amount_usd)}**.\n"
+        f"{_weekly_pl_line(user_id)}\n\n"
+        "Daily target kau untuk hari ni dah *REACH* bro.\n"
+        "Nasihat kawan: stop trade dulu hari ni, lock result, sambung esok kepala fresh.\n\n"
+        f"Current Balance: **{_usd(get_current_balance_usd(user_id))}**\n"
+        f"Tabung Balance: **{_usd(get_tabung_balance_usd(user_id))}**"
     )
 
 
@@ -526,10 +540,15 @@ async def _handle_trading_activity_update(payload: dict, update: Update, context
         )
         return
 
+    if has_reached_daily_target_today(user_id):
+        response_text = _build_trading_daily_target_hit_text(user_id, mode, amount_usd)
+    else:
+        response_text = _build_trading_saved_text(user_id, mode, amount_usd)
+
     await send_screen(
         context,
         message.chat_id,
-        _build_trading_saved_text(user_id, mode, amount_usd),
+        response_text,
         reply_markup=_build_account_activity_keyboard_for_user(user_id),
         parse_mode="Markdown",
     )
