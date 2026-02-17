@@ -158,6 +158,7 @@ def store_verification_submission(
         "submitted_at": datetime.now(timezone.utc).isoformat(),
         "status": "pending",
         "admin_group_message_id": None,
+        "user_deposit_prompt_message_id": None,
     }
 
     user_obj["telegram_username"] = telegram_username or ""
@@ -304,6 +305,19 @@ async def send_submission_to_admin_group(context: ContextTypes.DEFAULT_TYPE, ite
         reply_markup=verification_action_keyboard(str(item.get("submission_id"))),
     )
     update_submission_fields(str(item.get("submission_id")), {"admin_group_message_id": sent.message_id})
+
+
+async def clear_user_deposit_prompt(context: ContextTypes.DEFAULT_TYPE, item: dict) -> None:
+    user_id = item.get("user_id")
+    prompt_message_id = item.get("user_deposit_prompt_message_id")
+    if not isinstance(user_id, int) or not isinstance(prompt_message_id, int):
+        return
+    try:
+        await context.bot.delete_message(chat_id=user_id, message_id=prompt_message_id)
+    except Exception:
+        logger.exception("Failed to delete old user deposit prompt message")
+    finally:
+        update_submission_fields(str(item.get("submission_id")), {"user_deposit_prompt_message_id": None})
 
 
 async def refresh_admin_submission_message(context: ContextTypes.DEFAULT_TYPE, submission_id: str) -> None:
@@ -458,7 +472,8 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
             user_id = item.get("user_id")
             if isinstance(user_id, int):
                 try:
-                    await context.bot.send_message(
+                    await clear_user_deposit_prompt(context, item)
+                    sent = await context.bot.send_message(
                         chat_id=user_id,
                         text=(
                             "⚠️ Admin minta anda lengkapkan deposit USD100 dahulu.\n"
@@ -466,6 +481,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                         ),
                         reply_markup=user_deposit_keyboard(submission_id),
                     )
+                    update_submission_fields(submission_id, {"user_deposit_prompt_message_id": sent.message_id})
                 except Exception:
                     logger.exception("Failed to notify user for deposit request")
             await refresh_admin_submission_message(context, submission_id)
@@ -515,6 +531,7 @@ async def handle_user_deposit_callback(update: Update, context: ContextTypes.DEF
             await query.edit_message_reply_markup(reply_markup=None)
         except Exception:
             pass
+        update_submission_fields(submission_id, {"user_deposit_prompt_message_id": None})
         await query.message.reply_text("Baik, status deposit anda kekal belum selesai.")
         return
 
@@ -534,6 +551,7 @@ async def handle_user_deposit_callback(update: Update, context: ContextTypes.DEF
             await query.edit_message_reply_markup(reply_markup=None)
         except Exception:
             pass
+        update_submission_fields(submission_id, {"user_deposit_prompt_message_id": None})
         await refresh_admin_submission_message(context, submission_id)
         await query.message.reply_text(
             "✅ Deposit selesai direkod.\n"
@@ -682,11 +700,12 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
             reply_markup=main_menu_keyboard(user.id),
         )
         if not has_deposit_100:
-            await message.reply_text(
+            deposit_prompt = await message.reply_text(
                 "⏳ Status semasa: deposit USD100 masih belum lengkap.\n"
                 "Lepas deposit, tekan `Deposit Selesai` untuk hantar semakan semula.",
                 reply_markup=user_deposit_keyboard(submission_id),
             )
+            update_submission_fields(submission_id, {"user_deposit_prompt_message_id": deposit_prompt.message_id})
         return
 
     await message.reply_text("ℹ️ Miniapp demo diterima.", reply_markup=main_menu_keyboard(user.id))
