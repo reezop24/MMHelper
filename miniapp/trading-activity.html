@@ -245,6 +245,28 @@
       font-weight: 700;
     }
 
+    .daily-hit-alert {
+      margin: 0 0 14px;
+      border: 1px solid rgba(106, 173, 255, 0.58);
+      border-radius: 12px;
+      background: rgba(12, 40, 83, 0.86);
+      padding: 12px;
+    }
+
+    .daily-hit-alert-title {
+      margin: 0 0 6px;
+      color: #f3f8ff;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .daily-hit-alert-text {
+      margin: 0;
+      color: #d4e6ff;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
     .hidden {
       display: none;
     }
@@ -312,6 +334,11 @@
       <p id="dailyTargetValue" class="daily-target-value">USD 0.00 (0.00%)</p>
       <p id="dailyTargetNote" class="daily-target-note">Set New Goal dulu untuk aktifkan tracker target harian.</p>
       <button id="dailyTargetActionBtn" type="button" class="daily-target-action hidden">➡️ Update Tabung Sekarang</button>
+    </section>
+
+    <section id="dailyHitAlert" class="daily-hit-alert hidden">
+      <p class="daily-hit-alert-title">Daily target dah reach bro ✅</p>
+      <p class="daily-hit-alert-text">Setakat ni dah cun. Better stop trade untuk hari ni, simpan momentum, sambung esok dengan kepala fresh.</p>
     </section>
 
     <form id="tradingForm" class="card">

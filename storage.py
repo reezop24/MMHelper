@@ -831,6 +831,105 @@ def _month_range(reference_date: date) -> tuple[date, date]:
     return first_day, last_day
 
 
+def _trading_days_by_target_days(target_days: int) -> int:
+    mapping = {30: 22, 90: 66, 180: 132}
+    return mapping.get(int(target_days), 0)
+
+
+def _remaining_grow_target_usd(user_id: int) -> float:
+    goal = get_project_grow_goal_summary(user_id)
+    target_balance = _to_float(goal.get("target_balance_usd"))
+    baseline_balance = _to_float(goal.get("current_balance_usd"))
+    total_grow_target = max(target_balance - baseline_balance, 0.0)
+    return max(total_grow_target - get_tabung_balance_usd(user_id), 0.0)
+
+
+def _floating_progress_usd(user_id: int) -> float:
+    goal = get_project_grow_goal_summary(user_id)
+    baseline_balance = _to_float(goal.get("current_balance_usd"))
+    return get_current_balance_usd(user_id) - baseline_balance
+
+
+def _daily_target_usd(user_id: int) -> float:
+    goal = get_project_grow_goal_summary(user_id)
+    target_days = _to_int(goal.get("target_days"))
+    trading_days = _trading_days_by_target_days(target_days)
+    if trading_days <= 0:
+        return 0.0
+    return _remaining_grow_target_usd(user_id) / float(trading_days)
+
+
+def _daily_target_tracker_dates_from_user(user_obj: dict[str, Any]) -> list[str]:
+    sections = user_obj.get("sections", {})
+    tracker = sections.get("daily_target_tracker", {})
+    data = tracker.get("data", {}) if isinstance(tracker, dict) else {}
+    dates = data.get("reached_dates", [])
+    if not isinstance(dates, list):
+        return []
+    out: list[str] = []
+    for raw in dates:
+        text = str(raw or "").strip()
+        if _normalize_date_str(text):
+            out.append(text)
+    return out
+
+
+def _is_daily_target_hit_now(user_id: int) -> bool:
+    goal = get_project_grow_goal_summary(user_id)
+    if _to_float(goal.get("target_balance_usd")) <= 0:
+        return False
+    daily_target = _daily_target_usd(user_id)
+    if daily_target <= 0:
+        return False
+    floating = _floating_progress_usd(user_id)
+    return floating >= daily_target
+
+
+def has_reached_daily_target_today(user_id: int) -> bool:
+    today = malaysia_now().date().isoformat()
+    db = load_core_db()
+    user = db.get("users", {}).get(str(user_id))
+    if not isinstance(user, dict):
+        return False
+
+    if today in _daily_target_tracker_dates_from_user(user):
+        return True
+    return _is_daily_target_hit_now(user_id)
+
+
+def mark_daily_target_reached_today(user_id: int) -> bool:
+    db = load_core_db()
+    user = db.get("users", {}).get(str(user_id))
+    if not isinstance(user, dict):
+        return False
+
+    now = malaysia_now()
+    today = now.date().isoformat()
+    dates = _daily_target_tracker_dates_from_user(user)
+    if today in dates:
+        return False
+
+    dates.append(today)
+    # Keep tracker compact.
+    dates = dates[-120:]
+
+    sections = user.setdefault("sections", {})
+    sections["daily_target_tracker"] = {
+        "section": "daily_target_tracker",
+        "user_id": user_id,
+        "telegram_name": user.get("telegram_name") or str(user_id),
+        "saved_at": now.isoformat(),
+        "saved_date": now.strftime("%Y-%m-%d"),
+        "saved_time": now.strftime("%H:%M:%S"),
+        "timezone": "Asia/Kuala_Lumpur",
+        "data": {"reached_dates": dates},
+    }
+
+    user["updated_at"] = now.isoformat()
+    save_core_db(db)
+    return True
+
+
 def _bounded_current_week(reference_date: date) -> tuple[date, date]:
     sunday_offset = (reference_date.weekday() + 1) % 7
     week_start = reference_date - timedelta(days=sunday_offset)
@@ -1727,6 +1826,8 @@ def add_trading_activity_update(user_id: int, mode: str, amount_usd: float) -> b
     _bump_rollup(user, saved_at_iso=saved_at_iso, trading_delta=net_usd, trading_count=1)
     user["updated_at"] = saved_at_iso
     save_core_db(db)
+    if _is_daily_target_hit_now(user_id):
+        mark_daily_target_reached_today(user_id)
     return True
 
 

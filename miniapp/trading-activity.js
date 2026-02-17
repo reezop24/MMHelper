@@ -60,6 +60,7 @@
   var goalReached = (params.get("goal_reached") || "0") === "1";
   var goalBaselineBalance = Number(params.get("goal_baseline_balance_usd") || 0);
   var tabungUpdateUrl = params.get("tabung_update_url") || "";
+  var dailyTargetReachedToday = (params.get("daily_target_reached_today") || "0") === "1";
 
   document.getElementById("summaryName").textContent = name;
   document.getElementById("summaryCapital").textContent = formatUsd(initialCapital);
@@ -74,6 +75,7 @@
   var dailyTargetValueEl = document.getElementById("dailyTargetValue");
   var dailyTargetNoteEl = document.getElementById("dailyTargetNote");
   var dailyTargetActionBtn = document.getElementById("dailyTargetActionBtn");
+  var dailyHitAlertEl = document.getElementById("dailyHitAlert");
   var floatingProgressUsd = currentBalance - goalBaselineBalance;
   dailyTargetActionBtn.classList.add("hidden");
   dailyTargetActionBtn.addEventListener("click", function () {
@@ -101,10 +103,17 @@
       if (tabungUpdateUrl) {
         dailyTargetActionBtn.classList.remove("hidden");
       }
+      dailyTargetReachedToday = true;
     } else {
       dailyTargetValueEl.textContent = "USD " + formatUsd(dailyTargetUsd) + " (" + formatPct(dailyTargetPct) + "%)";
       dailyTargetNoteEl.innerHTML = "Baki grow target tabung: USD " + formatUsd(growTarget) + ".<br>Daily P/L semasa: USD " + formatUsd(floatingProgressUsd) + ".";
     }
+  }
+
+  if (dailyTargetReachedToday) {
+    dailyHitAlertEl.classList.remove("hidden");
+  } else {
+    dailyHitAlertEl.classList.add("hidden");
   }
 
   var introText = document.getElementById("introText");

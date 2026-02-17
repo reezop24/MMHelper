@@ -69,6 +69,7 @@ from storage import (
     get_total_balance_usd,
     get_weekly_performance_usd,
     get_weekly_profit_loss_usd,
+    has_reached_daily_target_today,
     has_project_grow_goal,
     has_initial_setup,
     is_project_grow_goal_reached,
@@ -214,6 +215,7 @@ def _build_account_activity_keyboard_for_user(user_id: int):
         "goal_reached": is_project_grow_goal_reached(user_id),
         "goal_baseline_balance_usd": float(goal_summary["current_balance_usd"]),
         "tabung_update_url": tabung_update_url,
+        "daily_target_reached_today": has_reached_daily_target_today(user_id),
     }
 
     deposit_url = get_deposit_activity_webapp_url(**common_kwargs)
