@@ -38,11 +38,13 @@ CB_VERIF_APPROVE = "VERIF_APPROVE"
 CB_VERIF_PENDING = "VERIF_PENDING"
 CB_VERIF_REJECT = "VERIF_REJECT"
 CB_VERIF_REQUEST_DEPOSIT = "VERIF_REQUEST_DEPOSIT"
+CB_VERIF_REVOKE_VIP = "VERIF_REVOKE_VIP"
 CB_USER_DEPOSIT_DONE = "USER_DEPOSIT_DONE"
 CB_USER_DEPOSIT_CANCEL = "USER_DEPOSIT_CANCEL"
 
 ADMIN_USER_IDS = {627116869}
 STATE_PATH = Path(__file__).with_name("sidebot_state.json")
+VIP_WHITELIST_PATH = Path(__file__).with_name("sidebot_vip_whitelist.json")
 
 MENU_DAFTAR_NEXT_MEMBER = "Daftar NEXT member"
 MENU_BELI_EVIDEO26 = "Beli NEXT eVideo26"
@@ -110,6 +112,52 @@ def load_state() -> dict:
 
 def save_state(data: dict) -> None:
     STATE_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def load_vip_whitelist() -> dict:
+    if not VIP_WHITELIST_PATH.exists():
+        return {"vip1": {"users": {}}}
+    try:
+        data = json.loads(VIP_WHITELIST_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"vip1": {"users": {}}}
+    if not isinstance(data, dict):
+        return {"vip1": {"users": {}}}
+    vip1 = data.get("vip1")
+    if not isinstance(vip1, dict):
+        data["vip1"] = {"users": {}}
+    users = data["vip1"].get("users")
+    if not isinstance(users, dict):
+        data["vip1"]["users"] = {}
+    return data
+
+
+def save_vip_whitelist(data: dict) -> None:
+    VIP_WHITELIST_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def add_user_to_vip1(item: dict) -> None:
+    data = load_vip_whitelist()
+    vip_users = data.setdefault("vip1", {}).setdefault("users", {})
+    user_id = str(item.get("user_id"))
+    vip_users[user_id] = {
+        "user_id": item.get("user_id"),
+        "telegram_username": item.get("telegram_username") or "",
+        "full_name": item.get("full_name") or "",
+        "wallet_id": item.get("wallet_id") or "",
+        "source_submission_id": item.get("submission_id"),
+        "added_at": datetime.now(timezone.utc).isoformat(),
+        "status": "active",
+    }
+    save_vip_whitelist(data)
+
+
+def remove_user_from_vip1(user_id: int) -> bool:
+    data = load_vip_whitelist()
+    vip_users = data.setdefault("vip1", {}).setdefault("users", {})
+    removed = vip_users.pop(str(user_id), None)
+    save_vip_whitelist(data)
+    return removed is not None
 
 
 def has_tnc_accepted(user_id: int) -> bool:
@@ -184,6 +232,14 @@ def verification_action_keyboard(submission_id: str) -> InlineKeyboardMarkup:
             [
                 InlineKeyboardButton("💸 Request Deposit", callback_data=f"{CB_VERIF_REQUEST_DEPOSIT}:{submission_id}")
             ],
+        ]
+    )
+
+
+def approved_admin_keyboard(submission_id: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton("🚫 Revoke User", callback_data=f"{CB_VERIF_REVOKE_VIP}:{submission_id}")],
         ]
     )
 
@@ -462,6 +518,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 submission_id=submission_id,
                 fields={
                     "status": "request_deposit",
+                    "has_deposit_100": False,
                     "reviewed_at": datetime.now(timezone.utc).isoformat(),
                     "reviewed_by": query.from_user.id,
                 },
@@ -489,6 +546,39 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
             await query.message.reply_text(f"✅ Request deposit dihantar kepada user untuk submission {submission_id}.")
             return
 
+        if action == CB_VERIF_REVOKE_VIP:
+            item = get_submission(submission_id)
+            if not item:
+                await query.message.reply_text("❌ Rekod submission tak jumpa atau dah dipadam.")
+                return
+            user_id = item.get("user_id")
+            if not isinstance(user_id, int):
+                await query.message.reply_text("❌ User ID tak sah.")
+                return
+            remove_user_from_vip1(user_id)
+            update_submission_fields(
+                submission_id=submission_id,
+                fields={
+                    "status": "revoked",
+                    "reviewed_at": datetime.now(timezone.utc).isoformat(),
+                    "reviewed_by": query.from_user.id,
+                },
+            )
+            try:
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text=(
+                        "Akses NEXT Member anda telah ditarik semula oleh admin.\n"
+                        "Jika perlu, sila buat pendaftaran baru."
+                    ),
+                )
+            except Exception:
+                logger.exception("Failed to notify user after revoke")
+            item = get_submission(submission_id)
+            if item:
+                await query.message.edit_text(render_admin_submission_text(item), reply_markup=approved_admin_keyboard(submission_id))
+            return
+
         status = action_status_map.get(action)
         if not status:
             return
@@ -498,11 +588,51 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
             await query.message.reply_text("❌ Rekod submission tak jumpa atau dah dipadam.")
             return
 
+        target_user_id = updated.get("user_id")
+        if isinstance(target_user_id, int):
+            try:
+                if status == "rejected":
+                    await context.bot.send_message(
+                        chat_id=target_user_id,
+                        text=(
+                            "Permohonan akses NEXT Member anda tidak diluluskan.\n"
+                            "Sila buat pendaftaran baru."
+                        ),
+                    )
+                elif status == "pending":
+                    await context.bot.send_message(
+                        chat_id=target_user_id,
+                        text=(
+                            "Permohonan anda sedang disemak semula.\n"
+                            "Sila tunggu maklum balas seterusnya daripada admin."
+                        ),
+                    )
+                elif status == "approved":
+                    add_user_to_vip1(updated)
+                    await context.bot.send_message(
+                        chat_id=target_user_id,
+                        text=(
+                            "Tahniah! Anda kini boleh menikmati semua keistimewaan/privilege NEXT Member."
+                        ),
+                    )
+            except Exception:
+                logger.exception("Failed to send status update to user")
+
         status_label = {
             "approved": "APPROVED",
             "pending": "PENDING",
             "rejected": "REJECTED",
         }.get(status, status.upper())
+        if status == "approved":
+            refreshed = get_submission(submission_id)
+            if refreshed:
+                await query.message.edit_text(
+                    render_admin_submission_text(refreshed),
+                    reply_markup=approved_admin_keyboard(submission_id),
+                )
+            return
+
+        await refresh_admin_submission_message(context, submission_id)
         await query.message.reply_text(f"✅ Status submission {submission_id} ditetapkan kepada {status_label}.")
         return
 
@@ -726,7 +856,7 @@ def main() -> None:
     app.add_handler(
         CallbackQueryHandler(
             handle_admin_callback,
-            pattern=f"^({CB_BETA_RESET_CONFIRM}|{CB_BETA_RESET_CANCEL}|{CB_VERIF_APPROVE}|{CB_VERIF_PENDING}|{CB_VERIF_REJECT}|{CB_VERIF_REQUEST_DEPOSIT}).*",
+            pattern=f"^({CB_BETA_RESET_CONFIRM}|{CB_BETA_RESET_CANCEL}|{CB_VERIF_APPROVE}|{CB_VERIF_PENDING}|{CB_VERIF_REJECT}|{CB_VERIF_REQUEST_DEPOSIT}|{CB_VERIF_REVOKE_VIP}).*",
         )
     )
     app.add_handler(CallbackQueryHandler(handle_user_deposit_callback, pattern=f"^({CB_USER_DEPOSIT_DONE}|{CB_USER_DEPOSIT_CANCEL}).*"))
