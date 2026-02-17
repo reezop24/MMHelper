@@ -27,6 +27,7 @@
   var panelVerification = document.getElementById("panelVerification");
   var btnDaftarAmarkets = document.getElementById("btnDaftarAmarkets");
   var btnPengesahanPelangganBaru = document.getElementById("btnPengesahanPelangganBaru");
+  var AMARKETS_SIGNUP_URL = "https://amarketstrading.co/sign-up/real-en/?g=REEZO24";
 
   var activeView = "home";
 
@@ -149,7 +150,11 @@
   });
 
   btnDaftarAmarkets.addEventListener("click", function () {
-    sendChoice("new_registration_amarkets");
+    if (tg && typeof tg.openLink === "function") {
+      tg.openLink(AMARKETS_SIGNUP_URL);
+      return;
+    }
+    window.open(AMARKETS_SIGNUP_URL, "_blank", "noopener");
   });
 
   btnPengesahanPelangganBaru.addEventListener("click", function () {
