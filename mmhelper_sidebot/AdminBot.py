@@ -34,6 +34,9 @@ TNC_ACCEPT = "ADMIN_TNC_ACCEPT"
 TNC_DECLINE = "ADMIN_TNC_DECLINE"
 CB_BETA_RESET_CONFIRM = "ADMIN_BETA_RESET_CONFIRM"
 CB_BETA_RESET_CANCEL = "ADMIN_BETA_RESET_CANCEL"
+CB_VERIF_APPROVE = "VERIF_APPROVE"
+CB_VERIF_PENDING = "VERIF_PENDING"
+CB_VERIF_REJECT = "VERIF_REJECT"
 
 ADMIN_USER_IDS = {627116869}
 STATE_PATH = Path(__file__).with_name("sidebot_state.json")
@@ -75,6 +78,16 @@ def get_register_next_webapp_url() -> str:
     if not url.lower().startswith("https://"):
         return ""
     return url
+
+
+def get_admin_group_id() -> int | None:
+    raw = (os.getenv("SIDEBOT_ADMIN_GROUP_ID") or "").strip()
+    if not raw:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        return None
 
 
 def load_state() -> dict:
@@ -120,17 +133,27 @@ def store_verification_submission(
     has_deposit_100: bool,
     full_name: str,
     phone_number: str,
-) -> None:
+) -> dict:
     state = load_state()
     users = state.setdefault("users", {})
     user_obj = users.setdefault(str(user_id), {})
+    submissions = state.setdefault("verification_submissions", {})
+    if not isinstance(submissions, dict):
+        submissions = {}
+        state["verification_submissions"] = submissions
+
+    submission_id = f"{user_id}-{int(datetime.now(timezone.utc).timestamp())}"
 
     payload = {
+        "submission_id": submission_id,
+        "user_id": user_id,
+        "telegram_username": telegram_username or "",
         "wallet_id": wallet_id,
         "has_deposit_100": bool(has_deposit_100),
         "full_name": full_name,
         "phone_number": phone_number,
         "submitted_at": datetime.now(timezone.utc).isoformat(),
+        "status": "pending",
     }
 
     user_obj["telegram_username"] = telegram_username or ""
@@ -140,7 +163,57 @@ def store_verification_submission(
         history = []
         user_obj["verification_history"] = history
     history.append(payload)
+    submissions[submission_id] = payload
     save_state(state)
+    return payload
+
+
+def verification_action_keyboard(submission_id: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton("✅ Approve", callback_data=f"{CB_VERIF_APPROVE}:{submission_id}"),
+                InlineKeyboardButton("⏳ Pending", callback_data=f"{CB_VERIF_PENDING}:{submission_id}"),
+                InlineKeyboardButton("❌ Reject", callback_data=f"{CB_VERIF_REJECT}:{submission_id}"),
+            ]
+        ]
+    )
+
+
+def update_submission_status(submission_id: str, status: str, reviewer_id: int) -> dict | None:
+    state = load_state()
+    submissions = state.setdefault("verification_submissions", {})
+    if not isinstance(submissions, dict):
+        return None
+
+    item = submissions.get(submission_id)
+    if not isinstance(item, dict):
+        return None
+
+    item["status"] = status
+    item["reviewed_at"] = datetime.now(timezone.utc).isoformat()
+    item["reviewed_by"] = reviewer_id
+
+    user_id = item.get("user_id")
+    users = state.setdefault("users", {})
+    user_obj = users.get(str(user_id), {})
+    if isinstance(user_obj, dict):
+        latest = user_obj.get("latest_verification")
+        if isinstance(latest, dict) and latest.get("submission_id") == submission_id:
+            latest["status"] = status
+            latest["reviewed_at"] = item["reviewed_at"]
+            latest["reviewed_by"] = reviewer_id
+        history = user_obj.get("verification_history", [])
+        if isinstance(history, list):
+            for row in history:
+                if isinstance(row, dict) and row.get("submission_id") == submission_id:
+                    row["status"] = status
+                    row["reviewed_at"] = item["reviewed_at"]
+                    row["reviewed_by"] = reviewer_id
+                    break
+
+    save_state(state)
+    return item
 
 
 def is_admin_user(user_id: int | None) -> bool:
@@ -257,6 +330,49 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
         await query.message.reply_text(BETA_RESET_DONE_TEXT)
         await query.message.reply_text("Sila baca dan setuju TnC dulu.", reply_markup=ReplyKeyboardRemove())
         await query.message.reply_text(TNC_TEXT, reply_markup=tnc_keyboard())
+        return
+
+    if ":" in str(query.data):
+        action, submission_id = str(query.data).split(":", 1)
+        action_status_map = {
+            CB_VERIF_APPROVE: "approved",
+            CB_VERIF_PENDING: "pending",
+            CB_VERIF_REJECT: "rejected",
+        }
+        status = action_status_map.get(action)
+        if not status:
+            return
+
+        updated = update_submission_status(submission_id=submission_id, status=status, reviewer_id=query.from_user.id)
+        if not updated:
+            await query.message.reply_text("❌ Rekod submission tak jumpa atau dah dipadam.")
+            return
+
+        status_label = {
+            "approved": "APPROVED",
+            "pending": "PENDING",
+            "rejected": "REJECTED",
+        }.get(status, status.upper())
+        await query.message.reply_text(f"✅ Status submission {submission_id} ditetapkan kepada {status_label}.")
+        return
+
+
+async def group_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    user = update.effective_user
+    chat = update.effective_chat
+    if not message or not user or not chat:
+        return
+    if not is_admin_user(user.id):
+        await message.reply_text("❌ Akses ditolak.")
+        return
+    await message.reply_text(
+        "📌 Group/Chat Info\n"
+        f"- chat_id: {chat.id}\n"
+        f"- type: {chat.type}\n\n"
+        "Salin chat_id ini dan letak dalam `.env`:\n"
+        "SIDEBOT_ADMIN_GROUP_ID=<chat_id>",
+    )
 
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -353,7 +469,7 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await message.reply_text("❌ Data pengesahan tak lengkap. Sila isi semula dalam miniapp.")
             return
 
-        store_verification_submission(
+        saved = store_verification_submission(
             user_id=user.id,
             telegram_username=str(user.username or ""),
             wallet_id=wallet_id,
@@ -362,8 +478,34 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
             phone_number=phone_number,
         )
         deposit_text = "Ya" if has_deposit_100 else "Belum"
+        submission_id = str(saved.get("submission_id") or "-")
+
+        admin_group_id = get_admin_group_id()
+        if admin_group_id:
+            try:
+                await context.bot.send_message(
+                    chat_id=admin_group_id,
+                    text=(
+                        "🆕 Pendaftaran Baru (Verification Submit)\n\n"
+                        f"Submission ID: {submission_id}\n"
+                        f"User ID: {user.id}\n"
+                        f"Username: @{user.username if user.username else '-'}\n"
+                        f"Nama: {full_name}\n"
+                        f"Wallet ID: {wallet_id}\n"
+                        f"Deposit USD100: {deposit_text}\n"
+                        f"No Telefon: {phone_number}\n"
+                        "Status: PENDING"
+                    ),
+                    reply_markup=verification_action_keyboard(submission_id),
+                )
+            except Exception:
+                logger.exception("Failed to send verification notification to admin group")
+
         await message.reply_text(
-            "✅ Pengesahan diterima.\n\n"
+            "✅ Pengesahan diterima.\n"
+            "Permohonan anda telah direkod dan dihantar ke admin.\n"
+            "Sila tunggu approval.\n\n"
+            f"Submission ID: {submission_id}\n"
             f"Wallet ID: {wallet_id}\n"
             f"Deposit USD100: {deposit_text}\n"
             f"Nama: {full_name}\n"
@@ -384,8 +526,14 @@ def main() -> None:
 
     app = ApplicationBuilder().token(get_token()).build()
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("groupid", group_id))
     app.add_handler(CallbackQueryHandler(handle_tnc_callback, pattern=f"^({TNC_ACCEPT}|{TNC_DECLINE})$"))
-    app.add_handler(CallbackQueryHandler(handle_admin_callback, pattern=f"^({CB_BETA_RESET_CONFIRM}|{CB_BETA_RESET_CANCEL})$"))
+    app.add_handler(
+        CallbackQueryHandler(
+            handle_admin_callback,
+            pattern=f"^({CB_BETA_RESET_CONFIRM}|{CB_BETA_RESET_CANCEL}|{CB_VERIF_APPROVE}|{CB_VERIF_PENDING}|{CB_VERIF_REJECT}).*",
+        )
+    )
     app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp_data))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     app.run_polling()
