@@ -14,6 +14,13 @@
   var growTargetHintEl = document.getElementById("growTargetHint");
   var minTargetHintEl = document.getElementById("minTargetHint");
   var targetInfoEl = document.getElementById("targetInfo");
+  var dailyTargetPctEl = document.getElementById("dailyTargetPct");
+  var dailyTargetUsdEl = document.getElementById("dailyTargetUsd");
+  var dailyRiskPctEl = document.getElementById("dailyRiskPct");
+  var dailyRiskUsdEl = document.getElementById("dailyRiskUsd");
+  var perSetupRiskPctEl = document.getElementById("perSetupRiskPct");
+  var perSetupRiskUsdEl = document.getElementById("perSetupRiskUsd");
+  var recommendationStatusEl = document.getElementById("recommendationStatus");
 
   topBackBtn.addEventListener("click", function () {
     if (tg) {
@@ -37,6 +44,60 @@
 
   function formatUsd(value) {
     return Number(value || 0).toFixed(2);
+  }
+
+  function formatPct(value) {
+    return Number(value || 0).toFixed(2);
+  }
+
+  function resetRecommendation() {
+    dailyTargetPctEl.textContent = "0.00";
+    dailyTargetUsdEl.textContent = "0.00";
+    dailyRiskPctEl.textContent = "0.00";
+    dailyRiskUsdEl.textContent = "0.00";
+    perSetupRiskPctEl.textContent = "0.00";
+    perSetupRiskUsdEl.textContent = "0.00";
+  }
+
+  function updateRecommendation() {
+    var initialCapital = getNumberValue("initial_capital_usd");
+    var targetBalance = getNumberValue("target_balance_usd");
+    var targetDays = Number((targetDaysSelect.value || "").trim());
+
+    if (
+      Number.isNaN(initialCapital) ||
+      initialCapital <= 0 ||
+      Number.isNaN(targetBalance) ||
+      targetBalance <= initialCapital ||
+      (targetDays !== 30 && targetDays !== 90 && targetDays !== 180)
+    ) {
+      resetRecommendation();
+      recommendationStatusEl.textContent = "Isi modal, target, dan tempoh untuk tengok cadangan.";
+      return;
+    }
+
+    var growTargetUsd = targetBalance - initialCapital;
+    var dailyTargetUsd = growTargetUsd / targetDays;
+    var dailyTargetPct = (dailyTargetUsd / initialCapital) * 100;
+
+    // Assumption: daily risk budget follows daily target pace (1:1 target-risk plan).
+    var dailyRiskPct = dailyTargetPct;
+    var dailyRiskUsd = (initialCapital * dailyRiskPct) / 100;
+    var perSetupRiskPct = dailyRiskPct / 2;
+    var perSetupRiskUsd = dailyRiskUsd / 2;
+
+    dailyTargetPctEl.textContent = formatPct(dailyTargetPct);
+    dailyTargetUsdEl.textContent = formatUsd(dailyTargetUsd);
+    dailyRiskPctEl.textContent = formatPct(dailyRiskPct);
+    dailyRiskUsdEl.textContent = formatUsd(dailyRiskUsd);
+    perSetupRiskPctEl.textContent = formatPct(perSetupRiskPct);
+    perSetupRiskUsdEl.textContent = formatUsd(perSetupRiskUsd);
+
+    if (dailyRiskPct > 5) {
+      recommendationStatusEl.textContent = "Cadangan ni agak agresif. Pertimbangkan tempoh lebih panjang untuk kurangkan pressure harian.";
+      return;
+    }
+    recommendationStatusEl.textContent = "Cadangan ini guna andaian 2 setup sehari dan pace konsisten.";
   }
 
   function updateGrowTargetPreview() {
@@ -74,14 +135,17 @@
 
   initialCapitalInput.addEventListener("input", function () {
     updateGrowTargetPreview();
+    updateRecommendation();
     statusEl.textContent = "";
   });
   targetBalanceInput.addEventListener("input", function () {
     updateGrowTargetPreview();
+    updateRecommendation();
     statusEl.textContent = "";
   });
   targetDaysSelect.addEventListener("change", function () {
     updateTargetInfo();
+    updateRecommendation();
     statusEl.textContent = "";
   });
 
@@ -140,4 +204,5 @@
 
   updateGrowTargetPreview();
   updateTargetInfo();
+  updateRecommendation();
 })();
