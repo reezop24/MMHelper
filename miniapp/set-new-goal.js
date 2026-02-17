@@ -57,7 +57,7 @@
   var dailyTargetValueEl = document.getElementById("dailyTargetValue");
   var dailyTargetNoteEl = document.getElementById("dailyTargetNote");
   var dailyTargetActionBtn = document.getElementById("dailyTargetActionBtn");
-  var floatingProgressUsd = Math.max(currentBalance - goalBaselineBalance, 0);
+  var floatingProgressUsd = currentBalance - goalBaselineBalance;
   dailyTargetActionBtn.classList.add("hidden");
   dailyTargetActionBtn.addEventListener("click", function () {
     if (!tabungUpdateUrl) return;
