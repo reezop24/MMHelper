@@ -11,6 +11,7 @@ from telegram import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     KeyboardButton,
+    ReplyKeyboardRemove,
     ReplyKeyboardMarkup,
     Update,
 )
@@ -160,6 +161,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await message.reply_text(MAIN_MENU_TEXT, reply_markup=main_menu_keyboard(user.id))
         return
 
+    await message.reply_text("Sila baca dan setuju TnC dulu.", reply_markup=ReplyKeyboardRemove())
     await message.reply_text(TNC_TEXT, reply_markup=tnc_keyboard())
 
 
@@ -208,6 +210,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
             pass
         reset_all_data()
         await query.message.reply_text(BETA_RESET_DONE_TEXT)
+        await query.message.reply_text("Sila baca dan setuju TnC dulu.", reply_markup=ReplyKeyboardRemove())
         await query.message.reply_text(TNC_TEXT, reply_markup=tnc_keyboard())
 
 
@@ -218,6 +221,13 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
 
     text = message.text.strip()
+
+    if not has_tnc_accepted(user.id):
+        await message.reply_text(
+            "❌ Akses menu dikunci sehingga anda setuju TnC. Tekan /start untuk teruskan.",
+            reply_markup=ReplyKeyboardRemove(),
+        )
+        return
 
     if text == MENU_ADMIN_PANEL:
         if not is_admin_user(user.id):
