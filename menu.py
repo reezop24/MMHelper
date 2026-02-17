@@ -85,6 +85,12 @@ def account_activity_keyboard(
         [SUBMENU_ACCOUNT_BUTTON_SUMMARY],
         [
             KeyboardButton(
+                SUBMENU_ACCOUNT_BUTTON_TRADING_ACTIVITY,
+                web_app=WebAppInfo(url=trading_activity_url),
+            )
+        ],
+        [
+            KeyboardButton(
                 SUBMENU_ACCOUNT_BUTTON_DEPOSIT_ACTIVITY,
                 web_app=WebAppInfo(url=deposit_activity_url),
             )
@@ -93,12 +99,6 @@ def account_activity_keyboard(
             KeyboardButton(
                 SUBMENU_ACCOUNT_BUTTON_WITHDRAWAL_ACTIVITY,
                 web_app=WebAppInfo(url=withdrawal_activity_url),
-            )
-        ],
-        [
-            KeyboardButton(
-                SUBMENU_ACCOUNT_BUTTON_TRADING_ACTIVITY,
-                web_app=WebAppInfo(url=trading_activity_url),
             )
         ],
         [KeyboardButton(SUBMENU_ACCOUNT_BUTTON_TABUNG, web_app=WebAppInfo(url=tabung_update_url))],
