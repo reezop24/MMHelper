@@ -298,10 +298,27 @@
     </section>
 
     <section id="ibTransferView" class="card content-card hidden">
-      <h2 class="section-title">Penukaran IB (Pelanggan sedia ada AMarkets)</h2>
-      <p>Screen ini kekal untuk flow Penukaran IB.</p>
-      <span class="placeholder-tag">Placeholder: IB Transfer</span>
+      <div class="tabs">
+        <button id="tabIbTransfer" type="button" class="tab-btn active">Penukaran IB</button>
+        <button id="tabIbVerification" type="button" class="tab-btn">Pengesahan Pendaftaran</button>
+      </div>
+
+      <div id="panelIbTransfer">
+        <h2 class="section-title">Penukaran IB (Pelanggan sedia ada AMarkets)</h2>
+        <p>Placeholder untuk flow Penukaran IB.</p>
+        <p>Maklumat dan syarat lengkap akan dimasukkan pada step seterusnya.</p>
+        <span class="placeholder-tag">Placeholder: IB Transfer</span>
+      </div>
+
+      <div id="panelIbVerification" class="hidden">
+        <h2 class="section-title">Pengesahan Pendaftaran (IB Transfer)</h2>
+        <p>Placeholder untuk flow pengesahan pendaftaran bagi Penukaran IB.</p>
+        <p>Borang dan tindakan susulan akan dimasukkan pada step seterusnya.</p>
+        <span class="placeholder-tag">Placeholder: IB Verification</span>
+      </div>
+
       <div class="inline-actions">
+        <button id="btnGoIbVerification" type="button" class="back-btn">➡️ Ke Pengesahan</button>
         <button id="btnBackFromIbTransfer" type="button" class="back-btn">⬅️ Back to Pilihan</button>
       </div>
     </section>

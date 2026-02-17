@@ -19,6 +19,7 @@
   var btnHomeIbTransfer = document.getElementById("btnHomeIbTransfer");
   var btnHomeUnderIbReezo = document.getElementById("btnHomeUnderIbReezo");
   var btnBackFromIbTransfer = document.getElementById("btnBackFromIbTransfer");
+  var btnGoIbVerification = document.getElementById("btnGoIbVerification");
   var btnBackFromUnderIbReezo = document.getElementById("btnBackFromUnderIbReezo");
 
   var tabNewRegistration = document.getElementById("tabNewRegistration");
@@ -27,6 +28,10 @@
   var panelVerification = document.getElementById("panelVerification");
   var btnDaftarAmarkets = document.getElementById("btnDaftarAmarkets");
   var btnPengesahanPelangganBaru = document.getElementById("btnPengesahanPelangganBaru");
+  var tabIbTransfer = document.getElementById("tabIbTransfer");
+  var tabIbVerification = document.getElementById("tabIbVerification");
+  var panelIbTransfer = document.getElementById("panelIbTransfer");
+  var panelIbVerification = document.getElementById("panelIbVerification");
   var walletIdInput = document.getElementById("walletIdInput");
   var fullNameInput = document.getElementById("fullNameInput");
   var phoneInput = document.getElementById("phoneInput");
@@ -78,6 +83,14 @@
     panelVerification.classList.toggle("hidden", isNew);
     tabNewRegistration.classList.toggle("active", isNew);
     tabVerification.classList.toggle("active", !isNew);
+  }
+
+  function openIbTab(tabName) {
+    var isTransfer = tabName === "transfer";
+    panelIbTransfer.classList.toggle("hidden", !isTransfer);
+    panelIbVerification.classList.toggle("hidden", isTransfer);
+    tabIbTransfer.classList.toggle("active", isTransfer);
+    tabIbVerification.classList.toggle("active", !isTransfer);
   }
 
   function sendToMainMenu() {
@@ -187,6 +200,7 @@
 
   btnHomeIbTransfer.addEventListener("click", function () {
     showView("ib_transfer");
+    openIbTab("transfer");
   });
 
   btnHomeUnderIbReezo.addEventListener("click", function () {
@@ -195,6 +209,10 @@
 
   btnBackFromIbTransfer.addEventListener("click", function () {
     showView("home");
+  });
+
+  btnGoIbVerification.addEventListener("click", function () {
+    openIbTab("verification");
   });
 
   btnBackFromUnderIbReezo.addEventListener("click", function () {
@@ -207,6 +225,14 @@
 
   tabVerification.addEventListener("click", function () {
     openTab("verification");
+  });
+
+  tabIbTransfer.addEventListener("click", function () {
+    openIbTab("transfer");
+  });
+
+  tabIbVerification.addEventListener("click", function () {
+    openIbTab("verification");
   });
 
   btnDaftarAmarkets.addEventListener("click", function () {
@@ -233,5 +259,6 @@
 
   showView("home");
   openTab("new");
+  openIbTab("transfer");
   setDepositChoice(null);
 })();
