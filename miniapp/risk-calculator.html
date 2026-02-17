@@ -197,7 +197,7 @@
     </section>
 
     <section id="resultBalanceCard" class="result-card hidden">
-      <p class="result-title"><strong>Output ikut Current Balance Sebenar</strong></p>
+      <p class="result-title"><strong>Result Baki Sebenar</strong></p>
       <p class="hint"><em>Dikira dari current balance sahaja, tidak termasuk baki tabung.</em></p>
       <p class="result-line">Current Balance: <strong>USD <span id="liveBalance">0.00</span></strong></p>
       <p class="result-line">Risk USD per setup: <strong class="risk-value">USD <span id="riskUsdLive">0.00</span></strong></p>
@@ -211,9 +211,15 @@
       <p class="result-line">Jarak harga max sebelum stop-out: <strong class="risk-value">USD <span id="maxMoveBeforeStopOutLive">0.00</span></strong></p>
       <p class="result-line">Anggaran floating @ zon penuh: <strong class="risk-value">USD <span id="floatingFullLive">0.00</span></strong></p>
       <p class="result-line">Anggaran floating @ separuh zon: <strong class="risk-value">USD <span id="floatingHalfLive">0.00</span></strong></p>
+    </section>
+
+    <section id="resultBalanceRecommendationCard" class="result-card hidden">
+      <p class="result-title"><strong>Recommendation (Akaun Kau)</strong></p>
       <p class="result-line">Daily target rujukan: <strong>USD <span id="dailyTargetUsdLive">0.00</span></strong></p>
       <p class="result-line">Risiko disaran sehari: <strong class="risk-value"><span id="dailyRiskPctLive">0.00</span>%</strong> (<strong class="risk-value">USD <span id="dailyRiskUsdLive">0.00</span></strong>)</p>
       <p class="result-line">Risiko disaran per setup (2 setup): <strong class="risk-value"><span id="perSetupRiskPctLive">0.00</span>%</strong> (<strong class="risk-value">USD <span id="perSetupRiskUsdLive">0.00</span></strong>)</p>
+      <p class="result-line">Lot disaran sehari ikut daily target: <strong><span id="recommendedLotDailyLive" class="lot-value">0.00</span> lot</strong></p>
+      <p class="result-line">Lot disaran per setup (2 setup): <strong><span id="recommendedLotPerSetupLive">0.00</span> lot</strong></p>
       <p id="liveRecommendationNote" class="hint"><em>Recommendation akan keluar bila data goal tersedia.</em></p>
       <p class="hint"><em>Kiraan guna current balance sebenar user dari sistem.</em></p>
     </section>

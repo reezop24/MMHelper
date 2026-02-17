@@ -17,6 +17,7 @@
   var tabBalanceBtn = document.getElementById("tabBalanceBtn");
   var resultInputCard = document.getElementById("resultInputCard");
   var resultBalanceCard = document.getElementById("resultBalanceCard");
+  var resultBalanceRecommendationCard = document.getElementById("resultBalanceRecommendationCard");
 
   function n(id) {
     return Number((document.getElementById(id).value || "").trim());
@@ -38,6 +39,7 @@
     var showInput = tabName === "input";
     resultInputCard.classList.toggle("hidden", !showInput);
     resultBalanceCard.classList.toggle("hidden", showInput);
+    resultBalanceRecommendationCard.classList.toggle("hidden", showInput);
     tabInputBtn.classList.toggle("active", showInput);
     tabBalanceBtn.classList.toggle("active", !showInput);
   }
@@ -49,36 +51,48 @@
     return 0;
   }
 
-  function updateLiveRecommendation(balance) {
+  function updateLiveRecommendation(balance, zonePips) {
     var dailyTargetUsdEl = document.getElementById("dailyTargetUsdLive");
     var dailyRiskPctEl = document.getElementById("dailyRiskPctLive");
     var dailyRiskUsdEl = document.getElementById("dailyRiskUsdLive");
     var perSetupRiskPctEl = document.getElementById("perSetupRiskPctLive");
     var perSetupRiskUsdEl = document.getElementById("perSetupRiskUsdLive");
+    var recommendedLotDailyEl = document.getElementById("recommendedLotDailyLive");
+    var recommendedLotPerSetupEl = document.getElementById("recommendedLotPerSetupLive");
     var noteEl = document.getElementById("liveRecommendationNote");
 
     var tradingDays = tradingDaysByTargetDays(liveTargetDays);
-    if (balance <= 0 || tradingDays <= 0 || liveGrowTargetUsd <= 0) {
+    if (balance <= 0 || tradingDays <= 0 || liveGrowTargetUsd <= 0 || zonePips <= 0) {
       dailyTargetUsdEl.textContent = "0.00";
       dailyRiskPctEl.textContent = "0.00";
       dailyRiskUsdEl.textContent = "0.00";
       perSetupRiskPctEl.textContent = "0.00";
       perSetupRiskUsdEl.textContent = "0.00";
+      recommendedLotDailyEl.textContent = "0.00";
+      recommendedLotPerSetupEl.textContent = "0.00";
       noteEl.textContent = "Recommendation perlukan data goal aktif (30/90/180 hari).";
       return;
     }
 
+    var pipSize = 0.10;
+    var contractSize = 100;
+    var zoneUsd = zonePips * pipSize;
     var dailyTargetUsd = liveGrowTargetUsd / tradingDays;
     var dailyRiskUsd = dailyTargetUsd;
     var dailyRiskPct = (dailyRiskUsd / balance) * 100;
     var perSetupRiskUsd = dailyRiskUsd / 2;
     var perSetupRiskPct = dailyRiskPct / 2;
+    var usdPerLotAtZone = zoneUsd * contractSize;
+    var recommendedLotDaily = usdPerLotAtZone > 0 ? floorToStep(dailyTargetUsd / usdPerLotAtZone, 0.01) : 0;
+    var recommendedLotPerSetup = floorToStep(recommendedLotDaily / 2, 0.01);
 
     dailyTargetUsdEl.textContent = f2(dailyTargetUsd);
     dailyRiskPctEl.textContent = f2(dailyRiskPct);
     dailyRiskUsdEl.textContent = f2(dailyRiskUsd);
     perSetupRiskPctEl.textContent = f2(perSetupRiskPct);
     perSetupRiskUsdEl.textContent = f2(perSetupRiskUsd);
+    recommendedLotDailyEl.textContent = f2(recommendedLotDaily);
+    recommendedLotPerSetupEl.textContent = f2(recommendedLotPerSetup);
     noteEl.textContent = "Cadangan ini berpandukan baki grow target semasa dan andaian 2 setup sehari.";
   }
 
@@ -201,7 +215,7 @@
     if (Number.isFinite(liveBalance) && liveBalance > 0) {
       var liveResult = calculate(liveBalance, riskPct, zonePips, layerCount, entryPrice, leverage, stopOutPct);
       render(liveResult, "Live", layerCount, liveBalance);
-      updateLiveRecommendation(liveBalance);
+      updateLiveRecommendation(liveBalance, zonePips);
       if (inputResult.floatingFull > inputResult.maxLossBeforeStopOut && inputResult.maxLossBeforeStopOut > 0) {
         statusEl.textContent = "Amaran: loss zon penuh (tab input) melebihi kapasiti sebelum stop-out.";
         return;
@@ -210,7 +224,7 @@
       return;
     }
 
-    updateLiveRecommendation(0);
+    updateLiveRecommendation(0, zonePips);
     statusEl.textContent = "Kiraan tab input siap. Tab current balance perlukan data balance user aktif.";
   });
 })();
