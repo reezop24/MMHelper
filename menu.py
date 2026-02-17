@@ -54,9 +54,21 @@ def main_menu_keyboard(user_id: int | None = None) -> ReplyKeyboardMarkup:
     risk_url = get_risk_calculator_webapp_url()
     if user_id is not None:
         try:
-            from storage import get_current_balance_usd
+            from storage import get_current_balance_usd, get_project_grow_goal_summary, get_tabung_balance_usd
 
-            risk_url = get_risk_calculator_webapp_url(current_balance_usd=get_current_balance_usd(user_id))
+            current_balance = get_current_balance_usd(user_id)
+            goal = get_project_grow_goal_summary(user_id)
+            target_days = int(goal.get("target_days") or 0)
+            target_balance = float(goal.get("target_balance_usd") or 0.0)
+            baseline_balance = float(goal.get("current_balance_usd") or 0.0)
+            tabung_balance = float(get_tabung_balance_usd(user_id) or 0.0)
+            total_grow_target = max(target_balance - baseline_balance, 0.0)
+            remaining_grow_target = max(total_grow_target - tabung_balance, 0.0)
+            risk_url = get_risk_calculator_webapp_url(
+                current_balance_usd=current_balance,
+                target_days=target_days,
+                grow_target_usd=remaining_grow_target,
+            )
         except Exception:
             risk_url = get_risk_calculator_webapp_url()
 

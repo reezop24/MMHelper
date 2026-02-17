@@ -21,11 +21,22 @@ def _miniapp_base_url() -> str:
     return base
 
 
-def get_risk_calculator_webapp_url(current_balance_usd: float | None = None) -> str:
+def get_risk_calculator_webapp_url(
+    current_balance_usd: float | None = None,
+    target_days: int | None = None,
+    grow_target_usd: float | None = None,
+) -> str:
     page = f"{_miniapp_base_url()}/risk-calculator.html"
-    if current_balance_usd is None:
+    if current_balance_usd is None and target_days is None and grow_target_usd is None:
         return page
-    query = urlencode({"current_balance_usd": f"{float(current_balance_usd):.2f}"})
+    query_data: dict[str, str] = {}
+    if current_balance_usd is not None:
+        query_data["current_balance_usd"] = f"{float(current_balance_usd):.2f}"
+    if target_days is not None:
+        query_data["target_days"] = str(max(0, int(target_days)))
+    if grow_target_usd is not None:
+        query_data["grow_target_usd"] = f"{float(grow_target_usd):.2f}"
+    query = urlencode(query_data)
     return f"{page}?{query}"
 
 

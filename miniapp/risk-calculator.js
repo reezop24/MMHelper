@@ -7,6 +7,8 @@
 
   var params = new URLSearchParams(window.location.search);
   var liveBalance = Number(params.get("current_balance_usd") || 0);
+  var liveTargetDays = Number(params.get("target_days") || 0);
+  var liveGrowTargetUsd = Number(params.get("grow_target_usd") || 0);
 
   var form = document.getElementById("riskForm");
   var statusEl = document.getElementById("status");
@@ -38,6 +40,46 @@
     resultBalanceCard.classList.toggle("hidden", showInput);
     tabInputBtn.classList.toggle("active", showInput);
     tabBalanceBtn.classList.toggle("active", !showInput);
+  }
+
+  function tradingDaysByTargetDays(targetDays) {
+    if (targetDays === 30) return 22;
+    if (targetDays === 90) return 66;
+    if (targetDays === 180) return 132;
+    return 0;
+  }
+
+  function updateLiveRecommendation(balance) {
+    var dailyTargetUsdEl = document.getElementById("dailyTargetUsdLive");
+    var dailyRiskPctEl = document.getElementById("dailyRiskPctLive");
+    var dailyRiskUsdEl = document.getElementById("dailyRiskUsdLive");
+    var perSetupRiskPctEl = document.getElementById("perSetupRiskPctLive");
+    var perSetupRiskUsdEl = document.getElementById("perSetupRiskUsdLive");
+    var noteEl = document.getElementById("liveRecommendationNote");
+
+    var tradingDays = tradingDaysByTargetDays(liveTargetDays);
+    if (balance <= 0 || tradingDays <= 0 || liveGrowTargetUsd <= 0) {
+      dailyTargetUsdEl.textContent = "0.00";
+      dailyRiskPctEl.textContent = "0.00";
+      dailyRiskUsdEl.textContent = "0.00";
+      perSetupRiskPctEl.textContent = "0.00";
+      perSetupRiskUsdEl.textContent = "0.00";
+      noteEl.textContent = "Recommendation perlukan data goal aktif (30/90/180 hari).";
+      return;
+    }
+
+    var dailyTargetUsd = liveGrowTargetUsd / tradingDays;
+    var dailyRiskUsd = dailyTargetUsd;
+    var dailyRiskPct = (dailyRiskUsd / balance) * 100;
+    var perSetupRiskUsd = dailyRiskUsd / 2;
+    var perSetupRiskPct = dailyRiskPct / 2;
+
+    dailyTargetUsdEl.textContent = f2(dailyTargetUsd);
+    dailyRiskPctEl.textContent = f2(dailyRiskPct);
+    dailyRiskUsdEl.textContent = f2(dailyRiskUsd);
+    perSetupRiskPctEl.textContent = f2(perSetupRiskPct);
+    perSetupRiskUsdEl.textContent = f2(perSetupRiskUsd);
+    noteEl.textContent = "Cadangan ini berpandukan baki grow target semasa dan andaian 2 setup sehari.";
   }
 
   function calculate(balance, riskPct, zonePips, layerCount, entryPrice, leverage, stopOutPct) {
@@ -159,6 +201,7 @@
     if (Number.isFinite(liveBalance) && liveBalance > 0) {
       var liveResult = calculate(liveBalance, riskPct, zonePips, layerCount, entryPrice, leverage, stopOutPct);
       render(liveResult, "Live", layerCount, liveBalance);
+      updateLiveRecommendation(liveBalance);
       if (inputResult.floatingFull > inputResult.maxLossBeforeStopOut && inputResult.maxLossBeforeStopOut > 0) {
         statusEl.textContent = "Amaran: loss zon penuh (tab input) melebihi kapasiti sebelum stop-out.";
         return;
@@ -167,6 +210,7 @@
       return;
     }
 
+    updateLiveRecommendation(0);
     statusEl.textContent = "Kiraan tab input siap. Tab current balance perlukan data balance user aktif.";
   });
 })();

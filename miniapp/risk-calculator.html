@@ -32,6 +32,7 @@
       margin-top: 7px;
     }
 
+    #layerCount,
     #stopOutPct {
       width: 100%;
       border: 1px solid var(--border-input);
@@ -175,8 +176,8 @@
     </form>
 
     <div class="tab-row">
-      <button id="tabInputBtn" type="button" class="tab-btn active">Output: Modal Input</button>
-      <button id="tabBalanceBtn" type="button" class="tab-btn">Output: Current Balance</button>
+      <button id="tabInputBtn" type="button" class="tab-btn active">Result : Custom</button>
+      <button id="tabBalanceBtn" type="button" class="tab-btn">Result : Akaun Kau</button>
     </div>
 
     <section id="resultInputCard" class="result-card">
@@ -197,6 +198,7 @@
 
     <section id="resultBalanceCard" class="result-card hidden">
       <p class="result-title"><strong>Output ikut Current Balance Sebenar</strong></p>
+      <p class="hint"><em>Dikira dari current balance sahaja, tidak termasuk baki tabung.</em></p>
       <p class="result-line">Current Balance: <strong>USD <span id="liveBalance">0.00</span></strong></p>
       <p class="result-line">Risk USD per setup: <strong class="risk-value">USD <span id="riskUsdLive">0.00</span></strong></p>
       <p class="result-line">Cadangan lot size: <strong><span id="lotSizeLive" class="lot-value">0.00</span> lot</strong></p>
@@ -209,6 +211,10 @@
       <p class="result-line">Jarak harga max sebelum stop-out: <strong class="risk-value">USD <span id="maxMoveBeforeStopOutLive">0.00</span></strong></p>
       <p class="result-line">Anggaran floating @ zon penuh: <strong class="risk-value">USD <span id="floatingFullLive">0.00</span></strong></p>
       <p class="result-line">Anggaran floating @ separuh zon: <strong class="risk-value">USD <span id="floatingHalfLive">0.00</span></strong></p>
+      <p class="result-line">Daily target rujukan: <strong>USD <span id="dailyTargetUsdLive">0.00</span></strong></p>
+      <p class="result-line">Risiko disaran sehari: <strong class="risk-value"><span id="dailyRiskPctLive">0.00</span>%</strong> (<strong class="risk-value">USD <span id="dailyRiskUsdLive">0.00</span></strong>)</p>
+      <p class="result-line">Risiko disaran per setup (2 setup): <strong class="risk-value"><span id="perSetupRiskPctLive">0.00</span>%</strong> (<strong class="risk-value">USD <span id="perSetupRiskUsdLive">0.00</span></strong>)</p>
+      <p id="liveRecommendationNote" class="hint"><em>Recommendation akan keluar bila data goal tersedia.</em></p>
       <p class="hint"><em>Kiraan guna current balance sebenar user dari sistem.</em></p>
     </section>
   </main>
