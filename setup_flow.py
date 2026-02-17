@@ -52,7 +52,6 @@ from texts import (
     MISSION_RESET_TEXT,
     MISSION_STARTED_TEXT,
     SET_NEW_GOAL_RESET_TEXT,
-    SETUP_SAVED_TEXT,
 )
 from ui import send_screen
 
@@ -196,15 +195,58 @@ def _build_tabung_saved_text(user_id: int, action: str, amount_usd: float) -> st
     )
 
 
-def _build_set_new_goal_saved_text(user_id: int, target_balance_usd: float, unlock_amount_usd: float, target_label: str) -> str:
+def _build_goal_recommendation_text(initial_capital: float, target_balance_usd: float, target_days: int) -> str:
+    recommendation = _build_setup_recommendation(initial_capital, target_balance_usd, target_days)
+    if recommendation["trading_days"] <= 0:
+        return "Cadangan plan belum dapat dikira. Semak semula tempoh target."
+    return (
+        "Rujukan plan harian (kiraan guna 22 hari trading sebulan, Isnin-Jumaat):\n"
+        f"- Daily target: **{recommendation['daily_target_pct']:.2f}%** "
+        f"(**{_usd(recommendation['daily_target_usd'])}**)\n"
+        f"- Risk maksimum sehari: **{recommendation['daily_risk_pct']:.2f}%** "
+        f"(**{_usd(recommendation['daily_risk_usd'])}**)\n"
+        f"- Risk per setup (2 setup/hari): **{recommendation['per_setup_risk_pct']:.2f}%** "
+        f"(**{_usd(recommendation['per_setup_risk_usd'])}**)"
+    )
+
+
+def _build_initial_setup_saved_text(
+    user_id: int,
+    name: str,
+    initial_capital: float,
+    target_balance_usd: float,
+    target_days: int,
+    target_label: str,
+) -> str:
+    recommendation_text = _build_goal_recommendation_text(initial_capital, target_balance_usd, target_days)
+    return (
+        "Initial setup berjaya disimpan ✅\n\n"
+        f"Nama: **{name}**\n"
+        f"Modal permulaan: **{_usd(initial_capital)}**\n"
+        f"Goal: **{_usd(target_balance_usd)}** ({target_label})\n\n"
+        f"{recommendation_text}\n\n"
+        f"Current Balance sekarang: **{_usd(get_current_balance_usd(user_id))}**."
+    )
+
+
+def _build_set_new_goal_saved_text(
+    user_id: int,
+    target_balance_usd: float,
+    unlock_amount_usd: float,
+    target_label: str,
+    target_days: int,
+    base_balance_usd: float,
+) -> str:
     if unlock_amount_usd >= 10:
         unlock_line = f"Kau unlock mission dengan simpanan awal tabung: **{_usd(unlock_amount_usd)}**."
     else:
         unlock_line = "Mission belum unlock lagi (minimum unlock mission USD 10). Tabung masih boleh guna seperti biasa."
+    recommendation_text = _build_goal_recommendation_text(base_balance_usd, target_balance_usd, target_days)
     return (
         "Set New Goal berjaya disimpan ✅\n\n"
         f"Target capital baru kau: **{_usd(target_balance_usd)}** ({target_label}).\n"
         f"{unlock_line}\n\n"
+        f"{recommendation_text}\n\n"
         f"Current Balance sekarang: **{_usd(get_current_balance_usd(user_id))}**.\n"
         f"Baki tabung sekarang: **{_usd(get_tabung_balance_usd(user_id))}**.\n"
         f"{_weekly_pl_line(user_id)}"
@@ -323,7 +365,14 @@ async def _handle_initial_setup(payload: dict, update: Update, context: ContextT
     await send_screen(
         context,
         message.chat_id,
-        SETUP_SAVED_TEXT,
+        _build_initial_setup_saved_text(
+            user_id=user.id,
+            name=name,
+            initial_capital=initial_capital,
+            target_balance_usd=target_balance_usd,
+            target_days=target_days,
+            target_label=target_label,
+        ),
         reply_markup=main_menu_keyboard(update.effective_user.id),
         parse_mode="Markdown",
     )
@@ -700,7 +749,14 @@ async def _handle_set_new_goal(payload: dict, update: Update, context: ContextTy
     await send_screen(
         context,
         message.chat_id,
-        _build_set_new_goal_saved_text(user.id, target_balance_usd, unlock_amount_usd, target_label),
+        _build_set_new_goal_saved_text(
+            user_id=user.id,
+            target_balance_usd=target_balance_usd,
+            unlock_amount_usd=unlock_amount_usd,
+            target_label=target_label,
+            target_days=target_days,
+            base_balance_usd=current_balance,
+        ),
         reply_markup=_build_project_grow_keyboard_for_user(user.id),
         parse_mode="Markdown",
     )
