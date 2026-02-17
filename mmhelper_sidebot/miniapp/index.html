@@ -6,40 +6,83 @@
   <title>Daftar NEXT Member</title>
   <link rel="stylesheet" href="global.css" />
   <style>
+    .hidden { display: none; }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .tab-btn {
+      margin: 0;
+      width: 100%;
+      border: 1px solid #4b9ea3;
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: rgba(12, 52, 62, 0.76);
+      color: #dff8ff;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .tab-btn.active {
+      background: linear-gradient(90deg, #1fbf8f 0%, #22d3a2 100%);
+      color: #062018;
+      border-color: #23c89a;
+    }
+
     .content-card p {
       margin: 0;
-      line-height: 1.5;
+      line-height: 1.55;
       color: #d7f0ff;
       font-size: 14px;
     }
 
-    .content-card p + p {
-      margin-top: 10px;
+    .content-card p + p { margin-top: 10px; }
+
+    .section-title {
+      margin: 0 0 10px;
+      color: #f3fbff;
+      font-size: 19px;
     }
 
     .feature-list {
       margin: 8px 0 0;
       padding-left: 18px;
       color: #d7f0ff;
-      line-height: 1.5;
+      line-height: 1.55;
       font-size: 14px;
     }
 
-    .feature-list li + li {
-      margin-top: 6px;
+    .feature-list li + li { margin-top: 6px; }
+
+    .brand-row {
+      margin-top: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
     }
 
-    .choice-list {
+    .brand-logo {
+      display: block;
+      width: auto;
+      object-fit: contain;
+    }
+
+    .brand-logo.reezo { height: 26px; }
+    .brand-logo.amarkets { height: 22px; }
+
+    .action-list {
       margin-top: 14px;
       display: grid;
       gap: 10px;
     }
 
-    .hidden {
-      display: none;
-    }
-
-    .choice-btn {
+    .action-btn {
       margin: 0;
       width: 100%;
       border: 1px solid #4b9ea3;
@@ -53,61 +96,18 @@
       line-height: 1.35;
     }
 
-    .choice-btn:hover {
-      background: rgba(16, 67, 79, 0.96);
-    }
-
-    .choice-btn.with-logo {
+    .action-btn.with-logo {
       display: flex;
       align-items: center;
       gap: 8px;
-    }
-
-    .choice-label {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
       flex-wrap: wrap;
     }
 
-    .choice-logo {
-      height: 28px;
+    .action-logo {
+      height: 18px;
       width: auto;
       object-fit: contain;
       flex-shrink: 0;
-    }
-
-    .choice-logo.reezo {
-      height: 32px;
-    }
-
-    .bottom-actions {
-      margin-top: 12px;
-    }
-
-    .back-btn {
-      margin: 0;
-      width: auto;
-      min-width: 210px;
-      padding: 10px 14px;
-      border-radius: 10px;
-      border: 1px solid #4b9ea3;
-      background: rgba(13, 54, 60, 0.9);
-      color: #e8fbff;
-      font-size: 13px;
-      font-weight: 700;
-    }
-
-    .placeholder-head {
-      margin: 0;
-      font-size: 20px;
-      color: #f2fbff;
-    }
-
-    .placeholder-copy {
-      margin-top: 8px;
-      color: #d7f0ff;
-      line-height: 1.5;
     }
 
     .placeholder-tag {
@@ -121,16 +121,19 @@
       background: rgba(14, 62, 73, 0.78);
     }
 
-    .inline-actions {
-      margin-top: 12px;
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
+    .bottom-actions { margin-top: 12px; }
 
-    .inline-actions .back-btn {
-      min-width: 170px;
-      margin-top: 0;
+    .back-btn {
+      margin: 0;
+      width: auto;
+      min-width: 210px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid #4b9ea3;
+      background: rgba(13, 54, 60, 0.9);
+      color: #e8fbff;
+      font-size: 13px;
+      font-weight: 700;
     }
   </style>
 </head>
@@ -145,72 +148,55 @@
       <h1>Daftar NEXT Member</h1>
     </header>
 
-    <section id="homeView" class="card content-card">
-      <p>NEXT Member memberi anda akses penuh kepada ekosistem tools dan sistem sokongan yang disediakan, termasuk:</p>
-      <ul class="feature-list">
-        <li>Akses penuh kepada MM Helper</li>
-        <li>Akses kandungan pembelajaran melalui eVideo</li>
-        <li>Akses kepada bot dan sistem tambahan di bawah rangkaian NEXT</li>
-        <li>Penyertaan dalam sesi webinar, seminar, TradeTalk dan program perkongsian ilmu yang dianjurkan dari semasa ke semasa</li>
-      </ul>
-      <p>Semua akses ini disusun dalam satu ekosistem berstruktur bagi memudahkan pembelajaran, penggunaan tools serta penglibatan dalam aktiviti yang berkaitan.</p>
-      <p>Sila pilih jenis permohonan di bawah untuk meneruskan.</p>
+    <section class="card content-card">
+      <div class="tabs">
+        <button id="tabNewRegistration" type="button" class="tab-btn active">Pendaftaran Baru</button>
+        <button id="tabVerification" type="button" class="tab-btn">Pengesahan Pendaftaran</button>
+      </div>
 
-      <div class="choice-list">
-        <button id="btnNewRegistration" type="button" class="choice-btn with-logo">
-          <span class="choice-label">
-            <span>Pendaftaran baru</span>
-            <img class="choice-logo amarkets" src="amarketslogo.png" alt="AMarkets" />
-          </span>
-        </button>
-        <button id="btnIbTransfer" type="button" class="choice-btn with-logo">
-          <span class="choice-label">
-            <span>Penukaran IB (Pelanggan sedia ada</span>
-            <img class="choice-logo amarkets" src="amarketslogo.png" alt="AMarkets" />
-            <span>)</span>
-          </span>
-        </button>
-        <button id="btnUnderIbReezo" type="button" class="choice-btn with-logo">
-          <span class="choice-label">
-            <span>Client</span>
-            <img class="choice-logo amarkets" src="amarketslogo.png" alt="AMarkets" />
-            <span>under IB</span>
-            <img class="choice-logo reezo" src="reezo.png" alt="Reezo" />
-          </span>
-        </button>
+      <div id="panelNewRegistration">
+        <h2 class="section-title">Syarat Pendaftaran NEXT Member untuk Pelanggan Baru</h2>
+
+        <p>Untuk melayakkan akses sebagai NEXT Member sebagai pelanggan baru AMarkets, syarat berikut perlu dipenuhi:</p>
+        <ul class="feature-list">
+          <li>Pendaftaran akaun AMarkets hendaklah dibuat melalui pautan yang disediakan atau dengan menekan butang “Daftar AMarkets” di bawah.</li>
+          <li>Akaun mesti disahkan (verify) sepenuhnya mengikut prosedur pihak broker.</li>
+          <li>Deposit minimum USD 100 diperlukan untuk pengaktifan kali pertama.</li>
+          <li>Selepas pendaftaran dan deposit dibuat, anda perlu membuat pengesahan dengan menekan butang Pengesahan Pelanggan Baru.</li>
+          <li>Akses NEXT Member akan diaktifkan selepas pengesahan selesai.</li>
+        </ul>
+
+        <p><strong>Tempoh & Polisi Akses</strong></p>
+        <ul class="feature-list">
+          <li>Akses diberikan selama 45 hari dan akan diperbaharui secara automatik selagi akaun kekal aktif.</li>
+          <li>Akses akan ditarik secara automatik sekiranya akaun tidak aktif selepas tamat tempoh.</li>
+          <li>Akses boleh ditarik serta-merta sekiranya berlaku pengeluaran dana selepas deposit tanpa sebarang aktiviti dagangan.</li>
+        </ul>
+
+        <p>Sila pastikan anda memahami syarat di atas sebelum meneruskan pendaftaran.</p>
+
+        <div class="brand-row" aria-label="Brand Partners">
+          <img class="brand-logo reezo" src="reezo.png" alt="Reezo" />
+          <img class="brand-logo amarkets" src="amarketslogo.png" alt="AMarkets" />
+        </div>
+
+        <div class="action-list">
+          <button id="btnDaftarAmarkets" type="button" class="action-btn with-logo">
+            <span>Daftar</span>
+            <img class="action-logo" src="amarketslogo.png" alt="AMarkets" />
+          </button>
+          <button id="btnPengesahanPelangganBaru" type="button" class="action-btn">Pengesahan Pelanggan Baru</button>
+        </div>
+      </div>
+
+      <div id="panelVerification" class="hidden">
+        <h2 class="section-title">Pengesahan Pendaftaran</h2>
+        <p>Ini placeholder untuk tab Pengesahan Pendaftaran.</p>
+        <p>Lepas ni kita akan isi form semakan dan dokumen ikut flow pendaftaran sebenar.</p>
+        <span class="placeholder-tag">Placeholder: Verification</span>
       </div>
 
       <p id="status" class="status" aria-live="polite"></p>
-    </section>
-
-    <section id="newRegistrationView" class="card content-card hidden">
-      <h2 class="placeholder-head">Pendaftaran baru AMarkets</h2>
-      <p class="placeholder-copy">Ini placeholder screen untuk flow pendaftaran baru. Seterusnya kita boleh masukkan form penuh ikut requirement.</p>
-      <span class="placeholder-tag">Placeholder: New Registration</span>
-      <div class="inline-actions">
-        <button id="btnBackToChoicesA" type="button" class="back-btn">⬅️ Back to Pilihan</button>
-      </div>
-      <p id="statusA" class="status" aria-live="polite"></p>
-    </section>
-
-    <section id="ibTransferView" class="card content-card hidden">
-      <h2 class="placeholder-head">Penukaran IB (Pelanggan sedia ada)</h2>
-      <p class="placeholder-copy">Ini placeholder screen untuk flow penukaran IB. Nanti kita sambung dengan langkah semakan akaun dan pengesahan dokumen.</p>
-      <span class="placeholder-tag">Placeholder: IB Transfer</span>
-      <div class="inline-actions">
-        <button id="btnBackToChoicesB" type="button" class="back-btn">⬅️ Back to Pilihan</button>
-      </div>
-      <p id="statusB" class="status" aria-live="polite"></p>
-    </section>
-
-    <section id="underIbReezoView" class="card content-card hidden">
-      <h2 class="placeholder-head">Client AMarkets under IB Reezo</h2>
-      <p class="placeholder-copy">Ini placeholder screen untuk flow client under IB Reezo. Nanti kita tambah logic kelayakan dan aliran seterusnya.</p>
-      <span class="placeholder-tag">Placeholder: Under IB Reezo</span>
-      <div class="inline-actions">
-        <button id="btnBackToChoicesC" type="button" class="back-btn">⬅️ Back to Pilihan</button>
-      </div>
-      <p id="statusC" class="status" aria-live="polite"></p>
     </section>
 
     <div class="bottom-actions">
