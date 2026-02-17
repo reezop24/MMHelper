@@ -80,6 +80,8 @@ def _build_activity_query(
     grow_target_usd: float,
     target_days: int,
     goal_reached: bool,
+    goal_baseline_balance_usd: float,
+    tabung_update_url: str,
 ) -> str:
     return urlencode(
         {
@@ -97,6 +99,8 @@ def _build_activity_query(
             "grow_target_usd": f"{grow_target_usd:.2f}",
             "target_days": str(max(0, int(target_days))),
             "goal_reached": "1" if goal_reached else "0",
+            "goal_baseline_balance_usd": f"{goal_baseline_balance_usd:.2f}",
+            "tabung_update_url": tabung_update_url,
         }
     )
 
@@ -116,6 +120,8 @@ def get_withdrawal_activity_webapp_url(
     grow_target_usd: float,
     target_days: int,
     goal_reached: bool,
+    goal_baseline_balance_usd: float,
+    tabung_update_url: str,
 ) -> str:
     page = f"{_miniapp_base_url()}/withdrawal-activity.html"
     query = _build_activity_query(
@@ -133,6 +139,8 @@ def get_withdrawal_activity_webapp_url(
         grow_target_usd=grow_target_usd,
         target_days=target_days,
         goal_reached=goal_reached,
+        goal_baseline_balance_usd=goal_baseline_balance_usd,
+        tabung_update_url=tabung_update_url,
     )
     return f"{page}?{query}"
 
@@ -152,6 +160,8 @@ def get_deposit_activity_webapp_url(
     grow_target_usd: float,
     target_days: int,
     goal_reached: bool,
+    goal_baseline_balance_usd: float,
+    tabung_update_url: str,
 ) -> str:
     page = f"{_miniapp_base_url()}/deposit-activity.html"
     query = _build_activity_query(
@@ -169,6 +179,8 @@ def get_deposit_activity_webapp_url(
         grow_target_usd=grow_target_usd,
         target_days=target_days,
         goal_reached=goal_reached,
+        goal_baseline_balance_usd=goal_baseline_balance_usd,
+        tabung_update_url=tabung_update_url,
     )
     return f"{page}?{query}"
 
@@ -188,6 +200,8 @@ def get_trading_activity_webapp_url(
     grow_target_usd: float,
     target_days: int,
     goal_reached: bool,
+    goal_baseline_balance_usd: float,
+    tabung_update_url: str,
 ) -> str:
     page = f"{_miniapp_base_url()}/trading-activity.html"
     query = _build_activity_query(
@@ -205,6 +219,8 @@ def get_trading_activity_webapp_url(
         grow_target_usd=grow_target_usd,
         target_days=target_days,
         goal_reached=goal_reached,
+        goal_baseline_balance_usd=goal_baseline_balance_usd,
+        tabung_update_url=tabung_update_url,
     )
     return f"{page}?{query}"
 
@@ -221,6 +237,8 @@ def get_set_new_goal_webapp_url(
     grow_target_usd: float,
     target_days: int,
     target_label: str,
+    tabung_update_url: str,
+    goal_baseline_balance_usd: float,
 ) -> str:
     page = f"{_miniapp_base_url()}/set-new-goal.html"
     query = urlencode(
@@ -236,6 +254,8 @@ def get_set_new_goal_webapp_url(
             "grow_target_usd": f"{grow_target_usd:.2f}",
             "target_days": str(max(0, int(target_days))),
             "target_label": target_label,
+            "tabung_update_url": tabung_update_url,
+            "goal_baseline_balance_usd": f"{goal_baseline_balance_usd:.2f}",
         }
     )
     return f"{page}?{query}"

@@ -97,6 +97,23 @@
       line-height: 1.35;
     }
 
+    .daily-target-action {
+      margin-top: 10px;
+      width: auto;
+      min-width: 210px;
+      border: 1px solid #4f78b7;
+      border-radius: 10px;
+      padding: 9px 12px;
+      background: rgba(16, 48, 95, 0.92);
+      color: #ecf4ff;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .hidden {
+      display: none;
+    }
+
     @media (max-width: 640px) {
       .summary {
         gap: 6px;
@@ -142,6 +159,7 @@
       <p class="daily-target-title"><strong>Target Hari Ini</strong></p>
       <p id="dailyTargetValue" class="daily-target-value">USD 0.00 (0.00%)</p>
       <p id="dailyTargetNote" class="daily-target-note">Set New Goal dulu untuk aktifkan tracker target harian.</p>
+      <button id="dailyTargetActionBtn" type="button" class="daily-target-action hidden">➡️ Update Tabung Sekarang</button>
     </section>
 
     <form id="withdrawalForm" class="card">

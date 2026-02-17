@@ -141,9 +141,60 @@ def _build_account_activity_keyboard_for_user(user_id: int):
     goal_summary = get_project_grow_goal_summary(user_id)
     tabung_update_state = get_tabung_update_state(user_id)
     tabung_start_date = get_tabung_start_date(user_id)
-    set_goal_grow_target = max(
-        float(goal_summary["target_balance_usd"]) - float(goal_summary["current_balance_usd"]) - tabung_balance,
-        0.0,
+    total_grow_target = max(float(goal_summary["target_balance_usd"]) - float(goal_summary["current_balance_usd"]), 0.0)
+    set_goal_grow_target = max(total_grow_target - tabung_balance, 0.0)
+
+    set_new_goal_url = get_set_new_goal_webapp_url(
+        name=summary["name"],
+        current_balance_usd=current_balance,
+        saved_date=summary["saved_date"],
+        tabung_start_date=tabung_start_date,
+        mission_status=get_project_grow_mission_status_text(user_id),
+        has_goal=goal_summary["target_balance_usd"] > 0,
+        goal_reached=is_project_grow_goal_reached(user_id),
+        target_balance_usd=goal_summary["target_balance_usd"],
+        grow_target_usd=set_goal_grow_target,
+        target_days=int(goal_summary["target_days"]),
+        target_label=goal_summary["target_label"],
+        tabung_update_url="",
+        goal_baseline_balance_usd=float(goal_summary["current_balance_usd"]),
+    )
+    tabung_update_url = get_tabung_update_webapp_url(
+        name=summary["name"],
+        saved_date=summary["saved_date"],
+        current_balance_usd=current_balance,
+        tabung_balance_usd=tabung_balance,
+        total_balance_usd=total_balance,
+        target_balance_usd=float(goal_summary["target_balance_usd"]),
+        goal_reached=bool(tabung_update_state["goal_reached"]),
+        emergency_left=int(tabung_update_state["emergency_left"]),
+        set_new_goal_url=set_new_goal_url,
+    )
+    set_new_goal_url = get_set_new_goal_webapp_url(
+        name=summary["name"],
+        current_balance_usd=current_balance,
+        saved_date=summary["saved_date"],
+        tabung_start_date=tabung_start_date,
+        mission_status=get_project_grow_mission_status_text(user_id),
+        has_goal=goal_summary["target_balance_usd"] > 0,
+        goal_reached=is_project_grow_goal_reached(user_id),
+        target_balance_usd=goal_summary["target_balance_usd"],
+        grow_target_usd=set_goal_grow_target,
+        target_days=int(goal_summary["target_days"]),
+        target_label=goal_summary["target_label"],
+        tabung_update_url=tabung_update_url,
+        goal_baseline_balance_usd=float(goal_summary["current_balance_usd"]),
+    )
+    tabung_update_url = get_tabung_update_webapp_url(
+        name=summary["name"],
+        saved_date=summary["saved_date"],
+        current_balance_usd=current_balance,
+        tabung_balance_usd=tabung_balance,
+        total_balance_usd=total_balance,
+        target_balance_usd=float(goal_summary["target_balance_usd"]),
+        goal_reached=bool(tabung_update_state["goal_reached"]),
+        emergency_left=int(tabung_update_state["emergency_left"]),
+        set_new_goal_url=set_new_goal_url,
     )
 
     common_kwargs = {
@@ -161,35 +212,13 @@ def _build_account_activity_keyboard_for_user(user_id: int):
         "grow_target_usd": set_goal_grow_target,
         "target_days": int(goal_summary["target_days"]),
         "goal_reached": is_project_grow_goal_reached(user_id),
+        "goal_baseline_balance_usd": float(goal_summary["current_balance_usd"]),
+        "tabung_update_url": tabung_update_url,
     }
 
     deposit_url = get_deposit_activity_webapp_url(**common_kwargs)
     withdrawal_url = get_withdrawal_activity_webapp_url(**common_kwargs)
     trading_url = get_trading_activity_webapp_url(**common_kwargs)
-    set_new_goal_url = get_set_new_goal_webapp_url(
-        name=summary["name"],
-        current_balance_usd=current_balance,
-        saved_date=summary["saved_date"],
-        tabung_start_date=tabung_start_date,
-        mission_status=get_project_grow_mission_status_text(user_id),
-        has_goal=goal_summary["target_balance_usd"] > 0,
-        goal_reached=common_kwargs["goal_reached"],
-        target_balance_usd=goal_summary["target_balance_usd"],
-        grow_target_usd=set_goal_grow_target,
-        target_days=int(goal_summary["target_days"]),
-        target_label=goal_summary["target_label"],
-    )
-    tabung_update_url = get_tabung_update_webapp_url(
-        name=summary["name"],
-        saved_date=summary["saved_date"],
-        current_balance_usd=current_balance,
-        tabung_balance_usd=tabung_balance,
-        total_balance_usd=total_balance,
-        target_balance_usd=float(goal_summary["target_balance_usd"]),
-        goal_reached=bool(tabung_update_state["goal_reached"]),
-        emergency_left=int(tabung_update_state["emergency_left"]),
-        set_new_goal_url=set_new_goal_url,
-    )
 
     return account_activity_keyboard(
         deposit_activity_url=deposit_url,
@@ -288,6 +317,9 @@ def _build_project_grow_keyboard_for_user(user_id: int):
     tabung_start_date = get_tabung_start_date(user_id)
     tabung_progress = get_tabung_progress_summary(user_id)
     grow_target_usd = tabung_progress["grow_target_usd"]
+    total_balance = get_total_balance_usd(user_id)
+    goal_reached = is_project_grow_goal_reached(user_id)
+    tabung_state = get_tabung_update_state(user_id)
     mission_url = get_project_grow_mission_webapp_url(
         name=summary["name"],
         current_balance_usd=current_balance,
@@ -302,6 +334,32 @@ def _build_project_grow_keyboard_for_user(user_id: int):
         mission_mode=mission_state["mode"],
         mission_started_date=mission_state["started_date"],
     )
+    provisional_set_new_goal_url = get_set_new_goal_webapp_url(
+        name=summary["name"],
+        current_balance_usd=current_balance,
+        saved_date=summary["saved_date"],
+        tabung_start_date=tabung_start_date,
+        mission_status=mission_status,
+        has_goal=goal_summary["target_balance_usd"] > 0,
+        goal_reached=goal_reached,
+        target_balance_usd=goal_summary["target_balance_usd"],
+        grow_target_usd=grow_target_usd,
+        target_days=int(goal_summary["target_days"]),
+        target_label=goal_summary["target_label"],
+        tabung_update_url="",
+        goal_baseline_balance_usd=float(goal_summary["current_balance_usd"]),
+    )
+    tabung_update_url = get_tabung_update_webapp_url(
+        name=summary["name"],
+        saved_date=summary["saved_date"],
+        current_balance_usd=current_balance,
+        tabung_balance_usd=tabung_balance,
+        total_balance_usd=total_balance,
+        target_balance_usd=float(goal_summary["target_balance_usd"]),
+        goal_reached=goal_reached,
+        emergency_left=int(tabung_state["emergency_left"]),
+        set_new_goal_url=provisional_set_new_goal_url,
+    )
     set_new_goal_url = get_set_new_goal_webapp_url(
         name=summary["name"],
         current_balance_usd=current_balance,
@@ -309,11 +367,13 @@ def _build_project_grow_keyboard_for_user(user_id: int):
         tabung_start_date=tabung_start_date,
         mission_status=mission_status,
         has_goal=goal_summary["target_balance_usd"] > 0,
-        goal_reached=is_project_grow_goal_reached(user_id),
+        goal_reached=goal_reached,
         target_balance_usd=goal_summary["target_balance_usd"],
         grow_target_usd=grow_target_usd,
         target_days=int(goal_summary["target_days"]),
         target_label=goal_summary["target_label"],
+        tabung_update_url=tabung_update_url,
+        goal_baseline_balance_usd=float(goal_summary["current_balance_usd"]),
     )
     tabung_progress_url = get_tabung_progress_webapp_url(
         name=summary["name"],

@@ -43,6 +43,8 @@
   var growTarget = Number(params.get("grow_target_usd") || 0);
   var targetDays = Number(params.get("target_days") || 0);
   var goalReached = (params.get("goal_reached") || "0") === "1";
+  var goalBaselineBalance = Number(params.get("goal_baseline_balance_usd") || 0);
+  var tabungUpdateUrl = params.get("tabung_update_url") || "";
 
   document.getElementById("summaryName").textContent = name;
   document.getElementById("summaryCapital").textContent = formatUsd(initialCapital);
@@ -56,19 +58,38 @@
 
   var dailyTargetValueEl = document.getElementById("dailyTargetValue");
   var dailyTargetNoteEl = document.getElementById("dailyTargetNote");
+  var dailyTargetActionBtn = document.getElementById("dailyTargetActionBtn");
+  var floatingProgressUsd = Math.max(currentBalance - goalBaselineBalance, 0);
+  dailyTargetActionBtn.classList.add("hidden");
+  dailyTargetActionBtn.addEventListener("click", function () {
+    if (!tabungUpdateUrl) return;
+    window.location.href = tabungUpdateUrl;
+  });
+
   if (targetBalance <= 0) {
     dailyTargetValueEl.textContent = "USD 0.00 (0.00%)";
     dailyTargetNoteEl.textContent = "Set New Goal dulu untuk aktifkan tracker target harian.";
   } else if (goalReached || growTarget <= 0) {
     dailyTargetValueEl.textContent = "USD 0.00 (0.00%)";
-    dailyTargetNoteEl.textContent = "Target dah capai. Masukkan keuntungan ke tabung supaya grow target dikira semula.";
+    dailyTargetNoteEl.textContent = "Target dah capai. Masukkan keuntungan ke tabung supaya grow target berubah.";
+    if (tabungUpdateUrl) {
+      dailyTargetActionBtn.classList.remove("hidden");
+    }
   } else {
     var tradingDays = tradingDaysByTargetDays(targetDays);
     var dailyTargetUsd = tradingDays > 0 ? growTarget / tradingDays : growTarget / 22;
     var baseBalance = currentBalance > 0 ? currentBalance : initialCapital;
     var dailyTargetPct = baseBalance > 0 ? (dailyTargetUsd / baseBalance) * 100 : 0;
-    dailyTargetValueEl.textContent = "USD " + formatUsd(dailyTargetUsd) + " (" + formatPct(dailyTargetPct) + "%)";
-    dailyTargetNoteEl.textContent = "Baki grow target: USD " + formatUsd(growTarget) + ". Kiraan guna 22 hari trading sebulan (Isnin-Jumaat).";
+    if (floatingProgressUsd >= dailyTargetUsd && dailyTargetUsd > 0) {
+      dailyTargetValueEl.textContent = "Daily Target Reached ✅";
+      dailyTargetNoteEl.textContent = "Target harian dah capai, tapi grow target takkan berubah selagi duit belum masuk tabung.";
+      if (tabungUpdateUrl) {
+        dailyTargetActionBtn.classList.remove("hidden");
+      }
+    } else {
+      dailyTargetValueEl.textContent = "USD " + formatUsd(dailyTargetUsd) + " (" + formatPct(dailyTargetPct) + "%)";
+      dailyTargetNoteEl.textContent = "Baki grow target tabung: USD " + formatUsd(growTarget) + ". Floating semasa: USD " + formatUsd(floatingProgressUsd) + ".";
+    }
   }
 
   var introText = document.getElementById("introText");
