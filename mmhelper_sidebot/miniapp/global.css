@@ -1,13 +1,13 @@
 :root {
-  --bg: #0b1015;
-  --panel: #111e2a;
-  --panel-soft: #173042;
+  --bg: #14090b;
+  --panel: #251114;
+  --panel-soft: #34171a;
   --text: #edf6ff;
-  --muted: #b4c9da;
-  --accent-main: #1fbf8f;
-  --accent-main-2: #22d3a2;
-  --border-card: #2d6f74;
-  --border-input: #3f8b93;
+  --muted: #d8bcc2;
+  --accent-main: #f59e0b;
+  --accent-main-2: #f97316;
+  --border-card: #6e3338;
+  --border-input: #8d4d54;
 }
 
 * {
@@ -18,9 +18,9 @@ body {
   margin: 0;
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   background:
-    radial-gradient(circle at top right, #19434f 0%, rgba(25, 67, 79, 0) 38%),
-    radial-gradient(circle at top left, #122735 0%, rgba(18, 39, 53, 0) 34%),
-    linear-gradient(180deg, #090e13 0%, var(--bg) 100%);
+    radial-gradient(circle at top right, #4a1f27 0%, rgba(74, 31, 39, 0) 42%),
+    radial-gradient(circle at top left, #301319 0%, rgba(48, 19, 25, 0) 37%),
+    linear-gradient(180deg, #12080a 0%, var(--bg) 100%);
   color: var(--text);
   position: relative;
   overflow-x: hidden;
@@ -99,7 +99,7 @@ body::before {
   padding: 18px;
   box-shadow:
     0 10px 24px rgba(0, 0, 0, 0.38),
-    0 0 0 1px rgba(45, 111, 116, 0.24) inset;
+    0 0 0 1px rgba(110, 51, 56, 0.28) inset;
 }
 
 button {
@@ -110,7 +110,7 @@ button {
   padding: 12px;
   font-size: 16px;
   font-weight: 700;
-  color: #062018;
+  color: #2e1400;
   background: linear-gradient(90deg, var(--accent-main) 0%, var(--accent-main-2) 100%);
 }
 
