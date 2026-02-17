@@ -281,7 +281,7 @@
     <section id="newRegistrationView" class="card content-card hidden">
       <div class="tabs">
         <button id="tabNewRegistration" type="button" class="tab-btn active">Pendaftaran Baru</button>
-        <button id="tabVerification" type="button" class="tab-btn">Pengesahan Pendaftaran</button>
+        <button id="tabVerification" type="button" class="tab-btn">Pengesahan Pelanggan Baru</button>
       </div>
 
       <div id="panelNewRegistration">
@@ -408,10 +408,44 @@
       </div>
 
       <div id="panelIbVerification" class="hidden">
-        <h2 class="section-title">Pengesahan Pendaftaran (IB Transfer)</h2>
-        <p>Placeholder untuk flow pengesahan pendaftaran bagi Penukaran IB.</p>
-        <p>Borang dan tindakan susulan akan dimasukkan pada step seterusnya.</p>
-        <span class="placeholder-tag">Placeholder: IB Verification</span>
+        <h2 class="section-title">Pengesahan Penukaran IB</h2>
+        <p>Sila isi maklumat di bawah untuk semakan pengaktifan NEXT Member.</p>
+        <div class="form-grid">
+          <div>
+            <span class="field-label">Dah submit request penukaran IB di dashboard AMarkets?</span>
+            <p class="deposit-help">Pilih satu sahaja untuk status semasa.</p>
+            <div class="deposit-choice">
+              <button id="ibRequestYesBtn" type="button" class="choice-btn">Ya, dah submit request</button>
+              <button id="ibRequestNoBtn" type="button" class="choice-btn">Belum submit request</button>
+            </div>
+          </div>
+
+          <div>
+            <label for="ibWalletIdInput" class="field-label">AMarkets Wallet ID</label>
+            <input id="ibWalletIdInput" class="field-input" type="text" inputmode="numeric" placeholder="Contoh: 2248557" />
+          </div>
+
+          <div>
+            <span class="field-label">Dah buat deposit USD 100?</span>
+            <p class="deposit-help">Pilih satu sahaja untuk status semasa.</p>
+            <div class="deposit-choice">
+              <button id="ibDepositYesBtn" type="button" class="choice-btn">Ya, dah deposit USD 100+</button>
+              <button id="ibDepositNoBtn" type="button" class="choice-btn">Belum deposit USD 100</button>
+            </div>
+          </div>
+
+          <div>
+            <label for="ibFullNameInput" class="field-label">Nama penuh</label>
+            <input id="ibFullNameInput" class="field-input" type="text" autocomplete="name" placeholder="Nama seperti pendaftaran AMarkets" />
+          </div>
+
+          <div>
+            <label for="ibPhoneInput" class="field-label">No telefon</label>
+            <input id="ibPhoneInput" class="field-input" type="tel" inputmode="tel" autocomplete="tel" placeholder="Contoh: +60123456789" />
+          </div>
+        </div>
+
+        <button id="submitIbVerificationBtn" type="button" class="submit-btn">Hantar Pengesahan Penukaran IB</button>
       </div>
 
       <div class="inline-actions">

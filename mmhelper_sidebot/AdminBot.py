@@ -184,6 +184,8 @@ def store_verification_submission(
     has_deposit_100: bool,
     full_name: str,
     phone_number: str,
+    registration_flow: str = "new_registration",
+    ib_request_submitted: bool | None = None,
 ) -> dict:
     state = load_state()
     users = state.setdefault("users", {})
@@ -203,6 +205,8 @@ def store_verification_submission(
         "has_deposit_100": bool(has_deposit_100),
         "full_name": full_name,
         "phone_number": phone_number,
+        "registration_flow": registration_flow,
+        "ib_request_submitted": ib_request_submitted,
         "submitted_at": datetime.now(timezone.utc).isoformat(),
         "status": "pending",
         "admin_group_message_id": None,
@@ -338,13 +342,21 @@ def render_admin_submission_text(item: dict) -> str:
     username = item.get("telegram_username") or "-"
     username_text = f"@{username}" if username != "-" else "-"
     deposit_text = "Ya" if bool(item.get("has_deposit_100")) else "Belum"
+    flow = str(item.get("registration_flow") or "new_registration")
+    flow_text = "Pelanggan Baru" if flow == "new_registration" else "Penukaran IB"
+    ib_req = item.get("ib_request_submitted")
+    ib_req_text = ""
+    if flow == "ib_transfer":
+        ib_req_text = f"Submit Request IB: {'Ya' if ib_req else 'Belum'}\n"
     return (
-        "🆕 Pendaftaran Baru (Verification Submit)\n\n"
+        "🆕 NEXT Member Verification Submit\n\n"
+        f"Flow: {flow_text}\n"
         f"Submission ID: {item.get('submission_id')}\n"
         f"User ID: {user_id}\n"
         f"Username: {username_text}\n"
         f"Nama: {item.get('full_name')}\n"
         f"Wallet ID: {item.get('wallet_id')}\n"
+        f"{ib_req_text}"
         f"Deposit USD100: {deposit_text}\n"
         f"No Telefon: {item.get('phone_number')}\n"
         f"Status: {status_text}"
@@ -805,6 +817,13 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     if payload_type == "sidebot_verification_submit":
+        registration_flow = str(payload.get("registration_flow") or "new_registration").strip() or "new_registration"
+        ib_request_raw = payload.get("ib_request_submitted", None)
+        ib_request_submitted = None
+        if registration_flow == "ib_transfer":
+            if isinstance(ib_request_raw, bool):
+                ib_request_submitted = ib_request_raw
+
         wallet_id = str(payload.get("wallet_id") or "").strip()
         full_name = str(payload.get("full_name") or "").strip()
         phone_number = str(payload.get("phone_number") or "").strip()
@@ -812,6 +831,9 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
         if not wallet_id or not full_name or not phone_number:
             await message.reply_text("❌ Data pengesahan tak lengkap. Sila isi semula dalam miniapp.")
+            return
+        if registration_flow == "ib_transfer" and ib_request_submitted is None:
+            await message.reply_text("❌ Status submit request penukaran IB belum dipilih. Sila isi semula.")
             return
 
         saved = store_verification_submission(
@@ -821,6 +843,8 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
             has_deposit_100=has_deposit_100,
             full_name=full_name,
             phone_number=phone_number,
+            registration_flow=registration_flow,
+            ib_request_submitted=ib_request_submitted,
         )
         deposit_text = "Ya" if has_deposit_100 else "Belum"
         submission_id = str(saved.get("submission_id") or "-")

@@ -42,10 +42,20 @@
   var depositYesBtn = document.getElementById("depositYesBtn");
   var depositNoBtn = document.getElementById("depositNoBtn");
   var submitVerificationBtn = document.getElementById("submitVerificationBtn");
+  var ibRequestYesBtn = document.getElementById("ibRequestYesBtn");
+  var ibRequestNoBtn = document.getElementById("ibRequestNoBtn");
+  var ibWalletIdInput = document.getElementById("ibWalletIdInput");
+  var ibDepositYesBtn = document.getElementById("ibDepositYesBtn");
+  var ibDepositNoBtn = document.getElementById("ibDepositNoBtn");
+  var ibFullNameInput = document.getElementById("ibFullNameInput");
+  var ibPhoneInput = document.getElementById("ibPhoneInput");
+  var submitIbVerificationBtn = document.getElementById("submitIbVerificationBtn");
   var AMARKETS_SIGNUP_URL = "https://amarketstrading.co/sign-up/real-en/?g=REEZO24";
 
   var activeView = "home";
   var hasDeposited100 = null;
+  var ibRequestSubmitted = null;
+  var ibHasDeposited100 = null;
 
   function updateBottomPrevState() {
     bottomPrevBtn.classList.toggle("hidden", activeView === "home");
@@ -154,6 +164,18 @@
     depositNoBtn.classList.toggle("active-no", value === false);
   }
 
+  function setIbRequestChoice(value) {
+    ibRequestSubmitted = value;
+    ibRequestYesBtn.classList.toggle("active-yes", value === true);
+    ibRequestNoBtn.classList.toggle("active-no", value === false);
+  }
+
+  function setIbDepositChoice(value) {
+    ibHasDeposited100 = value;
+    ibDepositYesBtn.classList.toggle("active-yes", value === true);
+    ibDepositNoBtn.classList.toggle("active-no", value === false);
+  }
+
   function readText(el) {
     return String((el && el.value) || "").trim();
   }
@@ -199,6 +221,55 @@
     }
 
     statusEl.textContent = "Preview mode: borang pengesahan dihantar.";
+  }
+
+  function submitIbVerification() {
+    var walletId = readText(ibWalletIdInput);
+    var fullName = readText(ibFullNameInput);
+    var phoneNumber = readText(ibPhoneInput);
+
+    if (ibRequestSubmitted === null) {
+      statusEl.textContent = "Sila pilih status submit request penukaran IB.";
+      return;
+    }
+    if (!walletId) {
+      statusEl.textContent = "Sila isi AMarkets Wallet ID.";
+      return;
+    }
+    if (ibHasDeposited100 === null) {
+      statusEl.textContent = "Sila pilih status deposit USD 100.";
+      return;
+    }
+    if (!fullName) {
+      statusEl.textContent = "Sila isi nama penuh.";
+      return;
+    }
+    if (!phoneNumber) {
+      statusEl.textContent = "Sila isi no telefon.";
+      return;
+    }
+
+    var payload = {
+      type: "sidebot_verification_submit",
+      registration_flow: "ib_transfer",
+      ib_request_submitted: ibRequestSubmitted,
+      wallet_id: walletId,
+      has_deposit_100: ibHasDeposited100,
+      full_name: fullName,
+      phone_number: phoneNumber
+    };
+
+    if (tg) {
+      try {
+        tg.sendData(JSON.stringify(payload));
+      } catch (err) {
+        // no-op
+      }
+      tg.close();
+      return;
+    }
+
+    statusEl.textContent = "Preview mode: borang pengesahan penukaran IB dihantar.";
   }
 
   topBackBtn.addEventListener("click", backToPreviousMenu);
@@ -277,10 +348,25 @@
   });
 
   submitVerificationBtn.addEventListener("click", submitVerification);
+  ibRequestYesBtn.addEventListener("click", function () {
+    setIbRequestChoice(true);
+  });
+  ibRequestNoBtn.addEventListener("click", function () {
+    setIbRequestChoice(false);
+  });
+  ibDepositYesBtn.addEventListener("click", function () {
+    setIbDepositChoice(true);
+  });
+  ibDepositNoBtn.addEventListener("click", function () {
+    setIbDepositChoice(false);
+  });
+  submitIbVerificationBtn.addEventListener("click", submitIbVerification);
 
   showView("home");
   openTab("new");
   openIbTab("transfer");
   openIbGuideTab("web");
   setDepositChoice(null);
+  setIbRequestChoice(null);
+  setIbDepositChoice(null);
 })();
