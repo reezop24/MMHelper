@@ -8,12 +8,52 @@
   var statusEl = document.getElementById("status");
   var topBackBtn = document.getElementById("topBackBtn");
   var bottomBackBtn = document.getElementById("bottomBackBtn");
+
+  var homeView = document.getElementById("homeView");
+  var newRegistrationView = document.getElementById("newRegistrationView");
+  var ibTransferView = document.getElementById("ibTransferView");
+  var underIbReezoView = document.getElementById("underIbReezoView");
+
+  var btnHomeNewRegistration = document.getElementById("btnHomeNewRegistration");
+  var btnHomeIbTransfer = document.getElementById("btnHomeIbTransfer");
+  var btnHomeUnderIbReezo = document.getElementById("btnHomeUnderIbReezo");
+  var btnBackFromIbTransfer = document.getElementById("btnBackFromIbTransfer");
+  var btnBackFromUnderIbReezo = document.getElementById("btnBackFromUnderIbReezo");
+
   var tabNewRegistration = document.getElementById("tabNewRegistration");
   var tabVerification = document.getElementById("tabVerification");
   var panelNewRegistration = document.getElementById("panelNewRegistration");
   var panelVerification = document.getElementById("panelVerification");
   var btnDaftarAmarkets = document.getElementById("btnDaftarAmarkets");
   var btnPengesahanPelangganBaru = document.getElementById("btnPengesahanPelangganBaru");
+
+  var activeView = "home";
+
+  function showView(name) {
+    homeView.classList.add("hidden");
+    newRegistrationView.classList.add("hidden");
+    ibTransferView.classList.add("hidden");
+    underIbReezoView.classList.add("hidden");
+
+    if (name === "new_registration") {
+      newRegistrationView.classList.remove("hidden");
+      activeView = name;
+      return;
+    }
+    if (name === "ib_transfer") {
+      ibTransferView.classList.remove("hidden");
+      activeView = name;
+      return;
+    }
+    if (name === "under_ib_reezo") {
+      underIbReezoView.classList.remove("hidden");
+      activeView = name;
+      return;
+    }
+
+    homeView.classList.remove("hidden");
+    activeView = "home";
+  }
 
   function openTab(tabName) {
     var isNew = tabName === "new";
@@ -24,6 +64,11 @@
   }
 
   function backToMainMenu() {
+    if (activeView !== "home") {
+      showView("home");
+      return;
+    }
+
     var payload = { type: "sidebot_back_to_main_menu" };
 
     if (tg) {
@@ -61,6 +106,27 @@
   topBackBtn.addEventListener("click", backToMainMenu);
   bottomBackBtn.addEventListener("click", backToMainMenu);
 
+  btnHomeNewRegistration.addEventListener("click", function () {
+    showView("new_registration");
+    openTab("new");
+  });
+
+  btnHomeIbTransfer.addEventListener("click", function () {
+    showView("ib_transfer");
+  });
+
+  btnHomeUnderIbReezo.addEventListener("click", function () {
+    showView("under_ib_reezo");
+  });
+
+  btnBackFromIbTransfer.addEventListener("click", function () {
+    showView("home");
+  });
+
+  btnBackFromUnderIbReezo.addEventListener("click", function () {
+    showView("home");
+  });
+
   tabNewRegistration.addEventListener("click", function () {
     openTab("new");
   });
@@ -77,5 +143,6 @@
     openTab("verification");
   });
 
+  showView("home");
   openTab("new");
 })();
