@@ -31,6 +31,32 @@
     .result-line + .result-line {
       margin-top: 7px;
     }
+
+    #stopOutPct {
+      width: 100%;
+      border: 1px solid var(--border-input);
+      background: #06142f;
+      color: var(--text);
+      border-radius: 10px;
+      padding: 12px;
+      font-size: 15px;
+      line-height: 1.35;
+      min-height: 46px;
+      appearance: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+    }
+
+    .risk-value {
+      color: #ff8f8f;
+    }
+
+    .lot-value {
+      color: #7ee0ff;
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: 0.2px;
+    }
   </style>
 </head>
 <body>
@@ -108,14 +134,14 @@
 
     <section class="result-card">
       <p class="result-title"><strong>Output per setup (XAUUSD)</strong></p>
-      <p class="result-line">Risk USD per setup: <strong>USD <span id="riskUsd">0.00</span></strong></p>
-      <p class="result-line">Cadangan lot size: <strong><span id="lotSize">0.00</span> lot</strong></p>
+      <p class="result-line">Risk USD per setup: <strong class="risk-value">USD <span id="riskUsd">0.00</span></strong></p>
+      <p class="result-line">Cadangan lot size: <strong><span id="lotSize" class="lot-value">0.00</span> lot</strong></p>
       <p class="result-line">Zon setara harga: <strong>USD <span id="zoneUsd">0.00</span></strong></p>
       <p class="result-line">Used margin anggaran: <strong>USD <span id="usedMargin">0.00</span></strong></p>
-      <p class="result-line">Loss max sebelum stop-out: <strong>USD <span id="maxLossBeforeStopOut">0.00</span></strong></p>
-      <p class="result-line">Jarak harga max sebelum stop-out: <strong>USD <span id="maxMoveBeforeStopOut">0.00</span></strong></p>
-      <p class="result-line">Anggaran floating @ zon penuh: <strong>USD <span id="floatingFull">0.00</span></strong></p>
-      <p class="result-line">Anggaran floating @ separuh zon: <strong>USD <span id="floatingHalf">0.00</span></strong></p>
+      <p class="result-line">Loss max sebelum stop-out: <strong class="risk-value">USD <span id="maxLossBeforeStopOut">0.00</span></strong></p>
+      <p class="result-line">Jarak harga max sebelum stop-out: <strong class="risk-value">USD <span id="maxMoveBeforeStopOut">0.00</span></strong></p>
+      <p class="result-line">Anggaran floating @ zon penuh: <strong class="risk-value">USD <span id="floatingFull">0.00</span></strong></p>
+      <p class="result-line">Anggaran floating @ separuh zon: <strong class="risk-value">USD <span id="floatingHalf">0.00</span></strong></p>
       <p class="hint"><em>Andaian kiraan: contract size XAUUSD = 100, 1 pip = 0.10, maka 1.00 lot ≈ USD 10 per pip.</em></p>
     </section>
   </main>
