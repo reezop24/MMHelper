@@ -18,6 +18,17 @@
     return sign + "USD " + number.toFixed(2);
   }
 
+  function formatPct(value) {
+    return Number(value || 0).toFixed(2);
+  }
+
+  function tradingDaysByTargetDays(targetDays) {
+    if (targetDays === 30) return 22;
+    if (targetDays === 90) return 66;
+    if (targetDays === 180) return 132;
+    return 0;
+  }
+
   function getNumericInputValue(inputEl) {
     var raw = (inputEl.value || "").trim();
     if (!raw) return NaN;
@@ -43,6 +54,10 @@
   var tabungBalance = Number(params.get("tabung_balance_usd") || 0);
   var weeklyPerformance = Number(params.get("weekly_performance_usd") || 0);
   var monthlyPerformance = Number(params.get("monthly_performance_usd") || 0);
+  var targetBalance = Number(params.get("target_balance_usd") || 0);
+  var growTarget = Number(params.get("grow_target_usd") || 0);
+  var targetDays = Number(params.get("target_days") || 0);
+  var goalReached = (params.get("goal_reached") || "0") === "1";
 
   document.getElementById("summaryName").textContent = name;
   document.getElementById("summaryCapital").textContent = formatUsd(initialCapital);
@@ -53,6 +68,23 @@
   document.getElementById("summaryMonthlyPerformance").textContent = formatPnl(monthlyPerformance);
   document.getElementById("summaryDate").textContent = savedDate;
   document.getElementById("summaryTabungStartDate").textContent = tabungStartDate;
+
+  var dailyTargetValueEl = document.getElementById("dailyTargetValue");
+  var dailyTargetNoteEl = document.getElementById("dailyTargetNote");
+  if (targetBalance <= 0) {
+    dailyTargetValueEl.textContent = "USD 0.00 (0.00%)";
+    dailyTargetNoteEl.textContent = "Set New Goal dulu untuk aktifkan tracker target harian.";
+  } else if (goalReached || growTarget <= 0) {
+    dailyTargetValueEl.textContent = "USD 0.00 (0.00%)";
+    dailyTargetNoteEl.textContent = "Target dah capai. Masukkan keuntungan ke tabung supaya grow target dikira semula.";
+  } else {
+    var tradingDays = tradingDaysByTargetDays(targetDays);
+    var dailyTargetUsd = tradingDays > 0 ? growTarget / tradingDays : growTarget / 22;
+    var baseBalance = currentBalance > 0 ? currentBalance : initialCapital;
+    var dailyTargetPct = baseBalance > 0 ? (dailyTargetUsd / baseBalance) * 100 : 0;
+    dailyTargetValueEl.textContent = "USD " + formatUsd(dailyTargetUsd) + " (" + formatPct(dailyTargetPct) + "%)";
+    dailyTargetNoteEl.textContent = "Baki grow target: USD " + formatUsd(growTarget) + ". Kiraan guna 22 hari trading sebulan (Isnin-Jumaat).";
+  }
 
   var introText = document.getElementById("introText");
   var modePrompt = document.getElementById("modePrompt");

@@ -204,6 +204,34 @@
       font-weight: 700;
     }
 
+    .daily-target-box {
+      margin: 0 0 16px;
+      border: 1px solid rgba(95, 145, 215, 0.45);
+      border-radius: 12px;
+      background: rgba(8, 26, 55, 0.78);
+      padding: 12px;
+    }
+
+    .daily-target-title {
+      margin: 0 0 6px;
+      color: #f4f9ff;
+      font-size: 14px;
+    }
+
+    .daily-target-value {
+      margin: 0;
+      color: #d8e6ff;
+      font-size: 14px;
+      line-height: 1.35;
+    }
+
+    .daily-target-note {
+      margin: 8px 0 0;
+      color: #c8d8f2;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
     .hidden {
       display: none;
     }
@@ -264,6 +292,12 @@
       <div class="summary-item"><strong>Monthly Performance:</strong> <span id="summaryMonthlyPerformance">USD 0.00</span></div>
       <div class="summary-item"><strong>Tarikh mula:</strong> <span id="summaryDate">-</span></div>
       <div class="summary-item"><strong>Tarikh mula tabung:</strong> <span id="summaryTabungStartDate">-</span></div>
+    </section>
+
+    <section class="daily-target-box">
+      <p class="daily-target-title"><strong>Target Hari Ini</strong></p>
+      <p id="dailyTargetValue" class="daily-target-value">USD 0.00 (0.00%)</p>
+      <p id="dailyTargetNote" class="daily-target-note">Set New Goal dulu untuk aktifkan tracker target harian.</p>
     </section>
 
     <form id="tradingForm" class="card">
