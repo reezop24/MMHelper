@@ -1,1 +1,17 @@
 /* Setup page specific styles. Keep minimal; shared theme lives in global.css. */
+
+#target_days {
+  width: 100%;
+  border: 1px solid var(--border-input);
+  background: #06142f;
+  color: var(--text);
+  border-radius: 10px;
+  padding: 13px 12px;
+  font-size: 16px;
+  line-height: 1.35;
+  min-height: 48px;
+}
+
+#target_days option {
+  font-size: 16px;
+}

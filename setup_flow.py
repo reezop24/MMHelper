@@ -191,8 +191,13 @@ async def _handle_initial_setup(payload: dict, update: Update, context: ContextT
         await send_screen(context, message.chat_id, "❌ Modal kena lebih dari 0, baru game start.")
         return
 
-    if target_balance_usd <= initial_capital:
-        await send_screen(context, message.chat_id, "❌ Target Capital kena lebih tinggi dari modal permulaan.")
+    minimum_target = initial_capital + 100.0
+    if target_balance_usd < minimum_target:
+        await send_screen(
+            context,
+            message.chat_id,
+            f"❌ Target Capital minimum ialah USD {minimum_target:.2f} (modal + 100).",
+        )
         return
 
     target_days_raw = str(payload.get("target_days") or "").strip()
@@ -232,7 +237,7 @@ async def _handle_initial_setup(payload: dict, update: Update, context: ContextT
         payload={
             "target_balance_usd": float(target_balance_usd),
             "unlock_amount_usd": 0.0,
-            "minimum_target_usd": float(initial_capital),
+            "minimum_target_usd": float(minimum_target),
             "current_balance_usd": float(initial_capital),
             "target_days": target_days,
             "target_label": target_label,

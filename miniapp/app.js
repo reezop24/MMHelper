@@ -1,6 +1,5 @@
 (function () {
   var tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
-  var content = window.MMHELPER_CONTENT || {};
   if (tg) {
     tg.ready();
     tg.expand();
@@ -13,6 +12,7 @@
   var targetBalanceInput = document.getElementById("target_balance_usd");
   var targetDaysSelect = document.getElementById("target_days");
   var growTargetHintEl = document.getElementById("growTargetHint");
+  var minTargetHintEl = document.getElementById("minTargetHint");
   var targetInfoEl = document.getElementById("targetInfo");
 
   topBackBtn.addEventListener("click", function () {
@@ -37,6 +37,11 @@
   function updateGrowTargetPreview() {
     var initialCapital = getNumberValue("initial_capital_usd");
     var targetBalance = getNumberValue("target_balance_usd");
+    if (Number.isNaN(initialCapital)) {
+      minTargetHintEl.textContent = "Minimum target ialah modal permulaan + USD 100.";
+    } else {
+      minTargetHintEl.textContent = "Minimum target semasa: USD " + formatUsd(initialCapital + 100);
+    }
     if (Number.isNaN(initialCapital) || Number.isNaN(targetBalance)) {
       growTargetHintEl.textContent = "Grow Target: USD 0.00";
       return;
@@ -59,7 +64,7 @@
       targetInfoEl.textContent = "6 bulan: pace konservatif untuk bina momentum stabil.";
       return;
     }
-    targetInfoEl.textContent = content.setNewGoalFinalPrompt || "Pilih tempoh yang realistik ikut pace account semasa.";
+    targetInfoEl.textContent = "Pilih tempoh yang realistik ikut pace account semasa.";
   }
 
   initialCapitalInput.addEventListener("input", function () {
@@ -108,8 +113,9 @@
       return;
     }
 
-    if (payload.target_balance_usd <= payload.initial_capital_usd) {
-      statusEl.textContent = "Target Capital mesti lebih tinggi dari modal permulaan.";
+    var minTarget = payload.initial_capital_usd + 100;
+    if (payload.target_balance_usd < minTarget) {
+      statusEl.textContent = "Target Capital minimum ialah USD " + formatUsd(minTarget) + ".";
       return;
     }
 
