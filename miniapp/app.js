@@ -76,8 +76,16 @@
       return;
     }
 
+    var tradingDaysMap = { 30: 22, 90: 66, 180: 132 };
+    var tradingDays = tradingDaysMap[targetDays] || 0;
+    if (!tradingDays) {
+      resetRecommendation();
+      recommendationStatusEl.textContent = "Tempoh target tak sah untuk kiraan trading day.";
+      return;
+    }
+
     var growTargetUsd = targetBalance - initialCapital;
-    var dailyTargetUsd = growTargetUsd / targetDays;
+    var dailyTargetUsd = growTargetUsd / tradingDays;
     var dailyTargetPct = (dailyTargetUsd / initialCapital) * 100;
 
     // Assumption: daily risk budget follows daily target pace (1:1 target-risk plan).
@@ -94,10 +102,10 @@
     perSetupRiskUsdEl.textContent = formatUsd(perSetupRiskUsd);
 
     if (dailyRiskPct > 5) {
-      recommendationStatusEl.textContent = "Cadangan ni agak agresif. Pertimbangkan tempoh lebih panjang untuk kurangkan pressure harian.";
+      recommendationStatusEl.textContent = "Kiraan guna 22 hari trading sebulan. Cadangan ni agak agresif, pertimbangkan tempoh lebih panjang.";
       return;
     }
-    recommendationStatusEl.textContent = "Cadangan ini guna andaian 2 setup sehari dan pace konsisten.";
+    recommendationStatusEl.textContent = "Kiraan guna 22 hari trading sebulan (Isnin-Jumaat) dengan andaian 2 setup sehari.";
   }
 
   function updateGrowTargetPreview() {
