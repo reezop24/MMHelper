@@ -19,11 +19,12 @@
 
   var form = document.getElementById("resetForm");
   var topBackBtn = document.getElementById("topBackBtn");
+  var bottomBackBtn = document.getElementById("bottomBackBtn");
   var submitBtn = document.getElementById("submitBtn");
   var statusEl = document.getElementById("formStatus");
   var confirmResetAll = document.getElementById("confirmResetAll");
 
-  topBackBtn.addEventListener("click", function () {
+  function backToMmSetting() {
     var payload = { type: "mm_setting_back_to_menu" };
 
     if (tg) {
@@ -33,7 +34,10 @@
     }
 
     statusEl.textContent = "Preview mode: buka dari Telegram untuk kembali ke MM Helper Setting.";
-  });
+  }
+
+  topBackBtn.addEventListener("click", backToMmSetting);
+  bottomBackBtn.addEventListener("click", backToMmSetting);
 
   form.addEventListener("submit", function (event) {
     event.preventDefault();

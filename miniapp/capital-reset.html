@@ -43,6 +43,25 @@
       opacity: 0.55;
       cursor: not-allowed;
     }
+
+    .bottom-actions {
+      display: flex;
+      justify-content: flex-start;
+      margin-top: 12px;
+    }
+
+    .back-btn {
+      margin: 0;
+      width: auto;
+      min-width: 210px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid #4a70ac;
+      background: rgba(11, 34, 71, 0.9);
+      color: #e6f0ff;
+      font-size: 13px;
+      font-weight: 700;
+    }
   </style>
 </head>
 <body>
@@ -84,6 +103,10 @@ Tindakan ni untuk user kau sahaja dan tak ganggu user lain.</p>
       <button id="submitBtn" type="submit">🗑️ Confirm Reset</button>
       <p id="formStatus" class="status" aria-live="polite"></p>
     </form>
+
+    <div class="bottom-actions">
+      <button id="bottomBackBtn" type="button" class="back-btn">⬅️ Back to MM Helper Setting</button>
+    </div>
   </main>
 
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
