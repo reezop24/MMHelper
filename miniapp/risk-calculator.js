@@ -54,47 +54,49 @@
 
   function updateLiveRecommendation(balance, zonePips) {
     var dailyTargetUsdEl = document.getElementById("dailyTargetUsdLive");
-    var dailyRiskPctEl = document.getElementById("dailyRiskPctLive");
-    var dailyRiskUsdEl = document.getElementById("dailyRiskUsdLive");
-    var perSetupRiskPctEl = document.getElementById("perSetupRiskPctLive");
-    var perSetupRiskUsdEl = document.getElementById("perSetupRiskUsdLive");
-    var recommendedLotDailyEl = document.getElementById("recommendedLotDailyLive");
-    var recommendedLotPerSetupEl = document.getElementById("recommendedLotPerSetupLive");
+    var perSetupTargetUsdEl = document.getElementById("perSetupTargetUsdLive");
+    var baseModal5UsdEl = document.getElementById("baseModal5UsdLive");
+    var baseModal10UsdEl = document.getElementById("baseModal10UsdLive");
+    var recommendedLot5El = document.getElementById("recommendedLot5Live");
+    var recommendedLot10El = document.getElementById("recommendedLot10Live");
+    var tpPips5El = document.getElementById("tpPips5Live");
+    var tpPips10El = document.getElementById("tpPips10Live");
     var noteEl = document.getElementById("liveRecommendationNote");
 
     var tradingDays = tradingDaysByTargetDays(liveTargetDays);
     if (balance <= 0 || tradingDays <= 0 || liveGrowTargetUsd <= 0 || zonePips <= 0) {
       dailyTargetUsdEl.textContent = "0.00";
-      dailyRiskPctEl.textContent = "0.00";
-      dailyRiskUsdEl.textContent = "0.00";
-      perSetupRiskPctEl.textContent = "0.00";
-      perSetupRiskUsdEl.textContent = "0.00";
-      recommendedLotDailyEl.textContent = "0.00";
-      recommendedLotPerSetupEl.textContent = "0.00";
+      perSetupTargetUsdEl.textContent = "0.00";
+      baseModal5UsdEl.textContent = "0.00";
+      baseModal10UsdEl.textContent = "0.00";
+      recommendedLot5El.textContent = "0.00";
+      recommendedLot10El.textContent = "0.00";
+      tpPips5El.textContent = "0.00";
+      tpPips10El.textContent = "0.00";
       noteEl.textContent = "Recommendation perlukan data goal aktif (30/90/180 hari).";
       return;
     }
 
-    var pipSize = 0.10;
-    var contractSize = 100;
-    var zoneUsd = zonePips * pipSize;
+    var pipValuePerLot = 10; // XAUUSD with pip=0.10
     var dailyTargetUsd = liveGrowTargetUsd / tradingDays;
-    var dailyRiskUsd = dailyTargetUsd;
-    var dailyRiskPct = (dailyRiskUsd / balance) * 100;
-    var perSetupRiskUsd = dailyRiskUsd / 2;
-    var perSetupRiskPct = dailyRiskPct / 2;
-    var usdPerLotAtZone = zoneUsd * contractSize;
-    var recommendedLotDaily = usdPerLotAtZone > 0 ? floorToStep(dailyTargetUsd / usdPerLotAtZone, 0.01) : 0;
-    var recommendedLotPerSetup = floorToStep(recommendedLotDaily / 2, 0.01);
+    var perSetupTargetUsd = dailyTargetUsd / 2;
+    var baseModal5Usd = balance * 0.05;
+    var baseModal10Usd = balance * 0.10;
+    var usdPerLotAtZone = zonePips * pipValuePerLot;
+    var lot5 = usdPerLotAtZone > 0 ? floorToStep(baseModal5Usd / usdPerLotAtZone, 0.01) : 0;
+    var lot10 = usdPerLotAtZone > 0 ? floorToStep(baseModal10Usd / usdPerLotAtZone, 0.01) : 0;
+    var tpPips5 = lot5 > 0 ? perSetupTargetUsd / (lot5 * pipValuePerLot) : 0;
+    var tpPips10 = lot10 > 0 ? perSetupTargetUsd / (lot10 * pipValuePerLot) : 0;
 
     dailyTargetUsdEl.textContent = f2(dailyTargetUsd);
-    dailyRiskPctEl.textContent = f2(dailyRiskPct);
-    dailyRiskUsdEl.textContent = f2(dailyRiskUsd);
-    perSetupRiskPctEl.textContent = f2(perSetupRiskPct);
-    perSetupRiskUsdEl.textContent = f2(perSetupRiskUsd);
-    recommendedLotDailyEl.textContent = f2(recommendedLotDaily);
-    recommendedLotPerSetupEl.textContent = f2(recommendedLotPerSetup);
-    noteEl.textContent = "Cadangan ini berpandukan baki grow target semasa dan andaian 2 setup sehari.";
+    perSetupTargetUsdEl.textContent = f2(perSetupTargetUsd);
+    baseModal5UsdEl.textContent = f2(baseModal5Usd);
+    baseModal10UsdEl.textContent = f2(baseModal10Usd);
+    recommendedLot5El.textContent = f2(lot5);
+    recommendedLot10El.textContent = f2(lot10);
+    tpPips5El.textContent = f2(tpPips5);
+    tpPips10El.textContent = f2(tpPips10);
+    noteEl.textContent = "Formula recommendation: modal asas 5%/10% dari current balance, ikut zon user, target 2 setup sehari.";
   }
 
   function calculate(balance, riskPct, zonePips, layerCount, entryPrice, leverage, stopOutPct) {
