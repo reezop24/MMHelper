@@ -89,7 +89,7 @@
       </div>
 
       <div class="field">
-        <label class="question" for="zonePips"><strong>3. Saiz zon / SL (pips)</strong></label>
+        <label class="question" for="zonePips"><strong>3. Saiz zon + SL (pips)</strong></label>
         <p class="hint"><em>Contoh 10 pips pada XAUUSD (andaian 1 pip = 0.10).</em></p>
         <div class="with-suffix">
           <input id="zonePips" type="number" inputmode="decimal" min="1" step="1" placeholder="Contoh: 10" required />
@@ -98,7 +98,18 @@
       </div>
 
       <div class="field">
-        <label class="question" for="entryPrice"><strong>4. Entry price XAUUSD</strong></label>
+        <label class="question" for="layerCount"><strong>4. Bilangan layer</strong></label>
+        <select id="layerCount" required>
+          <option value="1" selected>1 layer</option>
+          <option value="2">2 layer</option>
+          <option value="3">3 layer</option>
+          <option value="4">4 layer</option>
+          <option value="5">5 layer</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label class="question" for="entryPrice"><strong>5. Entry price XAUUSD</strong></label>
         <div class="with-prefix with-suffix">
           <span class="affix">USD</span>
           <input id="entryPrice" type="number" inputmode="decimal" min="0.1" step="0.1" placeholder="Contoh: 2900" required />
@@ -106,7 +117,7 @@
       </div>
 
       <div class="field">
-        <label class="question" for="leverage"><strong>5. Leverage account</strong></label>
+        <label class="question" for="leverage"><strong>6. Leverage account</strong></label>
         <div class="with-prefix">
           <span class="affix">1:</span>
           <input id="leverage" type="number" inputmode="numeric" min="1" step="1" placeholder="Contoh: 500" required />
@@ -114,7 +125,7 @@
       </div>
 
       <div class="field">
-        <label class="question" for="stopOutPct"><strong>6. Stop-out level (%)</strong></label>
+        <label class="question" for="stopOutPct"><strong>7. Stop-out level (%)</strong></label>
         <p class="hint"><em>Kebanyakan user memang sekitar 30%, tapi tetap check broker sendiri untuk pengesahan.</em></p>
         <div class="with-suffix">
           <select id="stopOutPct" required>
@@ -136,6 +147,9 @@
       <p class="result-title"><strong>Output per setup (XAUUSD)</strong></p>
       <p class="result-line">Risk USD per setup: <strong class="risk-value">USD <span id="riskUsd">0.00</span></strong></p>
       <p class="result-line">Cadangan lot size: <strong><span id="lotSize" class="lot-value">0.00</span> lot</strong></p>
+      <p class="result-line">Lot per layer (<span id="selectedLayerLabel">1</span> layer): <strong><span id="lotPerSelectedLayer">0.00</span> lot/layer</strong></p>
+      <p class="result-line">Rujukan 2 layer: <strong><span id="lotPerTwoLayer">0.00</span> lot/layer</strong></p>
+      <p class="result-line">Rujukan 3 layer: <strong><span id="lotPerThreeLayer">0.00</span> lot/layer</strong></p>
       <p class="result-line">Zon setara harga: <strong>USD <span id="zoneUsd">0.00</span></strong></p>
       <p class="result-line">Used margin anggaran: <strong>USD <span id="usedMargin">0.00</span></strong></p>
       <p class="result-line">Loss max sebelum stop-out: <strong class="risk-value">USD <span id="maxLossBeforeStopOut">0.00</span></strong></p>

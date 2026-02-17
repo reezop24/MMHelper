@@ -10,6 +10,10 @@
   var backBtn = document.getElementById("topBackBtn");
   var riskUsdEl = document.getElementById("riskUsd");
   var lotSizeEl = document.getElementById("lotSize");
+  var selectedLayerLabelEl = document.getElementById("selectedLayerLabel");
+  var lotPerSelectedLayerEl = document.getElementById("lotPerSelectedLayer");
+  var lotPerTwoLayerEl = document.getElementById("lotPerTwoLayer");
+  var lotPerThreeLayerEl = document.getElementById("lotPerThreeLayer");
   var zoneUsdEl = document.getElementById("zoneUsd");
   var usedMarginEl = document.getElementById("usedMargin");
   var maxLossBeforeStopOutEl = document.getElementById("maxLossBeforeStopOut");
@@ -25,8 +29,12 @@
     return Number(v || 0).toFixed(2);
   }
 
-  function f3(v) {
-    return Number(v || 0).toFixed(3);
+  function floorToStep(value, step) {
+    var n = Number(value || 0);
+    if (!Number.isFinite(n) || n <= 0) return 0;
+    var s = Number(step || 0);
+    if (!Number.isFinite(s) || s <= 0) return 0;
+    return Math.floor((n + 1e-12) / s) * s;
   }
 
   backBtn.addEventListener("click", function () {
@@ -43,6 +51,7 @@
     var balance = n("accountBalance");
     var riskPct = n("riskPercent");
     var zonePips = n("zonePips");
+    var layerCount = n("layerCount");
     var entryPrice = n("entryPrice");
     var leverage = n("leverage");
     var stopOutPct = n("stopOutPct");
@@ -57,6 +66,10 @@
     }
     if (Number.isNaN(zonePips) || zonePips <= 0) {
       statusEl.textContent = "Saiz zon/SL (pips) kena lebih dari 0.";
+      return;
+    }
+    if (Number.isNaN(layerCount) || layerCount <= 0) {
+      statusEl.textContent = "Layer tak sah.";
       return;
     }
     if (Number.isNaN(entryPrice) || entryPrice <= 0) {
@@ -77,7 +90,11 @@
     var zone = zonePips * pipSize;
     var riskUsd = balance * (riskPct / 100);
     var usdPerLotAtZone = zone * 100;
-    var lot = usdPerLotAtZone > 0 ? riskUsd / usdPerLotAtZone : 0;
+    var rawLot = usdPerLotAtZone > 0 ? riskUsd / usdPerLotAtZone : 0;
+    var lot = floorToStep(rawLot, 0.01);
+    var lotPerSelectedLayer = floorToStep(lot / layerCount, 0.01);
+    var lotPerTwoLayer = floorToStep(lot / 2, 0.01);
+    var lotPerThreeLayer = floorToStep(lot / 3, 0.01);
 
     // Margin model: used margin = (entry price * contract size * lot) / leverage.
     var contractSize = 100;
@@ -90,7 +107,11 @@
     var floatingHalf = lot * (zone / 2) * 100;
 
     riskUsdEl.textContent = f2(riskUsd);
-    lotSizeEl.textContent = f3(lot);
+    lotSizeEl.textContent = f2(lot);
+    selectedLayerLabelEl.textContent = String(layerCount);
+    lotPerSelectedLayerEl.textContent = f2(lotPerSelectedLayer);
+    lotPerTwoLayerEl.textContent = f2(lotPerTwoLayer);
+    lotPerThreeLayerEl.textContent = f2(lotPerThreeLayer);
     zoneUsdEl.textContent = f2(zone);
     usedMarginEl.textContent = f2(usedMargin);
     maxLossBeforeStopOutEl.textContent = f2(maxLossBeforeStopOut);
@@ -98,10 +119,15 @@
     floatingFullEl.textContent = f2(floatingFull);
     floatingHalfEl.textContent = f2(floatingHalf);
 
+    if (lot <= 0) {
+      statusEl.textContent = "Lot terlalu kecil selepas pembundaran 0.01. Naikkan risk% atau kecilkan zon.";
+      return;
+    }
+
     if (floatingFull > maxLossBeforeStopOut && maxLossBeforeStopOut > 0) {
       statusEl.textContent = "Amaran: loss zon penuh melebihi kapasiti akaun sebelum stop-out. Kecilkan lot atau zon.";
       return;
     }
-    statusEl.textContent = "Kiraan siap (per setup). Semak balik min lot/step lot dan stop-out broker.";
+    statusEl.textContent = "Kiraan siap (per setup). Lot dibundarkan ke bawah ikut step 0.01.";
   });
 })();
