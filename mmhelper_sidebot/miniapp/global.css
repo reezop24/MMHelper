@@ -1,13 +1,13 @@
 :root {
-  --bg: #14090b;
-  --panel: #251114;
-  --panel-soft: #34171a;
+  --bg: #0d0a0b;
+  --panel: #181113;
+  --panel-soft: #261518;
   --text: #edf6ff;
-  --muted: #d8bcc2;
+  --muted: #d7c2c6;
   --accent-main: #f59e0b;
   --accent-main-2: #f97316;
-  --border-card: #6e3338;
-  --border-input: #8d4d54;
+  --border-card: #5a3035;
+  --border-input: #744147;
 }
 
 * {
@@ -18,9 +18,9 @@ body {
   margin: 0;
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   background:
-    radial-gradient(circle at top right, #4a1f27 0%, rgba(74, 31, 39, 0) 42%),
-    radial-gradient(circle at top left, #301319 0%, rgba(48, 19, 25, 0) 37%),
-    linear-gradient(180deg, #12080a 0%, var(--bg) 100%);
+    radial-gradient(circle at 78% 10%, rgba(122, 36, 48, 0.28) 0%, rgba(122, 36, 48, 0) 40%),
+    radial-gradient(circle at 14% 24%, rgba(89, 27, 36, 0.24) 0%, rgba(89, 27, 36, 0) 38%),
+    linear-gradient(180deg, #090708 0%, #0d0a0b 48%, var(--bg) 100%);
   color: var(--text);
   position: relative;
   overflow-x: hidden;
@@ -57,13 +57,13 @@ body::before {
   margin: 0;
   width: auto;
   min-width: 0;
-  border: 1px solid rgba(137, 201, 209, 0.55);
+  border: 1px solid #5a3035;
   border-radius: 999px;
   padding: 8px 12px;
   font-size: 13px;
   font-weight: 700;
-  color: #e8fcff;
-  background: rgba(14, 54, 71, 0.9);
+  color: #ffeef1;
+  background: rgba(27, 18, 20, 0.92);
   line-height: 1;
 }
 

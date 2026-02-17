@@ -109,9 +109,9 @@
       min-width: 210px;
       padding: 10px 14px;
       border-radius: 10px;
-      border: 1px solid #4b9ea3;
-      background: rgba(13, 54, 60, 0.9);
-      color: #e8fbff;
+      border: 1px solid #5a3035;
+      background: rgba(27, 18, 20, 0.92);
+      color: #ffeef1;
       font-size: 13px;
       font-weight: 700;
     }
@@ -152,14 +152,21 @@
       gap: 8px;
     }
 
+    .deposit-help {
+      margin: 2px 0 0;
+      color: #d8c1c6;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
     .choice-btn {
       margin: 0;
       width: 100%;
-      border: 1px solid #f59e0b;
+      border: 1px solid #744147;
       border-radius: 10px;
       padding: 10px 11px;
-      background: linear-gradient(90deg, #f59e0b 0%, #f97316 100%);
-      color: #2e1400;
+      background: rgba(37, 21, 24, 0.92);
+      color: #f6e7ea;
       font-size: 13px;
       font-weight: 700;
       text-align: center;
@@ -173,9 +180,9 @@
     }
 
     .choice-btn.active-no {
-      background: linear-gradient(90deg, #f97316 0%, #ef4444 100%);
-      border-color: #f97316;
-      color: #2d0b0b;
+      background: linear-gradient(90deg, #6b7280 0%, #9ca3af 100%);
+      border-color: #9ca3af;
+      color: #0f172a;
     }
 
     .submit-btn {
@@ -268,9 +275,10 @@
 
           <div>
             <span class="field-label">Dah buat deposit USD 100?</span>
+            <p class="deposit-help">Pilih satu sahaja untuk status semasa.</p>
             <div class="deposit-choice">
-              <button id="depositYesBtn" type="button" class="choice-btn">Ya, dah deposit</button>
-              <button id="depositNoBtn" type="button" class="choice-btn">Belum deposit</button>
+              <button id="depositYesBtn" type="button" class="choice-btn">Ya, dah deposit USD 100+</button>
+              <button id="depositNoBtn" type="button" class="choice-btn">Belum deposit USD 100</button>
             </div>
           </div>
 
