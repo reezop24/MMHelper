@@ -33,23 +33,6 @@
 
     .feature-list li + li { margin-top: 6px; }
 
-    .brand-row {
-      margin-top: 12px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    .brand-logo {
-      display: block;
-      width: auto;
-      object-fit: contain;
-    }
-
-    .brand-logo.reezo { height: 26px; }
-    .brand-logo.amarkets { height: 22px; }
-
     .action-list {
       margin-top: 14px;
       display: grid;
@@ -68,20 +51,6 @@
       font-weight: 700;
       text-align: left;
       line-height: 1.35;
-    }
-
-    .action-btn.with-logo {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .action-logo {
-      height: 18px;
-      width: auto;
-      object-fit: contain;
-      flex-shrink: 0;
     }
 
     .tabs {
@@ -147,7 +116,7 @@
 <body>
   <main class="page">
     <div class="top-nav">
-      <button id="topBackBtn" type="button" class="top-back-btn">← Back</button>
+      <button id="topBackBtn" type="button" class="top-back-btn">← Back to Previous Menu</button>
     </div>
 
     <header class="hero">
@@ -202,16 +171,8 @@
 
         <p>Sila pastikan anda memahami syarat di atas sebelum meneruskan pendaftaran.</p>
 
-        <div class="brand-row" aria-label="Brand Partners">
-          <img class="brand-logo reezo" src="reezo.png" alt="Reezo" />
-          <img class="brand-logo amarkets" src="amarketslogo.png" alt="AMarkets" />
-        </div>
-
         <div class="action-list">
-          <button id="btnDaftarAmarkets" type="button" class="action-btn with-logo">
-            <span>Daftar</span>
-            <img class="action-logo" src="amarketslogo.png" alt="AMarkets" />
-          </button>
+          <button id="btnDaftarAmarkets" type="button" class="action-btn">Daftar AMarkets</button>
           <button id="btnPengesahanPelangganBaru" type="button" class="action-btn">Pengesahan Pelanggan Baru</button>
         </div>
       </div>
