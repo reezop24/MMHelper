@@ -88,7 +88,7 @@
       }
     } else {
       dailyTargetValueEl.textContent = "USD " + formatUsd(dailyTargetUsd) + " (" + formatPct(dailyTargetPct) + "%)";
-      dailyTargetNoteEl.textContent = "Baki grow target tabung: USD " + formatUsd(growTarget) + ". Floating semasa: USD " + formatUsd(floatingProgressUsd) + ".";
+      dailyTargetNoteEl.innerHTML = "Baki grow target tabung: USD " + formatUsd(growTarget) + ".<br>Daily P/L semasa: USD " + formatUsd(floatingProgressUsd) + ".";
     }
   }
 
