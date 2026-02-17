@@ -10,6 +10,7 @@
   var backBtn = document.getElementById("topBackBtn");
   var riskUsdEl = document.getElementById("riskUsd");
   var lotSizeEl = document.getElementById("lotSize");
+  var zoneUsdEl = document.getElementById("zoneUsd");
   var usedMarginEl = document.getElementById("usedMargin");
   var maxLossBeforeStopOutEl = document.getElementById("maxLossBeforeStopOut");
   var maxMoveBeforeStopOutEl = document.getElementById("maxMoveBeforeStopOut");
@@ -41,7 +42,7 @@
 
     var balance = n("accountBalance");
     var riskPct = n("riskPercent");
-    var zone = n("zoneSize");
+    var zonePips = n("zonePips");
     var entryPrice = n("entryPrice");
     var leverage = n("leverage");
     var stopOutPct = n("stopOutPct");
@@ -54,8 +55,8 @@
       statusEl.textContent = "Risk % kena lebih dari 0.";
       return;
     }
-    if (Number.isNaN(zone) || zone <= 0) {
-      statusEl.textContent = "Saiz zon/SL kena lebih dari 0.";
+    if (Number.isNaN(zonePips) || zonePips <= 0) {
+      statusEl.textContent = "Saiz zon/SL (pips) kena lebih dari 0.";
       return;
     }
     if (Number.isNaN(entryPrice) || entryPrice <= 0) {
@@ -71,7 +72,9 @@
       return;
     }
 
-    // XAUUSD assumptions: contract size=100, so 1.00 lot ~= USD 100 per USD 1.00 move.
+    // XAUUSD assumptions: contract size=100, pip size=0.01 (1 lot ~= USD 1 per pip).
+    var pipSize = 0.01;
+    var zone = zonePips * pipSize;
     var riskUsd = balance * (riskPct / 100);
     var usdPerLotAtZone = zone * 100;
     var lot = usdPerLotAtZone > 0 ? riskUsd / usdPerLotAtZone : 0;
@@ -88,6 +91,7 @@
 
     riskUsdEl.textContent = f2(riskUsd);
     lotSizeEl.textContent = f3(lot);
+    zoneUsdEl.textContent = f2(zone);
     usedMarginEl.textContent = f2(usedMargin);
     maxLossBeforeStopOutEl.textContent = f2(maxLossBeforeStopOut);
     maxMoveBeforeStopOutEl.textContent = f2(maxMoveBeforeStopOut);

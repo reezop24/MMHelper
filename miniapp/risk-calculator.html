@@ -63,11 +63,11 @@
       </div>
 
       <div class="field">
-        <label class="question" for="zoneSize"><strong>3. Saiz zon / SL (USD)</strong></label>
-        <p class="hint"><em>Contoh zon 3.5 bermaksud jarak SL 3.5 dollar pada XAUUSD.</em></p>
-        <div class="with-prefix with-suffix">
-          <span class="affix">USD</span>
-          <input id="zoneSize" type="number" inputmode="decimal" min="0.1" step="0.1" placeholder="Contoh: 3.5" required />
+        <label class="question" for="zonePips"><strong>3. Saiz zon / SL (pips)</strong></label>
+        <p class="hint"><em>Contoh 350 pips pada XAUUSD (andaian 1 pip = 0.01).</em></p>
+        <div class="with-suffix">
+          <input id="zonePips" type="number" inputmode="decimal" min="1" step="1" placeholder="Contoh: 350" required />
+          <span class="affix">pips</span>
         </div>
       </div>
 
@@ -104,12 +104,13 @@
       <p class="result-title"><strong>Output per setup (XAUUSD)</strong></p>
       <p class="result-line">Risk USD per setup: <strong>USD <span id="riskUsd">0.00</span></strong></p>
       <p class="result-line">Cadangan lot size: <strong><span id="lotSize">0.00</span> lot</strong></p>
+      <p class="result-line">Zon setara harga: <strong>USD <span id="zoneUsd">0.00</span></strong></p>
       <p class="result-line">Used margin anggaran: <strong>USD <span id="usedMargin">0.00</span></strong></p>
       <p class="result-line">Loss max sebelum stop-out: <strong>USD <span id="maxLossBeforeStopOut">0.00</span></strong></p>
       <p class="result-line">Jarak harga max sebelum stop-out: <strong>USD <span id="maxMoveBeforeStopOut">0.00</span></strong></p>
       <p class="result-line">Anggaran floating @ zon penuh: <strong>USD <span id="floatingFull">0.00</span></strong></p>
       <p class="result-line">Anggaran floating @ separuh zon: <strong>USD <span id="floatingHalf">0.00</span></strong></p>
-      <p class="hint"><em>Andaian kiraan: contract size XAUUSD = 100, 1.00 lot ≈ USD 100 per pergerakan harga USD 1.00.</em></p>
+      <p class="hint"><em>Andaian kiraan: contract size XAUUSD = 100, 1 pip = 0.01, maka 1.00 lot ≈ USD 1 per pip.</em></p>
     </section>
   </main>
 
