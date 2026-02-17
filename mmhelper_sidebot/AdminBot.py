@@ -71,6 +71,8 @@ def get_token() -> str:
 
 def get_register_next_webapp_url() -> str:
     url = (os.getenv("SIDEBOT_REGISTER_WEBAPP_URL") or "").strip()
+    if not url.lower().startswith("https://"):
+        return ""
     return url
 
 
@@ -287,6 +289,20 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
             return
         await message.reply_text("Sila baca dan setuju TnC dulu.", reply_markup=ReplyKeyboardRemove())
         await message.reply_text(TNC_TEXT, reply_markup=tnc_keyboard())
+        return
+
+    if payload_type == "next_member_request_type":
+        choice = str(payload.get("choice") or "").strip()
+        labels = {
+            "new_registration_amarkets": "Pendaftaran baru AMarkets",
+            "ib_transfer_existing_amarkets": "Penukaran IB (Pelanggan sedia ada AMarkets)",
+            "client_under_ib_reezo": "Client AMarkets under IB Reezo",
+        }
+        selected = labels.get(choice) or "Pilihan tidak dikenali"
+        await message.reply_text(
+            f"✅ Pilihan diterima: {selected}\n\nFlow seterusnya akan kita sambung dalam step berikutnya.",
+            reply_markup=main_menu_keyboard(user.id),
+        )
         return
 
     await message.reply_text("ℹ️ Miniapp demo diterima.", reply_markup=main_menu_keyboard(user.id))
