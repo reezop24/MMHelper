@@ -32,6 +32,10 @@
   var tabIbVerification = document.getElementById("tabIbVerification");
   var panelIbTransfer = document.getElementById("panelIbTransfer");
   var panelIbVerification = document.getElementById("panelIbVerification");
+  var tabIbGuideWeb = document.getElementById("tabIbGuideWeb");
+  var tabIbGuideMobile = document.getElementById("tabIbGuideMobile");
+  var panelIbGuideWeb = document.getElementById("panelIbGuideWeb");
+  var panelIbGuideMobile = document.getElementById("panelIbGuideMobile");
   var walletIdInput = document.getElementById("walletIdInput");
   var fullNameInput = document.getElementById("fullNameInput");
   var phoneInput = document.getElementById("phoneInput");
@@ -91,6 +95,14 @@
     panelIbVerification.classList.toggle("hidden", isTransfer);
     tabIbTransfer.classList.toggle("active", isTransfer);
     tabIbVerification.classList.toggle("active", !isTransfer);
+  }
+
+  function openIbGuideTab(tabName) {
+    var isWeb = tabName === "web";
+    panelIbGuideWeb.classList.toggle("hidden", !isWeb);
+    panelIbGuideMobile.classList.toggle("hidden", isWeb);
+    tabIbGuideWeb.classList.toggle("active", isWeb);
+    tabIbGuideMobile.classList.toggle("active", !isWeb);
   }
 
   function sendToMainMenu() {
@@ -201,6 +213,7 @@
   btnHomeIbTransfer.addEventListener("click", function () {
     showView("ib_transfer");
     openIbTab("transfer");
+    openIbGuideTab("web");
   });
 
   btnHomeUnderIbReezo.addEventListener("click", function () {
@@ -235,6 +248,14 @@
     openIbTab("verification");
   });
 
+  tabIbGuideWeb.addEventListener("click", function () {
+    openIbGuideTab("web");
+  });
+
+  tabIbGuideMobile.addEventListener("click", function () {
+    openIbGuideTab("mobile");
+  });
+
   btnDaftarAmarkets.addEventListener("click", function () {
     if (tg && typeof tg.openLink === "function") {
       tg.openLink(AMARKETS_SIGNUP_URL);
@@ -260,5 +281,6 @@
   showView("home");
   openTab("new");
   openIbTab("transfer");
+  openIbGuideTab("web");
   setDepositChoice(null);
 })();
