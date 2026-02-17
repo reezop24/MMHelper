@@ -1290,6 +1290,15 @@ def _tabung_records_since(user_id: int, start_date: date) -> list[dict[str, Any]
     return out
 
 
+def has_tabung_save_today(user_id: int) -> bool:
+    today = malaysia_now().date()
+    for record in _tabung_records_since(user_id, today):
+        mode = str(record.get("mode") or "").strip().lower()
+        if mode == "save":
+            return True
+    return False
+
+
 def get_mission_progress_summary(user_id: int) -> dict[str, str]:
     state = get_project_grow_mission_state(user_id)
     mission_status = get_project_grow_mission_status_text(user_id)

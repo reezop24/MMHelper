@@ -16,6 +16,12 @@
     return Number(value || 0).toFixed(2);
   }
 
+  function formatPnl(value) {
+    var number = Number(value || 0);
+    var sign = number > 0 ? "+" : "";
+    return sign + "USD " + number.toFixed(2);
+  }
+
   function tradingDaysByTargetDays(targetDays) {
     if (targetDays === 30) return 22;
     if (targetDays === 90) return 66;
@@ -45,6 +51,8 @@
   var currentTargetLabel = params.get("target_label") || "-";
   var tabungUpdateUrl = params.get("tabung_update_url") || "";
   var goalBaselineBalance = Number(params.get("goal_baseline_balance_usd") || 0);
+  var dailyTargetReachedToday = (params.get("daily_target_reached_today") || "0") === "1";
+  var hasTabungSaveToday = (params.get("has_tabung_save_today") || "0") === "1";
 
   var minTarget = currentBalance + 100;
 
@@ -83,6 +91,11 @@
       if (tabungUpdateUrl) {
         dailyTargetActionBtn.classList.remove("hidden");
       }
+    } else if (dailyTargetReachedToday && hasTabungSaveToday) {
+      dailyTargetValueEl.textContent = "Target Hari Ini Dah Capai ✅";
+      dailyTargetNoteEl.innerHTML =
+        "Daily target rujukan: USD " + formatUsd(dailyTargetUsd) + " (" + formatPct(dailyTargetPct) + "%)." +
+        "<br>Daily P/L semasa: " + formatPnl(floatingProgressUsd) + ".";
     } else {
       dailyTargetValueEl.textContent = "USD " + formatUsd(dailyTargetUsd) + " (" + formatPct(dailyTargetPct) + "%)";
       dailyTargetNoteEl.textContent = "Baki grow target tabung: USD " + formatUsd(currentGrowTarget) + ". Kiraan guna 22 hari trading sebulan (Isnin-Jumaat).";
