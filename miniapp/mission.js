@@ -31,7 +31,7 @@
   var missionMode = (params.get("mission_mode") || "").toLowerCase();
   var missionStartedDate = params.get("mission_started_date") || "-";
 
-  var canOpen = targetBalance > 0 && tabungBalance >= 10;
+  var canOpen = tabungBalance >= 20;
 
   document.getElementById("summaryName").textContent = name;
   document.getElementById("summaryBalance").textContent = formatUsd(currentBalance);

@@ -716,7 +716,7 @@ async def _handle_project_grow_mission_start(payload: dict, update: Update, cont
         await send_screen(
             context,
             message.chat_id,
-            "❌ Mission tak boleh start lagi. Pastikan goal dah set dan tabung minimum USD 10.",
+            "❌ Mission tak boleh start lagi. Pastikan balance tabung minimum USD 20.",
             reply_markup=_build_project_grow_keyboard_for_user(user.id),
         )
         return

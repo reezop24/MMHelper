@@ -129,7 +129,7 @@ window.MMHELPER_CONTENT = {
   setNewGoalReachedInfoText: "Bila ready, tekan Set New Goal untuk sambung fasa seterusnya tanpa reset flow lama.",
   setNewGoalReachedBtn: "🎯 Set New Goal",
 
-  missionLockedText: "Mission belum boleh dibuka. Set New Goal dulu, kemudian pastikan balance tabung minimum USD 10.",
+  missionLockedText: "Mission belum boleh dibuka. Pastikan balance tabung minimum USD 20.",
   missionBeforeStartIntro: [
     "Project Grow datang sekali dengan Mission.",
     "Kau kena maintain prestasi dan disiplin untuk complete mission satu per satu.",

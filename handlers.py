@@ -640,7 +640,7 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
         await send_screen(
             context,
             message.chat_id,
-            "Mission masih locked. Set New Goal dulu, lepas tu pastikan balance tabung minimum USD 10.",
+            "Mission masih locked. Pastikan balance tabung minimum USD 20.",
             reply_markup=_build_project_grow_keyboard_for_user(user.id),
         )
         return

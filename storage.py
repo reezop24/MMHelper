@@ -1169,7 +1169,7 @@ def get_tabung_progress_summary(user_id: int) -> dict[str, Any]:
 
 
 def can_open_project_grow_mission(user_id: int) -> bool:
-    return has_project_grow_goal(user_id) and get_tabung_balance_usd(user_id) >= 10
+    return get_tabung_balance_usd(user_id) >= 20
 
 
 def get_tabung_start_date(user_id: int) -> str:
