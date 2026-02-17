@@ -90,7 +90,11 @@ def main_menu_keyboard(user_id: int | None = None) -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
 
-def mm_helper_setting_keyboard(initial_capital_reset_url: str, balance_adjustment_url: str) -> ReplyKeyboardMarkup:
+def mm_helper_setting_keyboard(
+    initial_capital_reset_url: str,
+    balance_adjustment_url: str,
+    system_info_url: str,
+) -> ReplyKeyboardMarkup:
     rows = [
         [
             KeyboardButton(
@@ -103,7 +107,10 @@ def mm_helper_setting_keyboard(initial_capital_reset_url: str, balance_adjustmen
                 SUBMENU_MM_BUTTON_CORRECTION,
                 web_app=WebAppInfo(url=balance_adjustment_url),
             ),
-            SUBMENU_MM_BUTTON_SYSTEM_INFO,
+            KeyboardButton(
+                SUBMENU_MM_BUTTON_SYSTEM_INFO,
+                web_app=WebAppInfo(url=system_info_url),
+            ),
         ],
         [SUBMENU_MM_BUTTON_BACK_MAIN],
     ]

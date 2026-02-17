@@ -51,6 +51,7 @@ from settings import (
     get_trading_activity_webapp_url,
     get_withdrawal_activity_webapp_url,
     get_user_log_webapp_url,
+    get_system_info_webapp_url,
 )
 from storage import (
     get_balance_adjustment_rules,
@@ -125,7 +126,8 @@ def _build_mm_setting_keyboard_for_user(user_id: int):
         window_open=rules["window_open"],
         window_label=rules["window_label"],
     )
-    return mm_helper_setting_keyboard(reset_url, balance_adjustment_url)
+    system_info_url = get_system_info_webapp_url()
+    return mm_helper_setting_keyboard(reset_url, balance_adjustment_url, system_info_url)
 
 
 def _build_admin_panel_keyboard_for_user(user_id: int):

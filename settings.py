@@ -46,6 +46,10 @@ def get_user_log_webapp_url(users_payload_json: str) -> str:
     return f"{page}?{query}"
 
 
+def get_system_info_webapp_url() -> str:
+    return f"{_miniapp_base_url()}/system-info.html"
+
+
 def get_initial_capital_reset_webapp_url(
     name: str,
     initial_capital: float,
