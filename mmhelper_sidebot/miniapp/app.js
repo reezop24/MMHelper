@@ -27,9 +27,16 @@
   var panelVerification = document.getElementById("panelVerification");
   var btnDaftarAmarkets = document.getElementById("btnDaftarAmarkets");
   var btnPengesahanPelangganBaru = document.getElementById("btnPengesahanPelangganBaru");
+  var walletIdInput = document.getElementById("walletIdInput");
+  var fullNameInput = document.getElementById("fullNameInput");
+  var phoneInput = document.getElementById("phoneInput");
+  var depositYesBtn = document.getElementById("depositYesBtn");
+  var depositNoBtn = document.getElementById("depositNoBtn");
+  var submitVerificationBtn = document.getElementById("submitVerificationBtn");
   var AMARKETS_SIGNUP_URL = "https://amarketstrading.co/sign-up/real-en/?g=REEZO24";
 
   var activeView = "home";
+  var hasDeposited100 = null;
 
   function updateBottomPrevState() {
     bottomPrevBtn.classList.toggle("hidden", activeView === "home");
@@ -116,6 +123,59 @@
     statusEl.textContent = "Preview mode: pilihan direkod -> " + choice;
   }
 
+  function setDepositChoice(value) {
+    hasDeposited100 = value;
+    depositYesBtn.classList.toggle("active-yes", value === true);
+    depositNoBtn.classList.toggle("active-no", value === false);
+  }
+
+  function readText(el) {
+    return String((el && el.value) || "").trim();
+  }
+
+  function submitVerification() {
+    var walletId = readText(walletIdInput);
+    var fullName = readText(fullNameInput);
+    var phoneNumber = readText(phoneInput);
+
+    if (!walletId) {
+      statusEl.textContent = "Sila isi AMarkets Wallet ID.";
+      return;
+    }
+    if (hasDeposited100 === null) {
+      statusEl.textContent = "Sila pilih status deposit USD 100.";
+      return;
+    }
+    if (!fullName) {
+      statusEl.textContent = "Sila isi nama penuh.";
+      return;
+    }
+    if (!phoneNumber) {
+      statusEl.textContent = "Sila isi no telefon.";
+      return;
+    }
+
+    var payload = {
+      type: "sidebot_verification_submit",
+      wallet_id: walletId,
+      has_deposit_100: hasDeposited100,
+      full_name: fullName,
+      phone_number: phoneNumber
+    };
+
+    if (tg) {
+      try {
+        tg.sendData(JSON.stringify(payload));
+      } catch (err) {
+        // no-op
+      }
+      tg.close();
+      return;
+    }
+
+    statusEl.textContent = "Preview mode: borang pengesahan dihantar.";
+  }
+
   topBackBtn.addEventListener("click", backToPreviousMenu);
   bottomBackBtn.addEventListener("click", sendToMainMenu);
   bottomPrevBtn.addEventListener("click", backToPreviousMenu);
@@ -161,6 +221,17 @@
     openTab("verification");
   });
 
+  depositYesBtn.addEventListener("click", function () {
+    setDepositChoice(true);
+  });
+
+  depositNoBtn.addEventListener("click", function () {
+    setDepositChoice(false);
+  });
+
+  submitVerificationBtn.addEventListener("click", submitVerification);
+
   showView("home");
   openTab("new");
+  setDepositChoice(null);
 })();

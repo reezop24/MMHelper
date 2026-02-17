@@ -6,6 +6,7 @@ import json
 import logging
 import os
 from pathlib import Path
+from datetime import datetime, timezone
 
 from telegram import (
     InlineKeyboardButton,
@@ -109,6 +110,36 @@ def mark_tnc_accepted(user_id: int, accepted: bool) -> None:
     users = state.setdefault("users", {})
     user_obj = users.setdefault(str(user_id), {})
     user_obj["tnc_accepted"] = bool(accepted)
+    save_state(state)
+
+
+def store_verification_submission(
+    user_id: int,
+    telegram_username: str,
+    wallet_id: str,
+    has_deposit_100: bool,
+    full_name: str,
+    phone_number: str,
+) -> None:
+    state = load_state()
+    users = state.setdefault("users", {})
+    user_obj = users.setdefault(str(user_id), {})
+
+    payload = {
+        "wallet_id": wallet_id,
+        "has_deposit_100": bool(has_deposit_100),
+        "full_name": full_name,
+        "phone_number": phone_number,
+        "submitted_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    user_obj["telegram_username"] = telegram_username or ""
+    user_obj["latest_verification"] = payload
+    history = user_obj.setdefault("verification_history", [])
+    if not isinstance(history, list):
+        history = []
+        user_obj["verification_history"] = history
+    history.append(payload)
     save_state(state)
 
 
@@ -282,6 +313,13 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await message.reply_text("❌ Data miniapp tak sah. Cuba buka semula.")
         return
 
+    if not has_tnc_accepted(user.id):
+        await message.reply_text(
+            "❌ Akses menu dikunci sehingga anda setuju TnC. Tekan /start untuk teruskan.",
+            reply_markup=ReplyKeyboardRemove(),
+        )
+        return
+
     payload_type = str(payload.get("type") or "").strip()
     if payload_type == "sidebot_back_to_main_menu":
         if has_tnc_accepted(user.id):
@@ -301,6 +339,35 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
         selected = labels.get(choice) or "Pilihan tidak dikenali"
         await message.reply_text(
             f"✅ Pilihan diterima: {selected}\n\nFlow seterusnya akan kita sambung dalam step berikutnya.",
+            reply_markup=main_menu_keyboard(user.id),
+        )
+        return
+
+    if payload_type == "sidebot_verification_submit":
+        wallet_id = str(payload.get("wallet_id") or "").strip()
+        full_name = str(payload.get("full_name") or "").strip()
+        phone_number = str(payload.get("phone_number") or "").strip()
+        has_deposit_100 = bool(payload.get("has_deposit_100"))
+
+        if not wallet_id or not full_name or not phone_number:
+            await message.reply_text("❌ Data pengesahan tak lengkap. Sila isi semula dalam miniapp.")
+            return
+
+        store_verification_submission(
+            user_id=user.id,
+            telegram_username=str(user.username or ""),
+            wallet_id=wallet_id,
+            has_deposit_100=has_deposit_100,
+            full_name=full_name,
+            phone_number=phone_number,
+        )
+        deposit_text = "Ya" if has_deposit_100 else "Belum"
+        await message.reply_text(
+            "✅ Pengesahan diterima.\n\n"
+            f"Wallet ID: {wallet_id}\n"
+            f"Deposit USD100: {deposit_text}\n"
+            f"Nama: {full_name}\n"
+            f"Telefon: {phone_number}",
             reply_markup=main_menu_keyboard(user.id),
         )
         return

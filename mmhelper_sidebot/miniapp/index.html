@@ -117,6 +117,80 @@
     }
 
     .bottom-actions { margin-top: 12px; }
+
+    .form-grid {
+      margin-top: 12px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .field-label {
+      font-size: 13px;
+      color: #d7f0ff;
+      margin: 0 0 4px;
+      display: block;
+      font-weight: 700;
+    }
+
+    .field-input {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid #4b9ea3;
+      border-radius: 10px;
+      background: rgba(10, 44, 56, 0.9);
+      color: #f2fbff;
+      padding: 10px 11px;
+      font-size: 14px;
+      outline: none;
+    }
+
+    .field-input::placeholder { color: #9bc4d6; }
+
+    .deposit-choice {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .choice-btn {
+      margin: 0;
+      width: 100%;
+      border: 1px solid #4b9ea3;
+      border-radius: 10px;
+      padding: 10px 11px;
+      background: rgba(12, 52, 62, 0.86);
+      color: #e8fbff;
+      font-size: 13px;
+      font-weight: 700;
+      text-align: center;
+      line-height: 1.2;
+    }
+
+    .choice-btn.active-yes {
+      background: linear-gradient(90deg, #1fbf8f 0%, #22d3a2 100%);
+      border-color: #23c89a;
+      color: #072318;
+    }
+
+    .choice-btn.active-no {
+      background: linear-gradient(90deg, #f97316 0%, #ef4444 100%);
+      border-color: #f97316;
+      color: #2d0b0b;
+    }
+
+    .submit-btn {
+      margin-top: 6px;
+      width: 100%;
+      border: 1px solid #23c89a;
+      border-radius: 12px;
+      padding: 11px 12px;
+      background: linear-gradient(90deg, #1fbf8f 0%, #22d3a2 100%);
+      color: #062018;
+      font-size: 14px;
+      font-weight: 800;
+      text-align: center;
+      line-height: 1.2;
+    }
   </style>
 </head>
 <body>
@@ -185,9 +259,33 @@
 
       <div id="panelVerification" class="hidden">
         <h2 class="section-title">Pengesahan Pendaftaran</h2>
-        <p>Ini placeholder untuk tab Pengesahan Pendaftaran.</p>
-        <p>Lepas ni kita akan isi form semakan dan dokumen ikut flow pendaftaran sebenar.</p>
-        <span class="placeholder-tag">Placeholder: Verification</span>
+        <p>Sila isi maklumat di bawah untuk semakan pengaktifan NEXT Member.</p>
+        <div class="form-grid">
+          <div>
+            <label for="walletIdInput" class="field-label">AMarkets Wallet ID</label>
+            <input id="walletIdInput" class="field-input" type="text" inputmode="numeric" placeholder="Contoh: 12345678" />
+          </div>
+
+          <div>
+            <span class="field-label">Dah buat deposit USD 100?</span>
+            <div class="deposit-choice">
+              <button id="depositYesBtn" type="button" class="choice-btn">Ya, dah deposit</button>
+              <button id="depositNoBtn" type="button" class="choice-btn">Belum deposit</button>
+            </div>
+          </div>
+
+          <div>
+            <label for="fullNameInput" class="field-label">Nama penuh</label>
+            <input id="fullNameInput" class="field-input" type="text" autocomplete="name" placeholder="Nama seperti dalam dokumen" />
+          </div>
+
+          <div>
+            <label for="phoneInput" class="field-label">No telefon</label>
+            <input id="phoneInput" class="field-input" type="tel" inputmode="tel" autocomplete="tel" placeholder="Contoh: +60123456789" />
+          </div>
+        </div>
+
+        <button id="submitVerificationBtn" type="button" class="submit-btn">Hantar Pengesahan</button>
       </div>
     </section>
 
