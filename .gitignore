@@ -11,3 +11,6 @@ mmhelper_db.json
 # OS/editor
 .DS_Store
 .vscode/
+
+# Sidebot runtime data
+mmhelper_sidebot/sidebot_state.json
