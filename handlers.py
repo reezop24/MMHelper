@@ -2,7 +2,7 @@
 
 import json
 
-from telegram import Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
 from menu import (
@@ -105,6 +105,86 @@ from texts import (
 )
 from ui import clear_last_screen, send_screen
 from welcome import start
+
+BETA_RESET_PASSWORD = "202210"
+BETA_RESET_CB_BEGIN = "BETA_RESET_BEGIN"
+BETA_RESET_CB_CANCEL = "BETA_RESET_CANCEL"
+BETA_RESET_CB_CONFIRM = "BETA_RESET_CONFIRM"
+
+
+def _beta_reset_begin_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton("✅ Ya, teruskan", callback_data=BETA_RESET_CB_BEGIN)],
+            [InlineKeyboardButton("❌ Batal", callback_data=BETA_RESET_CB_CANCEL)],
+        ]
+    )
+
+
+def _beta_reset_confirm_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton("🗑️ Confirm BETA RESET", callback_data=BETA_RESET_CB_CONFIRM)],
+            [InlineKeyboardButton("❌ Batal", callback_data=BETA_RESET_CB_CANCEL)],
+        ]
+    )
+
+
+async def handle_admin_inline_actions(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    user = update.effective_user
+    if not query or not user:
+        return
+
+    await query.answer()
+    cb = str(query.data or "").strip()
+    if cb not in {BETA_RESET_CB_BEGIN, BETA_RESET_CB_CANCEL, BETA_RESET_CB_CONFIRM}:
+        return
+
+    if not is_admin_user(user.id):
+        await send_screen(
+            context,
+            query.message.chat_id,
+            "❌ Akses ditolak.",
+            reply_markup=main_menu_keyboard(user.id),
+        )
+        return
+
+    if cb == BETA_RESET_CB_CANCEL:
+        context.user_data.pop("beta_reset_wait_password", None)
+        context.user_data.pop("beta_reset_ready_confirm", None)
+        await send_screen(
+            context,
+            query.message.chat_id,
+            "BETA RESET dibatalkan.",
+            reply_markup=_build_admin_panel_keyboard_for_user(user.id),
+        )
+        return
+
+    if cb == BETA_RESET_CB_BEGIN:
+        context.user_data["beta_reset_wait_password"] = True
+        context.user_data.pop("beta_reset_ready_confirm", None)
+        await send_screen(
+            context,
+            query.message.chat_id,
+            "Masukkan password BETA RESET.\n\nPassword hint: 6 digit.",
+            reply_markup=_build_admin_panel_keyboard_for_user(user.id),
+        )
+        return
+
+    if not context.user_data.get("beta_reset_ready_confirm"):
+        await send_screen(
+            context,
+            query.message.chat_id,
+            "❌ Sesi reset tak sah. Mulakan semula dari butang BETA RESET.",
+            reply_markup=_build_admin_panel_keyboard_for_user(user.id),
+        )
+        return
+
+    reset_all_data()
+    context.user_data.clear()
+    await clear_last_screen(context, query.message.chat_id)
+    await start(update, context)
 
 
 def _build_mm_setting_keyboard_for_user(user_id: int):
@@ -429,6 +509,37 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     text = message.text.strip()
 
+    if context.user_data.get("beta_reset_wait_password"):
+        if not is_admin_user(user.id):
+            context.user_data.pop("beta_reset_wait_password", None)
+            context.user_data.pop("beta_reset_ready_confirm", None)
+            await send_screen(
+                context,
+                message.chat_id,
+                "❌ Akses ditolak.",
+                reply_markup=main_menu_keyboard(user.id),
+            )
+            return
+
+        if text != BETA_RESET_PASSWORD:
+            await send_screen(
+                context,
+                message.chat_id,
+                "❌ Password salah. Cuba lagi atau tekan BETA RESET semula.",
+                reply_markup=_build_admin_panel_keyboard_for_user(user.id),
+            )
+            return
+
+        context.user_data.pop("beta_reset_wait_password", None)
+        context.user_data["beta_reset_ready_confirm"] = True
+        await send_screen(
+            context,
+            message.chat_id,
+            "Password betul ✅\n\nConfirm terakhir: tekan button bawah untuk reset semua data.",
+            reply_markup=_beta_reset_confirm_keyboard(),
+        )
+        return
+
     if not has_initial_setup(user.id):
         await start(update, context)
         return
@@ -462,10 +573,14 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
             )
             return
 
-        reset_all_data()
-        await clear_last_screen(context, message.chat_id)
-        context.user_data.clear()
-        await start(update, context)
+        context.user_data.pop("beta_reset_wait_password", None)
+        context.user_data.pop("beta_reset_ready_confirm", None)
+        await send_screen(
+            context,
+            message.chat_id,
+            "⚠️ BETA RESET akan padam SEMUA data semua user.\n\nTeruskan?",
+            reply_markup=_beta_reset_begin_keyboard(),
+        )
         return
 
     if text == SUBMENU_ADMIN_BUTTON_NOTIFICATION_SETTING:

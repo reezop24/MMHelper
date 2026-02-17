@@ -12,7 +12,13 @@ from telegram.ext import (
     filters,
 )
 
-from handlers import handle_text_actions
+from handlers import (
+    BETA_RESET_CB_BEGIN,
+    BETA_RESET_CB_CANCEL,
+    BETA_RESET_CB_CONFIRM,
+    handle_admin_inline_actions,
+    handle_text_actions,
+)
 from notification_engine import run_notification_engine
 from setup_flow import handle_setup_webapp
 from welcome import TNC_ACCEPT, TNC_DECLINE, handle_tnc_callback, start
@@ -50,6 +56,12 @@ def main() -> None:
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(handle_tnc_callback, pattern=f"^({TNC_ACCEPT}|{TNC_DECLINE})$"))
+    app.add_handler(
+        CallbackQueryHandler(
+            handle_admin_inline_actions,
+            pattern=f"^({BETA_RESET_CB_BEGIN}|{BETA_RESET_CB_CANCEL}|{BETA_RESET_CB_CONFIRM})$",
+        )
+    )
     app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_setup_webapp))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_actions))
     if app.job_queue is not None:
