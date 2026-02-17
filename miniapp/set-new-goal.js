@@ -109,6 +109,13 @@
   var formStatusEl = document.getElementById("formStatus");
   var configuredStatusEl = document.getElementById("configuredStatus");
   var reachedStatusEl = document.getElementById("reachedStatus");
+  var dailyTargetPctEl = document.getElementById("dailyTargetPct");
+  var dailyTargetUsdEl = document.getElementById("dailyTargetUsd");
+  var dailyRiskPctEl = document.getElementById("dailyRiskPct");
+  var dailyRiskUsdEl = document.getElementById("dailyRiskUsd");
+  var perSetupRiskPctEl = document.getElementById("perSetupRiskPct");
+  var perSetupRiskUsdEl = document.getElementById("perSetupRiskUsd");
+  var recommendationStatusEl = document.getElementById("recommendationStatus");
 
   var targetBalanceInput = document.getElementById("targetBalance");
   var targetSelect = document.getElementById("targetDays");
@@ -172,6 +179,62 @@
     targetSelect.value = "";
     unlockAmountInput.value = "";
     updateGrowTargetHint(0, currentBalance, growTargetHint);
+    updateRecommendation();
+  }
+
+  function resetRecommendation() {
+    dailyTargetPctEl.textContent = "0.00";
+    dailyTargetUsdEl.textContent = "0.00";
+    dailyRiskPctEl.textContent = "0.00";
+    dailyRiskUsdEl.textContent = "0.00";
+    perSetupRiskPctEl.textContent = "0.00";
+    perSetupRiskUsdEl.textContent = "0.00";
+  }
+
+  function updateRecommendation() {
+    var targetBalance = Number((targetBalanceInput.value || "").trim());
+    var targetDays = Number((targetSelect.value || "").trim());
+
+    if (
+      Number.isNaN(targetBalance) ||
+      targetBalance <= currentBalance ||
+      (targetDays !== 30 && targetDays !== 90 && targetDays !== 180)
+    ) {
+      resetRecommendation();
+      recommendationStatusEl.textContent = "Isi target dan tempoh untuk tengok cadangan.";
+      return;
+    }
+
+    var tradingDays = tradingDaysByTargetDays(targetDays);
+    if (!tradingDays) {
+      resetRecommendation();
+      recommendationStatusEl.textContent = "Tempoh target tak sah untuk kiraan trading day.";
+      return;
+    }
+
+    var growTargetUsd = targetBalance - currentBalance;
+    var dailyTargetUsd = growTargetUsd / tradingDays;
+    var baseBalance = currentBalance > 0 ? currentBalance : 0;
+    var dailyTargetPct = baseBalance > 0 ? (dailyTargetUsd / baseBalance) * 100 : 0;
+
+    // Assumption: daily risk budget follows daily target pace (1:1 target-risk plan).
+    var dailyRiskPct = dailyTargetPct;
+    var dailyRiskUsd = (baseBalance * dailyRiskPct) / 100;
+    var perSetupRiskPct = dailyRiskPct / 2;
+    var perSetupRiskUsd = dailyRiskUsd / 2;
+
+    dailyTargetPctEl.textContent = formatPct(dailyTargetPct);
+    dailyTargetUsdEl.textContent = formatUsd(dailyTargetUsd);
+    dailyRiskPctEl.textContent = formatPct(dailyRiskPct);
+    dailyRiskUsdEl.textContent = formatUsd(dailyRiskUsd);
+    perSetupRiskPctEl.textContent = formatPct(perSetupRiskPct);
+    perSetupRiskUsdEl.textContent = formatUsd(perSetupRiskUsd);
+
+    if (dailyRiskPct > 5) {
+      recommendationStatusEl.textContent = "Cadangan ni agak agresif, pertimbangkan tempoh lebih panjang.";
+      return;
+    }
+    recommendationStatusEl.textContent = "Cadangan ini guna andaian 2 setup sehari.";
   }
 
   function handleResetGoal(statusEl) {
@@ -225,6 +288,11 @@
   targetBalanceInput.addEventListener("input", function () {
     var targetBalance = Number((targetBalanceInput.value || "").trim());
     updateGrowTargetHint(targetBalance, currentBalance, growTargetHint);
+    updateRecommendation();
+    formStatusEl.textContent = "";
+  });
+  targetSelect.addEventListener("change", function () {
+    updateRecommendation();
     formStatusEl.textContent = "";
   });
 
@@ -280,4 +348,6 @@
 
     formStatusEl.textContent = "Preview mode: buka dari Telegram untuk submit.";
   });
+
+  updateRecommendation();
 })();
