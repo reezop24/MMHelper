@@ -476,8 +476,9 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                     sent = await context.bot.send_message(
                         chat_id=user_id,
                         text=(
-                            "⚠️ Admin minta anda lengkapkan deposit USD100 dahulu.\n"
-                            "Bila dah selesai, tekan butang `Deposit Selesai` di bawah."
+                            f"Sila buat deposit USD100 ke akaun Amarkets ({item.get('wallet_id')}) "
+                            "untuk melengkapkan proses pendaftaran.\n\n"
+                            "Tekan butang DEPOSIT SELESAI untuk pengesahan semula."
                         ),
                         reply_markup=user_deposit_keyboard(submission_id),
                     )
