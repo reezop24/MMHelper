@@ -8,32 +8,6 @@
   <style>
     .hidden { display: none; }
 
-    .tabs {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-      margin-bottom: 12px;
-    }
-
-    .tab-btn {
-      margin: 0;
-      width: 100%;
-      border: 1px solid #4b9ea3;
-      border-radius: 12px;
-      padding: 10px 12px;
-      background: rgba(12, 52, 62, 0.76);
-      color: #dff8ff;
-      font-size: 13px;
-      font-weight: 700;
-      line-height: 1.2;
-    }
-
-    .tab-btn.active {
-      background: linear-gradient(90deg, #1fbf8f 0%, #22d3a2 100%);
-      color: #062018;
-      border-color: #23c89a;
-    }
-
     .content-card p {
       margin: 0;
       line-height: 1.55;
@@ -110,6 +84,32 @@
       flex-shrink: 0;
     }
 
+    .tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .tab-btn {
+      margin: 0;
+      width: 100%;
+      border: 1px solid #4b9ea3;
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: rgba(12, 52, 62, 0.76);
+      color: #dff8ff;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .tab-btn.active {
+      background: linear-gradient(90deg, #1fbf8f 0%, #22d3a2 100%);
+      color: #062018;
+      border-color: #23c89a;
+    }
+
     .placeholder-tag {
       display: inline-block;
       margin-top: 10px;
@@ -121,7 +121,12 @@
       background: rgba(14, 62, 73, 0.78);
     }
 
-    .bottom-actions { margin-top: 12px; }
+    .inline-actions {
+      margin-top: 12px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
 
     .back-btn {
       margin: 0;
@@ -135,6 +140,8 @@
       font-size: 13px;
       font-weight: 700;
     }
+
+    .bottom-actions { margin-top: 12px; }
   </style>
 </head>
 <body>
@@ -148,7 +155,27 @@
       <h1>Daftar NEXT Member</h1>
     </header>
 
-    <section class="card content-card">
+    <section id="homeView" class="card content-card">
+      <p>NEXT Member memberi anda akses penuh kepada ekosistem tools dan sistem sokongan yang disediakan, termasuk:</p>
+      <ul class="feature-list">
+        <li>Akses penuh kepada MM Helper</li>
+        <li>Akses kandungan pembelajaran melalui eVideo</li>
+        <li>Akses kepada bot dan sistem tambahan di bawah rangkaian NEXT</li>
+        <li>Penyertaan dalam sesi webinar, seminar, TradeTalk dan program perkongsian ilmu yang dianjurkan dari semasa ke semasa</li>
+      </ul>
+      <p>Semua akses ini disusun dalam satu ekosistem berstruktur bagi memudahkan pembelajaran, penggunaan tools serta penglibatan dalam aktiviti yang berkaitan.</p>
+      <p>Sila pilih jenis permohonan di bawah untuk meneruskan.</p>
+
+      <div class="action-list">
+        <button id="btnHomeNewRegistration" type="button" class="action-btn">Pendaftaran baru AMarkets</button>
+        <button id="btnHomeIbTransfer" type="button" class="action-btn">Penukaran IB (Pelanggan sedia ada AMarkets)</button>
+        <button id="btnHomeUnderIbReezo" type="button" class="action-btn">Client AMarkets under IB Reezo</button>
+      </div>
+
+      <p id="status" class="status" aria-live="polite"></p>
+    </section>
+
+    <section id="newRegistrationView" class="card content-card hidden">
       <div class="tabs">
         <button id="tabNewRegistration" type="button" class="tab-btn active">Pendaftaran Baru</button>
         <button id="tabVerification" type="button" class="tab-btn">Pengesahan Pendaftaran</button>
@@ -195,8 +222,24 @@
         <p>Lepas ni kita akan isi form semakan dan dokumen ikut flow pendaftaran sebenar.</p>
         <span class="placeholder-tag">Placeholder: Verification</span>
       </div>
+    </section>
 
-      <p id="status" class="status" aria-live="polite"></p>
+    <section id="ibTransferView" class="card content-card hidden">
+      <h2 class="section-title">Penukaran IB (Pelanggan sedia ada AMarkets)</h2>
+      <p>Screen ini kekal untuk flow Penukaran IB.</p>
+      <span class="placeholder-tag">Placeholder: IB Transfer</span>
+      <div class="inline-actions">
+        <button id="btnBackFromIbTransfer" type="button" class="back-btn">⬅️ Back to Pilihan</button>
+      </div>
+    </section>
+
+    <section id="underIbReezoView" class="card content-card hidden">
+      <h2 class="section-title">Client AMarkets under IB Reezo</h2>
+      <p>Screen ini kekal untuk flow Client under IB Reezo.</p>
+      <span class="placeholder-tag">Placeholder: Under IB Reezo</span>
+      <div class="inline-actions">
+        <button id="btnBackFromUnderIbReezo" type="button" class="back-btn">⬅️ Back to Pilihan</button>
+      </div>
     </section>
 
     <div class="bottom-actions">
