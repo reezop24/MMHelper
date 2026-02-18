@@ -214,7 +214,6 @@ def _build_weekly_report_pdf(user_id: int) -> tuple[bytes, str]:
     goal = get_project_grow_goal_summary(user_id)
     today = current_user_date(user_id)
     week_start, week_end = _previous_closed_report_period(today)
-    weekly_pl = get_weekly_profit_loss_usd(user_id)
     records = get_transaction_history_records_between(
         user_id,
         week_start,
@@ -235,6 +234,16 @@ def _build_weekly_report_pdf(user_id: int) -> tuple[bytes, str]:
     grow_target_total = max(target_balance - goal_baseline_balance, 0.0)
     grow_target_achieved = max(min(grow_target_total - grow_target_remaining, grow_target_total), 0.0)
     remain_pct = (grow_target_remaining / grow_target_total * 100.0) if grow_target_total > 0 else 0.0
+    goal_section = sections.get("project_grow_goal", {}) if isinstance(sections, dict) else {}
+    goal_saved_date_raw = str(goal_section.get("saved_date") or "").strip() if isinstance(goal_section, dict) else ""
+    goal_start_date: date | None = None
+    if goal_saved_date_raw:
+        try:
+            goal_start_date = date.fromisoformat(goal_saved_date_raw)
+        except ValueError:
+            goal_start_date = None
+    if goal_start_date is not None and week_start <= goal_start_date <= week_end:
+        daily_target_usd = float(get_weekly_frozen_daily_target_usd(user_id, goal_start_date))
 
     setup_date = None
     try:
@@ -318,7 +327,10 @@ def _build_weekly_report_pdf(user_id: int) -> tuple[bytes, str]:
         d_name = day_names[cursor.weekday()]
         pl = float(daily_trading_pl.get(d_iso, 0.0))
         tabung_saved = float(daily_tabung_save.get(d_iso, 0.0))
-        if cursor.weekday() >= 5:
+        if goal_start_date is not None and cursor < goal_start_date:
+            status = "No Target (Before Goal Start)"
+            target_text = "-"
+        elif cursor.weekday() >= 5:
             status = "No Trade Day"
             target_text = "-"
         elif daily_target_usd <= 0:
@@ -332,15 +344,6 @@ def _build_weekly_report_pdf(user_id: int) -> tuple[bytes, str]:
                 reached_count += 1
         daily_rows.append((f"{d_name} {d_iso}", target_text, f"USD {pl:.2f}", f"USD {tabung_saved:.2f}", status))
         cursor += timedelta(days=1)
-
-    goal_section = sections.get("project_grow_goal", {}) if isinstance(sections, dict) else {}
-    goal_saved_date_raw = str(goal_section.get("saved_date") or "").strip() if isinstance(goal_section, dict) else ""
-    goal_start_date: date | None = None
-    if goal_saved_date_raw:
-        try:
-            goal_start_date = date.fromisoformat(goal_saved_date_raw)
-        except ValueError:
-            goal_start_date = None
 
     remaining_calendar_days_now = 0
     remaining_trading_days_now = 0
@@ -360,7 +363,7 @@ def _build_weekly_report_pdf(user_id: int) -> tuple[bytes, str]:
     cmds: list[str] = []
     # Header
     cmds.append(_pdf_rect(35, 770, 525, 48, fill_rgb=(0.09, 0.20, 0.42)))
-    cmds.append(_pdf_text(50, 798, "MM HELPER - WEEKLY REPORT", size=15, bold=True, rgb=(1, 1, 1)))
+    cmds.append(_pdf_text(50, 798, "MM HELPER - WEEKLY REPORT (beta)", size=15, bold=True, rgb=(1, 1, 1)))
     cmds.append(_pdf_text(50, 782, f"User: {summary['name']}  |  Report Date: {today.isoformat()}", size=9, rgb=(0.90, 0.95, 1.0)))
 
     # Meta
@@ -377,7 +380,7 @@ def _build_weekly_report_pdf(user_id: int) -> tuple[bytes, str]:
     # Daily target status table
     cmds.append(_pdf_rect(35, 420, 525, 248, fill_rgb=(1, 1, 1), stroke_rgb=(0.82, 0.85, 0.90), line_w=0.8))
     cmds.append(_pdf_text(48, 652, "Daily Target Status by Day", size=11, bold=True, rgb=(0.10, 0.20, 0.35)))
-    cmds.append(_pdf_text(48, 638, f"Current Daily Target: USD {daily_target_usd:.2f}", size=9, bold=True, rgb=(0.08, 0.17, 0.30)))
+    cmds.append(_pdf_text(48, 638, f"Frozen Daily Target (Report Week): USD {daily_target_usd:.2f}", size=9, bold=True, rgb=(0.08, 0.17, 0.30)))
     cmds.append(_pdf_text(280, 638, f"Reached Days: {reached_count}", size=9, bold=True, rgb=(0.08, 0.17, 0.30)))
 
     col_x = [48, 180, 290, 390, 485]
@@ -472,7 +475,7 @@ def _build_weekly_report_pdf(user_id: int) -> tuple[bytes, str]:
     cmds.append(_pdf_text(340, 106, "Ending Balance", size=9, bold=True, rgb=(0.08, 0.17, 0.30)))
     cmds.append(_pdf_text(340, 88, f"USD {ending_balance:.2f}", size=12, bold=True, rgb=(0.08, 0.17, 0.30)))
 
-    cmds.append(_pdf_text(48, 58, "Note: 'Reached' status is marked only when same-day tabung save amount reaches daily target.", size=8, rgb=(0.34, 0.38, 0.45)))
+    cmds.append(_pdf_text(48, 58, "Note: Beta report. Data is best effort and may differ from final audited totals.", size=8, rgb=(0.34, 0.38, 0.45)))
 
     pdf_bytes = _build_styled_pdf(cmds)
     filename = f"weekly-report-{today.isoformat()}.pdf"
