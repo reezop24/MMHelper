@@ -455,10 +455,53 @@
 
     <section id="underIbReezoView" class="card content-card hidden">
       <h2 class="section-title">Client AMarkets under IB Reezo</h2>
-      <p>Screen ini kekal untuk flow Client under IB Reezo.</p>
-      <span class="placeholder-tag">Placeholder: Under IB Reezo</span>
+      <p>Untuk pelanggan AMarkets yang masih berada di dalam Affiliate Reezo, anda hanya perlu mengikut langkah berikut.</p>
+      <ul class="feature-list">
+        <li>Deposit minimum USD 50 (terkumpul dalam tempoh 10 hari adalah dibenarkan).</li>
+        <li>Selepas deposit dibuat anda perlu mengisi borang pengesahan di bawah.</li>
+        <li>Akses NEXT Member akan diaktifkan selepas pengesahan selesai.</li>
+      </ul>
+
+      <p><strong>Tempoh & Polisi Akses</strong></p>
+      <ul class="feature-list">
+        <li>Akses diberikan selama 45 hari dan akan diperbaharui secara automatik selagi akaun kekal aktif.</li>
+        <li>Akses akan ditarik secara automatik sekiranya akaun tidak aktif selepas tamat tempoh.</li>
+        <li>Akses boleh ditarik serta-merta sekiranya berlaku pengeluaran dana selepas deposit tanpa sebarang aktiviti dagangan.</li>
+      </ul>
+
+      <p>Sila pastikan anda memahami syarat di atas sebelum meneruskan pendaftaran.</p>
+      <p>Nota: sekiranya anda tidak pasti anda masih berada dalam Affiliate Group Reezo atau tidak, boleh cuba masukkan IB Code: <strong>REEZO24</strong> di ruangan Affiliate Group AMarkets.</p>
+
+      <h3 class="section-title" style="font-size:16px; margin-top:14px;">Pengesahan Deposit</h3>
+      <div class="form-grid">
+        <div>
+          <label for="reezoWalletIdInput" class="field-label">AMarkets Wallet ID</label>
+          <input id="reezoWalletIdInput" class="field-input" type="text" inputmode="numeric" placeholder="Contoh: 2248557" />
+        </div>
+
+        <div>
+          <span class="field-label">Dah buat deposit USD 50?</span>
+          <p class="deposit-help">Pilih satu sahaja untuk status semasa.</p>
+          <div class="deposit-choice">
+            <button id="reezoDepositYesBtn" type="button" class="choice-btn">Ya, dah deposit USD 50+</button>
+            <button id="reezoDepositNoBtn" type="button" class="choice-btn">Belum deposit USD 50</button>
+          </div>
+        </div>
+
+        <div>
+          <label for="reezoFullNameInput" class="field-label">Nama penuh</label>
+          <input id="reezoFullNameInput" class="field-input" type="text" autocomplete="name" placeholder="Nama seperti pendaftaran AMarkets" />
+        </div>
+
+        <div>
+          <label for="reezoPhoneInput" class="field-label">No telefon</label>
+          <input id="reezoPhoneInput" class="field-input" type="tel" inputmode="tel" autocomplete="tel" placeholder="Contoh: +60123456789" />
+        </div>
+      </div>
+
+      <button id="submitReezoVerificationBtn" type="button" class="submit-btn">Hantar Pengesahan Deposit</button>
       <div class="inline-actions">
-        <button id="btnBackFromUnderIbReezo" type="button" class="back-btn">⬅️ Back to Pilihan</button>
+        <button id="btnBackFromUnderIbReezo" type="button" class="back-btn hidden">⬅️ Back to Pilihan</button>
       </div>
     </section>
 

@@ -163,6 +163,12 @@ def remove_user_from_vip1(user_id: int) -> bool:
     return removed is not None
 
 
+def get_required_deposit_amount(registration_flow: str) -> int:
+    if registration_flow == "under_ib_reezo":
+        return 50
+    return 100
+
+
 def has_tnc_accepted(user_id: int) -> bool:
     state = load_state()
     users = state.get("users", {})
@@ -200,6 +206,8 @@ def store_verification_submission(
 
     submission_id = f"{user_id}-{int(datetime.now(timezone.utc).timestamp())}"
 
+    deposit_required_usd = get_required_deposit_amount(registration_flow)
+
     payload = {
         "submission_id": submission_id,
         "user_id": user_id,
@@ -210,6 +218,7 @@ def store_verification_submission(
         "phone_number": phone_number,
         "registration_flow": registration_flow,
         "ib_request_submitted": ib_request_submitted,
+        "deposit_required_usd": deposit_required_usd,
         "submitted_at": datetime.now(timezone.utc).isoformat(),
         "status": "pending",
         "admin_group_message_id": None,
@@ -229,7 +238,10 @@ def store_verification_submission(
     return payload
 
 
-def verification_action_keyboard(submission_id: str) -> InlineKeyboardMarkup:
+def verification_action_keyboard(submission_id: str, registration_flow: str) -> InlineKeyboardMarkup:
+    second_row = [InlineKeyboardButton("💸 Request Deposit", callback_data=f"{CB_VERIF_REQUEST_DEPOSIT}:{submission_id}")]
+    if registration_flow == "ib_transfer":
+        second_row.append(InlineKeyboardButton("🔁 Request Change IB", callback_data=f"{CB_VERIF_REQUEST_CHANGE_IB}:{submission_id}"))
     return InlineKeyboardMarkup(
         [
             [
@@ -237,10 +249,7 @@ def verification_action_keyboard(submission_id: str) -> InlineKeyboardMarkup:
                 InlineKeyboardButton("⏳ Pending", callback_data=f"{CB_VERIF_PENDING}:{submission_id}"),
                 InlineKeyboardButton("❌ Reject", callback_data=f"{CB_VERIF_REJECT}:{submission_id}"),
             ],
-            [
-                InlineKeyboardButton("💸 Request Deposit", callback_data=f"{CB_VERIF_REQUEST_DEPOSIT}:{submission_id}"),
-                InlineKeyboardButton("🔁 Request Change IB", callback_data=f"{CB_VERIF_REQUEST_CHANGE_IB}:{submission_id}"),
-            ],
+            second_row,
         ]
     )
 
@@ -363,7 +372,13 @@ def render_admin_submission_text(item: dict) -> str:
     username_text = f"@{username}" if username != "-" else "-"
     deposit_text = "Ya" if bool(item.get("has_deposit_100")) else "Belum"
     flow = str(item.get("registration_flow") or "new_registration")
-    flow_text = "Pelanggan Baru" if flow == "new_registration" else "Penukaran IB"
+    deposit_required_usd = int(item.get("deposit_required_usd") or get_required_deposit_amount(flow))
+    flow_text_map = {
+        "new_registration": "Pelanggan Baru",
+        "ib_transfer": "Penukaran IB",
+        "under_ib_reezo": "Client Under IB Reezo",
+    }
+    flow_text = flow_text_map.get(flow, flow)
     ib_req = item.get("ib_request_submitted")
     ib_req_text = ""
     if flow == "ib_transfer":
@@ -377,7 +392,7 @@ def render_admin_submission_text(item: dict) -> str:
         f"Nama: {item.get('full_name')}\n"
         f"Wallet ID: {item.get('wallet_id')}\n"
         f"{ib_req_text}"
-        f"Deposit USD100: {deposit_text}\n"
+        f"Deposit Minimum USD{deposit_required_usd}: {deposit_text}\n"
         f"No Telefon: {item.get('phone_number')}\n"
         f"Status: {status_text}"
     )
@@ -390,7 +405,7 @@ async def send_submission_to_admin_group(context: ContextTypes.DEFAULT_TYPE, ite
     sent = await context.bot.send_message(
         chat_id=admin_group_id,
         text=render_admin_submission_text(item),
-        reply_markup=verification_action_keyboard(str(item.get("submission_id"))),
+        reply_markup=verification_action_keyboard(str(item.get("submission_id")), str(item.get("registration_flow") or "")),
     )
     update_submission_fields(str(item.get("submission_id")), {"admin_group_message_id": sent.message_id})
 
@@ -459,12 +474,13 @@ async def send_user_deposit_request_message(
     user_id = item.get("user_id")
     if not isinstance(user_id, int):
         return
+    deposit_required_usd = int(item.get("deposit_required_usd") or get_required_deposit_amount(str(item.get("registration_flow") or "")))
     await clear_user_deposit_prompt(context, item)
     await clear_user_ib_prompt(context, item)
     sent = await context.bot.send_message(
         chat_id=user_id,
         text=(
-            f"Sila buat deposit USD100 ke akaun Amarkets ({item.get('wallet_id')}) "
+            f"Sila buat deposit USD{deposit_required_usd} ke akaun Amarkets ({item.get('wallet_id')}) "
             "untuk melengkapkan proses pendaftaran.\n\n"
             "Tekan butang DEPOSIT SELESAI untuk pengesahan semula."
         ),
@@ -1002,6 +1018,7 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
             registration_flow=registration_flow,
             ib_request_submitted=ib_request_submitted,
         )
+        deposit_required_usd = get_required_deposit_amount(registration_flow)
         deposit_text = "Ya" if has_deposit_100 else "Belum"
         submission_id = str(saved.get("submission_id") or "-")
 
@@ -1016,7 +1033,7 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
             "Sila tunggu approval.\n\n"
             f"Submission ID: {submission_id}\n"
             f"Wallet ID: {wallet_id}\n"
-            f"Deposit USD100: {deposit_text}\n"
+            f"Deposit Minimum USD{deposit_required_usd}: {deposit_text}\n"
             f"Nama: {full_name}\n"
             f"Telefon: {phone_number}",
             reply_markup=main_menu_keyboard(user.id),

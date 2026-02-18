@@ -49,12 +49,19 @@
   var ibFullNameInput = document.getElementById("ibFullNameInput");
   var ibPhoneInput = document.getElementById("ibPhoneInput");
   var submitIbVerificationBtn = document.getElementById("submitIbVerificationBtn");
+  var reezoWalletIdInput = document.getElementById("reezoWalletIdInput");
+  var reezoDepositYesBtn = document.getElementById("reezoDepositYesBtn");
+  var reezoDepositNoBtn = document.getElementById("reezoDepositNoBtn");
+  var reezoFullNameInput = document.getElementById("reezoFullNameInput");
+  var reezoPhoneInput = document.getElementById("reezoPhoneInput");
+  var submitReezoVerificationBtn = document.getElementById("submitReezoVerificationBtn");
   var AMARKETS_SIGNUP_URL = "https://amarketstrading.co/sign-up/real-en/?g=REEZO24";
 
   var activeView = "home";
   var hasDeposited100 = null;
   var ibRequestSubmitted = null;
   var ibHasDeposited100 = null;
+  var reezoHasDeposited50 = null;
 
   function updateBottomPrevState() {
     bottomPrevBtn.classList.toggle("hidden", activeView === "home");
@@ -176,6 +183,12 @@
     ibDepositNoBtn.classList.toggle("active-no", value === false);
   }
 
+  function setReezoDepositChoice(value) {
+    reezoHasDeposited50 = value;
+    reezoDepositYesBtn.classList.toggle("active-yes", value === true);
+    reezoDepositNoBtn.classList.toggle("active-no", value === false);
+  }
+
   function readText(el) {
     return String((el && el.value) || "").trim();
   }
@@ -272,6 +285,50 @@
     statusEl.textContent = "Preview mode: borang pengesahan penukaran IB dihantar.";
   }
 
+  function submitReezoVerification() {
+    var walletId = readText(reezoWalletIdInput);
+    var fullName = readText(reezoFullNameInput);
+    var phoneNumber = readText(reezoPhoneInput);
+
+    if (!walletId) {
+      statusEl.textContent = "Sila isi AMarkets Wallet ID.";
+      return;
+    }
+    if (reezoHasDeposited50 === null) {
+      statusEl.textContent = "Sila pilih status deposit USD 50.";
+      return;
+    }
+    if (!fullName) {
+      statusEl.textContent = "Sila isi nama penuh.";
+      return;
+    }
+    if (!phoneNumber) {
+      statusEl.textContent = "Sila isi no telefon.";
+      return;
+    }
+
+    var payload = {
+      type: "sidebot_verification_submit",
+      registration_flow: "under_ib_reezo",
+      wallet_id: walletId,
+      has_deposit_100: reezoHasDeposited50,
+      full_name: fullName,
+      phone_number: phoneNumber
+    };
+
+    if (tg) {
+      try {
+        tg.sendData(JSON.stringify(payload));
+      } catch (err) {
+        // no-op
+      }
+      tg.close();
+      return;
+    }
+
+    statusEl.textContent = "Preview mode: borang pengesahan client under IB Reezo dihantar.";
+  }
+
   topBackBtn.addEventListener("click", backToPreviousMenu);
   bottomBackBtn.addEventListener("click", sendToMainMenu);
   bottomPrevBtn.addEventListener("click", backToPreviousMenu);
@@ -357,6 +414,13 @@
     setIbDepositChoice(false);
   });
   submitIbVerificationBtn.addEventListener("click", submitIbVerification);
+  reezoDepositYesBtn.addEventListener("click", function () {
+    setReezoDepositChoice(true);
+  });
+  reezoDepositNoBtn.addEventListener("click", function () {
+    setReezoDepositChoice(false);
+  });
+  submitReezoVerificationBtn.addEventListener("click", submitReezoVerification);
 
   showView("home");
   openTab("new");
@@ -365,4 +429,5 @@
   setDepositChoice(null);
   setIbRequestChoice(null);
   setIbDepositChoice(null);
+  setReezoDepositChoice(null);
 })();
