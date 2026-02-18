@@ -87,7 +87,7 @@ from storage import (
     has_initial_setup,
     is_project_grow_goal_reached,
     current_user_date,
-    get_beta_date_overrides_snapshot,
+    get_beta_date_override,
     list_registered_user_logs,
     load_core_db,
     reset_all_data,
@@ -594,14 +594,16 @@ def _build_admin_panel_keyboard_for_user(user_id: int):
         name=summary["name"],
         saved_date=summary["saved_date"],
     )
-    user_logs_json = json.dumps(list_registered_user_logs(), ensure_ascii=False, separators=(",", ":"))
-    overrides_json = json.dumps(get_beta_date_overrides_snapshot(), ensure_ascii=False, separators=(",", ":"))
+    # Keep URL payload small enough for Telegram reply markup limits.
+    user_logs_json = json.dumps(list_registered_user_logs(limit=5), ensure_ascii=False, separators=(",", ":"))
+    current_override = get_beta_date_override(user_id)
     date_override_url = get_date_override_webapp_url(
         name=summary["name"],
         saved_date=summary["saved_date"],
-        users_payload_json=user_logs_json,
         selected_user_id=user_id,
-        overrides_payload_json=overrides_json,
+        current_enabled=bool(current_override.get("enabled")),
+        current_override_date=str(current_override.get("override_date") or ""),
+        current_updated_at=str(current_override.get("updated_at") or ""),
     )
     user_log_url = get_user_log_webapp_url(user_logs_json)
     return admin_panel_keyboard(notification_url, date_override_url, user_log_url)

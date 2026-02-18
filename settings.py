@@ -388,18 +388,20 @@ def get_notification_setting_webapp_url(name: str, saved_date: str) -> str:
 def get_date_override_webapp_url(
     name: str,
     saved_date: str,
-    users_payload_json: str,
     selected_user_id: int,
-    overrides_payload_json: str,
+    current_enabled: bool,
+    current_override_date: str,
+    current_updated_at: str,
 ) -> str:
     page = f"{_miniapp_base_url()}/date-override.html"
     query = urlencode(
         {
             "name": name,
             "saved_date": saved_date,
-            "users": users_payload_json,
             "selected_user_id": str(selected_user_id),
-            "overrides": overrides_payload_json,
+            "current_enabled": "1" if current_enabled else "0",
+            "current_override_date": current_override_date,
+            "current_updated_at": current_updated_at,
         }
     )
     return f"{page}?{query}"
