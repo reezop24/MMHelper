@@ -165,7 +165,7 @@ def amarkets_check_is_client(wallet_id: str) -> tuple[bool | None, str]:
     if isinstance(parsed, bool):
         return parsed, "ok"
     if isinstance(parsed, dict):
-        for key in ("is_client", "result", "data", "value"):
+        for key in ("is_client", "exists", "result", "data", "value"):
             value = parsed.get(key)
             if isinstance(value, bool):
                 return value, "ok"
