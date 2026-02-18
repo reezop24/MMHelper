@@ -30,7 +30,6 @@
     monthlyPerformance: asNum("monthly_performance_usd"),
     goalReached: (params.get("goal_reached") || "0") === "1",
     emergencyLeft: asNum("emergency_left"),
-    setNewGoalUrl: params.get("set_new_goal_url") || "",
 
     activeTab: "trading",
     tradingMode: "",
@@ -99,12 +98,7 @@
 
   function syncTabungModeView() {
     var action = (tabungActionEl.value || "save").trim();
-    var needAmount = action !== "goal_keep_and_new_goal";
-    tabungAmountWrapEl.classList.toggle("hidden", !needAmount);
-    if (action === "goal_keep_and_new_goal") {
-      tabungHintEl.textContent = "Akan redirect ke Set New Goal (tanpa submit amount).";
-      return;
-    }
+    tabungAmountWrapEl.classList.toggle("hidden", false);
     if (action === "emergency_withdrawal") {
       tabungHintEl.textContent = "Emergency left bulan ini: " + model.emergencyLeft + " kali.";
       return;
@@ -195,14 +189,6 @@
     }
 
     var action = String(tabungActionEl.value || "save").trim();
-    if (action === "goal_keep_and_new_goal") {
-      if (!model.setNewGoalUrl) {
-        statusEl.textContent = "Set New Goal URL tak tersedia.";
-        return;
-      }
-      window.location.href = model.setNewGoalUrl;
-      return;
-    }
 
     var amountTabung = Number((document.getElementById("tabungAmount").value || "").trim());
     if (!Number.isFinite(amountTabung) || amountTabung <= 0) {

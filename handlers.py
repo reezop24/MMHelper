@@ -717,9 +717,13 @@ def _build_account_activity_keyboard_for_user(user_id: int):
     activity_hub_url = ""
     if is_admin_user(user_id):
         activity_hub_url = get_activity_hub_webapp_url(
-            **common_kwargs,
+            name=summary["name"],
+            current_balance_usd=current_balance,
+            saved_date=summary["saved_date"],
+            tabung_balance_usd=tabung_balance,
+            weekly_performance_usd=weekly_performance,
+            monthly_performance_usd=monthly_performance,
             emergency_left=emergency_left,
-            set_new_goal_url=set_new_goal_url,
         )
 
     return account_activity_keyboard(
