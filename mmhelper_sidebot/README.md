@@ -8,6 +8,7 @@ Companion bot yang boleh redirect user ke MM HELPER (bot utama).
 2. Isi `SIDEBOT_TOKEN` dan `MAIN_BOT_USERNAME`.
 3. Isi `SIDEBOT_REGISTER_WEBAPP_URL` untuk butang `Daftar NEXT member` (opsyenal, tapi diperlukan untuk buka miniapp).
 4. Isi `SIDEBOT_ADMIN_GROUP_ID` untuk hantar notifikasi pendaftaran baru ke group admin.
+5. Isi `AMARKETS_API_BASE_URL` dan `AMARKETS_API_TOKEN` untuk semakan automatik status client under affiliate.
 4. Run manual:
 
 ```bash

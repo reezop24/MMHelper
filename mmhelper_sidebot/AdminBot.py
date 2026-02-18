@@ -7,6 +7,9 @@ import logging
 import os
 from pathlib import Path
 from datetime import datetime, timezone
+from urllib.parse import quote
+from urllib.request import Request, urlopen
+from urllib.error import HTTPError, URLError
 
 from telegram import (
     InlineKeyboardButton,
@@ -96,6 +99,62 @@ def get_admin_group_id() -> int | None:
         return int(raw)
     except ValueError:
         return None
+
+
+def get_amarkets_api_base_url() -> str:
+    return (os.getenv("AMARKETS_API_BASE_URL") or "").strip().rstrip("/")
+
+
+def get_amarkets_api_token() -> str:
+    return (os.getenv("AMARKETS_API_TOKEN") or "").strip()
+
+
+def amarkets_check_is_client(wallet_id: str) -> tuple[bool | None, str]:
+    base_url = get_amarkets_api_base_url()
+    token = get_amarkets_api_token()
+    if not base_url or not token:
+        return None, "AMarkets API belum dikonfigurasi"
+
+    endpoint = f"{base_url}/partner/is_client/{quote(wallet_id)}"
+    req = Request(
+        endpoint,
+        method="GET",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json,text/plain,*/*",
+        },
+    )
+    try:
+        with urlopen(req, timeout=12) as resp:
+            raw = resp.read().decode("utf-8", errors="ignore").strip()
+    except HTTPError as exc:
+        return None, f"HTTP {exc.code}"
+    except URLError:
+        return None, "Connection failed"
+    except Exception:
+        return None, "Unknown error"
+
+    lowered = raw.lower()
+    if lowered in {"true", "1", "yes"}:
+        return True, "ok"
+    if lowered in {"false", "0", "no"}:
+        return False, "ok"
+
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        return None, "Unexpected response"
+
+    if isinstance(parsed, bool):
+        return parsed, "ok"
+    if isinstance(parsed, dict):
+        for key in ("is_client", "result", "data", "value"):
+            value = parsed.get(key)
+            if isinstance(value, bool):
+                return value, "ok"
+            if isinstance(value, str) and value.lower() in {"true", "false"}:
+                return value.lower() == "true", "ok"
+    return None, "Unexpected response"
 
 
 def load_state() -> dict:
@@ -387,6 +446,15 @@ def render_admin_submission_text(item: dict) -> str:
     ib_req_text = ""
     if flow == "ib_transfer":
         ib_req_text = f"Submit Request IB: {'Ya' if ib_req else 'Belum'}\n"
+    api_check_text = ""
+    api_ib_status = item.get("api_is_client_under_ib")
+    api_message = str(item.get("api_check_message") or "").strip()
+    if api_ib_status is True:
+        api_check_text = "API Check (Under IB): ✅ PASS\n"
+    elif api_ib_status is False:
+        api_check_text = "API Check (Under IB): ❌ FAIL\n"
+    elif api_message:
+        api_check_text = f"API Check (Under IB): ⚠️ {api_message}\n"
     return (
         "🆕 NEXT Member Verification Submit\n\n"
         f"Flow: {flow_text}\n"
@@ -396,6 +464,7 @@ def render_admin_submission_text(item: dict) -> str:
         f"Nama: {item.get('full_name')}\n"
         f"Wallet ID: {item.get('wallet_id')}\n"
         f"{ib_req_text}"
+        f"{api_check_text}"
         f"Deposit Minimum USD{deposit_required_usd}: {deposit_text}\n"
         f"No Telefon: {item.get('phone_number')}\n"
         f"Status: {status_text}"
@@ -1025,6 +1094,20 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
             registration_flow=registration_flow,
             ib_request_submitted=ib_request_submitted,
         )
+        api_is_client_under_ib = None
+        api_check_message = ""
+        if registration_flow in {"ib_transfer", "under_ib_reezo"}:
+            api_is_client_under_ib, api_check_message = amarkets_check_is_client(wallet_id)
+            update_submission_fields(
+                submission_id=str(saved.get("submission_id")),
+                fields={
+                    "api_checked_at": datetime.now(timezone.utc).isoformat(),
+                    "api_is_client_under_ib": api_is_client_under_ib,
+                    "api_check_message": api_check_message,
+                },
+            )
+            saved = get_submission(str(saved.get("submission_id"))) or saved
+
         deposit_required_usd = get_required_deposit_amount(registration_flow)
         deposit_text = "Ya" if has_deposit_100 else "Belum"
         submission_id = str(saved.get("submission_id") or "-")
