@@ -18,7 +18,6 @@
   var btnHomeNewRegistration = document.getElementById("btnHomeNewRegistration");
   var btnHomeIbTransfer = document.getElementById("btnHomeIbTransfer");
   var btnHomeUnderIbReezo = document.getElementById("btnHomeUnderIbReezo");
-  var btnBackFromIbTransfer = document.getElementById("btnBackFromIbTransfer");
   var btnGoIbVerification = document.getElementById("btnGoIbVerification");
   var btnBackFromUnderIbReezo = document.getElementById("btnBackFromUnderIbReezo");
 
@@ -105,6 +104,7 @@
     panelIbVerification.classList.toggle("hidden", isTransfer);
     tabIbTransfer.classList.toggle("active", isTransfer);
     tabIbVerification.classList.toggle("active", !isTransfer);
+    btnGoIbVerification.classList.toggle("hidden", !isTransfer);
   }
 
   function openIbGuideTab(tabName) {
@@ -289,10 +289,6 @@
 
   btnHomeUnderIbReezo.addEventListener("click", function () {
     showView("under_ib_reezo");
-  });
-
-  btnBackFromIbTransfer.addEventListener("click", function () {
-    showView("home");
   });
 
   btnGoIbVerification.addEventListener("click", function () {

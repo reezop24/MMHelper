@@ -38,9 +38,12 @@ CB_VERIF_APPROVE = "VERIF_APPROVE"
 CB_VERIF_PENDING = "VERIF_PENDING"
 CB_VERIF_REJECT = "VERIF_REJECT"
 CB_VERIF_REQUEST_DEPOSIT = "VERIF_REQUEST_DEPOSIT"
+CB_VERIF_REQUEST_CHANGE_IB = "VERIF_REQUEST_CHANGE_IB"
 CB_VERIF_REVOKE_VIP = "VERIF_REVOKE_VIP"
 CB_USER_DEPOSIT_DONE = "USER_DEPOSIT_DONE"
 CB_USER_DEPOSIT_CANCEL = "USER_DEPOSIT_CANCEL"
+CB_USER_IB_DONE = "USER_IB_DONE"
+CB_USER_IB_CANCEL = "USER_IB_CANCEL"
 
 ADMIN_USER_IDS = {627116869}
 STATE_PATH = Path(__file__).with_name("sidebot_state.json")
@@ -211,6 +214,7 @@ def store_verification_submission(
         "status": "pending",
         "admin_group_message_id": None,
         "user_deposit_prompt_message_id": None,
+        "user_ib_prompt_message_id": None,
     }
 
     user_obj["telegram_username"] = telegram_username or ""
@@ -234,7 +238,8 @@ def verification_action_keyboard(submission_id: str) -> InlineKeyboardMarkup:
                 InlineKeyboardButton("❌ Reject", callback_data=f"{CB_VERIF_REJECT}:{submission_id}"),
             ],
             [
-                InlineKeyboardButton("💸 Request Deposit", callback_data=f"{CB_VERIF_REQUEST_DEPOSIT}:{submission_id}")
+                InlineKeyboardButton("💸 Request Deposit", callback_data=f"{CB_VERIF_REQUEST_DEPOSIT}:{submission_id}"),
+                InlineKeyboardButton("🔁 Request Change IB", callback_data=f"{CB_VERIF_REQUEST_CHANGE_IB}:{submission_id}"),
             ],
         ]
     )
@@ -254,6 +259,17 @@ def user_deposit_keyboard(submission_id: str) -> InlineKeyboardMarkup:
             [
                 InlineKeyboardButton("✅ Deposit Selesai", callback_data=f"{CB_USER_DEPOSIT_DONE}:{submission_id}"),
                 InlineKeyboardButton("❌ Batal", callback_data=f"{CB_USER_DEPOSIT_CANCEL}:{submission_id}"),
+            ]
+        ]
+    )
+
+
+def user_ib_request_keyboard(submission_id: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton("✅ Change IB Selesai", callback_data=f"{CB_USER_IB_DONE}:{submission_id}"),
+                InlineKeyboardButton("❌ Batal", callback_data=f"{CB_USER_IB_CANCEL}:{submission_id}"),
             ]
         ]
     )
@@ -388,6 +404,19 @@ async def clear_user_deposit_prompt(context: ContextTypes.DEFAULT_TYPE, item: di
         update_submission_fields(str(item.get("submission_id")), {"user_deposit_prompt_message_id": None})
 
 
+async def clear_user_ib_prompt(context: ContextTypes.DEFAULT_TYPE, item: dict) -> None:
+    user_id = item.get("user_id")
+    prompt_message_id = item.get("user_ib_prompt_message_id")
+    if not isinstance(user_id, int) or not isinstance(prompt_message_id, int):
+        return
+    try:
+        await context.bot.delete_message(chat_id=user_id, message_id=prompt_message_id)
+    except Exception:
+        logger.exception("Failed to delete old user change-IB prompt message")
+    finally:
+        update_submission_fields(str(item.get("submission_id")), {"user_ib_prompt_message_id": None})
+
+
 async def clear_user_deposit_prompt_by_submission(
     context: ContextTypes.DEFAULT_TYPE, submission_id: str
 ) -> None:
@@ -395,6 +424,15 @@ async def clear_user_deposit_prompt_by_submission(
     if not item:
         return
     await clear_user_deposit_prompt(context, item)
+
+
+async def clear_user_ib_prompt_by_submission(
+    context: ContextTypes.DEFAULT_TYPE, submission_id: str
+) -> None:
+    item = get_submission(submission_id)
+    if not item:
+        return
+    await clear_user_ib_prompt(context, item)
 
 
 async def refresh_admin_submission_message(context: ContextTypes.DEFAULT_TYPE, submission_id: str) -> None:
@@ -551,6 +589,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
             if isinstance(user_id, int):
                 try:
                     await clear_user_deposit_prompt(context, item)
+                    await clear_user_ib_prompt(context, item)
                     sent = await context.bot.send_message(
                         chat_id=user_id,
                         text=(
@@ -565,6 +604,39 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                     logger.exception("Failed to notify user for deposit request")
             await refresh_admin_submission_message(context, submission_id)
             await query.message.reply_text(f"✅ Request deposit dihantar kepada user untuk submission {submission_id}.")
+            return
+
+        if action == CB_VERIF_REQUEST_CHANGE_IB:
+            item = update_submission_fields(
+                submission_id=submission_id,
+                fields={
+                    "status": "request_change_ib",
+                    "ib_request_submitted": False,
+                    "reviewed_at": datetime.now(timezone.utc).isoformat(),
+                    "reviewed_by": query.from_user.id,
+                },
+            )
+            if not item:
+                await query.message.reply_text("❌ Rekod submission tak jumpa atau dah dipadam.")
+                return
+            user_id = item.get("user_id")
+            if isinstance(user_id, int):
+                try:
+                    await clear_user_ib_prompt(context, item)
+                    await clear_user_deposit_prompt(context, item)
+                    sent = await context.bot.send_message(
+                        chat_id=user_id,
+                        text=(
+                            "Sila submit request penukaran IB di dashboard AMarkets terlebih dahulu.\n\n"
+                            "Tekan butang CHANGE IB SELESAI untuk pengesahan semula."
+                        ),
+                        reply_markup=user_ib_request_keyboard(submission_id),
+                    )
+                    update_submission_fields(submission_id, {"user_ib_prompt_message_id": sent.message_id})
+                except Exception:
+                    logger.exception("Failed to notify user for change-IB request")
+            await refresh_admin_submission_message(context, submission_id)
+            await query.message.reply_text(f"✅ Request change IB dihantar kepada user untuk submission {submission_id}.")
             return
 
         if action == CB_VERIF_REVOKE_VIP:
@@ -586,6 +658,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 },
             )
             await clear_user_deposit_prompt_by_submission(context, submission_id)
+            await clear_user_ib_prompt_by_submission(context, submission_id)
             try:
                 await context.bot.send_message(
                     chat_id=user_id,
@@ -613,6 +686,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
         target_user_id = updated.get("user_id")
         if isinstance(target_user_id, int):
             await clear_user_deposit_prompt_by_submission(context, submission_id)
+            await clear_user_ib_prompt_by_submission(context, submission_id)
             try:
                 if status == "rejected":
                     await context.bot.send_message(
@@ -709,6 +783,60 @@ async def handle_user_deposit_callback(update: Update, context: ContextTypes.DEF
         await refresh_admin_submission_message(context, submission_id)
         await query.message.reply_text(
             "✅ Deposit selesai direkod.\n"
+            "Permohonan anda dihantar semula kepada admin untuk semakan."
+        )
+        return
+
+
+async def handle_user_ib_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    if not query:
+        return
+
+    await query.answer()
+    if ":" not in str(query.data):
+        return
+
+    action, submission_id = str(query.data).split(":", 1)
+    item = get_submission(submission_id)
+    if not item:
+        await query.message.reply_text("❌ Rekod submission tak jumpa.")
+        return
+
+    user_id = item.get("user_id")
+    if query.from_user.id != user_id:
+        await query.message.reply_text("❌ Butang ini bukan untuk anda.")
+        return
+
+    if action == CB_USER_IB_CANCEL:
+        try:
+            await query.edit_message_reply_markup(reply_markup=None)
+        except Exception:
+            pass
+        update_submission_fields(submission_id, {"user_ib_prompt_message_id": None})
+        await query.message.reply_text("Baik, status submit request penukaran IB anda kekal belum selesai.")
+        return
+
+    if action == CB_USER_IB_DONE:
+        updated = update_submission_fields(
+            submission_id=submission_id,
+            fields={
+                "ib_request_submitted": True,
+                "status": "pending",
+                "ib_request_completed_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+        if not updated:
+            await query.message.reply_text("❌ Rekod submission tak jumpa.")
+            return
+        try:
+            await query.edit_message_reply_markup(reply_markup=None)
+        except Exception:
+            pass
+        update_submission_fields(submission_id, {"user_ib_prompt_message_id": None})
+        await refresh_admin_submission_message(context, submission_id)
+        await query.message.reply_text(
+            "✅ Request penukaran IB selesai direkod.\n"
             "Permohonan anda dihantar semula kepada admin untuk semakan."
         )
         return
@@ -891,10 +1019,11 @@ def main() -> None:
     app.add_handler(
         CallbackQueryHandler(
             handle_admin_callback,
-            pattern=f"^({CB_BETA_RESET_CONFIRM}|{CB_BETA_RESET_CANCEL}|{CB_VERIF_APPROVE}|{CB_VERIF_PENDING}|{CB_VERIF_REJECT}|{CB_VERIF_REQUEST_DEPOSIT}|{CB_VERIF_REVOKE_VIP}).*",
+            pattern=f"^({CB_BETA_RESET_CONFIRM}|{CB_BETA_RESET_CANCEL}|{CB_VERIF_APPROVE}|{CB_VERIF_PENDING}|{CB_VERIF_REJECT}|{CB_VERIF_REQUEST_DEPOSIT}|{CB_VERIF_REQUEST_CHANGE_IB}|{CB_VERIF_REVOKE_VIP}).*",
         )
     )
     app.add_handler(CallbackQueryHandler(handle_user_deposit_callback, pattern=f"^({CB_USER_DEPOSIT_DONE}|{CB_USER_DEPOSIT_CANCEL}).*"))
+    app.add_handler(CallbackQueryHandler(handle_user_ib_callback, pattern=f"^({CB_USER_IB_DONE}|{CB_USER_IB_CANCEL}).*"))
     app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp_data))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     app.run_polling()
