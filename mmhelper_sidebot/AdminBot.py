@@ -57,6 +57,7 @@ MENU_BELI_EVIDEO26 = "Beli NEXT eVideo26"
 MENU_ALL_PRODUCT_PREVIEW = "All Product Preview"
 MENU_ADMIN_PANEL = "Admin Panel"
 MENU_BETA_RESET = "🧪 BETA RESET"
+MENU_CHECK_UNDER_IB = "🔎 Check Under IB"
 MENU_BACK_MAIN = "⬅️ Back to Main Menu"
 
 
@@ -618,6 +619,7 @@ def main_menu_keyboard(user_id: int | None) -> ReplyKeyboardMarkup:
 def admin_panel_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         [
+            [KeyboardButton(MENU_CHECK_UNDER_IB)],
             [KeyboardButton(MENU_BETA_RESET)],
             [KeyboardButton(MENU_BACK_MAIN)],
         ],
@@ -992,11 +994,54 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         )
         return
 
+    awaiting_wallet_check = bool(context.user_data.get("awaiting_under_ib_wallet_check"))
+    if awaiting_wallet_check:
+        if text == MENU_BACK_MAIN:
+            context.user_data["awaiting_under_ib_wallet_check"] = False
+            await message.reply_text(MAIN_MENU_TEXT, reply_markup=main_menu_keyboard(user.id))
+            return
+        if text == MENU_ADMIN_PANEL:
+            context.user_data["awaiting_under_ib_wallet_check"] = False
+            await message.reply_text(ADMIN_PANEL_TEXT, reply_markup=admin_panel_keyboard())
+            return
+        if not is_admin_user(user.id):
+            context.user_data["awaiting_under_ib_wallet_check"] = False
+            await message.reply_text("❌ Akses ditolak.")
+            return
+        wallet_id = text
+        if not is_valid_wallet_id(wallet_id):
+            await message.reply_text("❌ Wallet ID mesti 7 angka. Sila masukkan semula atau tekan Back.")
+            return
+        context.user_data["awaiting_under_ib_wallet_check"] = False
+        is_client, check_message = amarkets_check_is_client(wallet_id)
+        if is_client is True:
+            result = "✅ YA, client ini under affiliate/IB anda."
+        elif is_client is False:
+            result = "❌ TIDAK, client ini bukan under affiliate/IB anda."
+        else:
+            result = f"⚠️ Semakan gagal: {check_message}"
+        await message.reply_text(
+            f"Semakan Wallet ID: {wallet_id}\n{result}",
+            reply_markup=admin_panel_keyboard(),
+        )
+        return
+
     if text == MENU_ADMIN_PANEL:
         if not is_admin_user(user.id):
             await message.reply_text("❌ Akses ditolak.", reply_markup=main_menu_keyboard(user.id))
             return
         await message.reply_text(ADMIN_PANEL_TEXT, reply_markup=admin_panel_keyboard())
+        return
+
+    if text == MENU_CHECK_UNDER_IB:
+        if not is_admin_user(user.id):
+            await message.reply_text("❌ Akses ditolak.", reply_markup=main_menu_keyboard(user.id))
+            return
+        context.user_data["awaiting_under_ib_wallet_check"] = True
+        await message.reply_text(
+            "Masukkan AMarkets Wallet ID (7 angka) untuk semakan under IB.",
+            reply_markup=admin_panel_keyboard(),
+        )
         return
 
     if text == MENU_DAFTAR_NEXT_MEMBER:
