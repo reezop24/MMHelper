@@ -28,7 +28,6 @@ from menu import (
     SUBMENU_PROJECT_BUTTON_TABUNG_PROGRESS,
     SUBMENU_PROJECT_BUTTON_TABUNG_PROGRESS_LOCKED,
     SUBMENU_STAT_BUTTON_MONTHLY_REPORTS,
-    SUBMENU_STAT_BUTTON_ACCOUNT_SUMMARY,
     SUBMENU_STAT_BUTTON_TRANSACTION_HISTORY,
     SUBMENU_STAT_BUTTON_WEEKLY_REPORTS,
     admin_panel_keyboard,
@@ -39,6 +38,7 @@ from menu import (
     records_reports_keyboard,
 )
 from settings import (
+    get_account_summary_webapp_url,
     get_balance_adjustment_webapp_url,
     get_date_override_webapp_url,
     get_initial_capital_reset_webapp_url,
@@ -71,6 +71,7 @@ from storage import (
     get_transaction_history_records,
     get_transaction_history_records_between,
     get_tabung_balance_usd,
+    get_month_start_balance_usd,
     get_total_balance_usd,
     get_weekly_frozen_daily_target_usd,
     get_weekly_performance_usd,
@@ -614,8 +615,9 @@ def _build_admin_panel_keyboard_for_user(user_id: int):
     return admin_panel_keyboard(notification_url, date_override_url, user_log_url)
 
 
-def _build_account_summary_text(user_id: int) -> str:
+def _build_records_reports_keyboard_for_user(user_id: int):
     summary = get_initial_setup_summary(user_id)
+    reference_date = current_user_date(user_id)
     current_balance = get_current_balance_usd(user_id)
     current_profit = get_current_profit_usd(user_id)
     total_balance = get_total_balance_usd(user_id)
@@ -623,75 +625,50 @@ def _build_account_summary_text(user_id: int) -> str:
     weekly = get_weekly_profit_loss_usd(user_id)
     monthly = get_monthly_profit_loss_usd(user_id)
     tabung_start = get_tabung_start_date(user_id)
-
     goal = get_project_grow_goal_summary(user_id)
     mission_state = get_project_grow_mission_state(user_id)
     mission = get_mission_progress_summary(user_id)
-    target_capital = float(goal.get("target_balance_usd") or 0)
-    grow_target_total = max(target_capital - float(goal.get("current_balance_usd") or 0), 0.0)
+    target_capital = float(goal.get("target_balance_usd") or 0.0)
+    grow_target_total = max(target_capital - float(goal.get("current_balance_usd") or 0.0), 0.0)
     grow_target = max(grow_target_total - tabung_balance, 0.0)
-    target_label = goal.get("target_label") or "-"
-
-    def _usd(v: float) -> str:
-        return f"{v:.2f}"
-
-    lines = [
-        "*Account Summary*",
-        "",
-        "*Account*",
-        f"- Name: {summary['name']}",
-        f"- Tarikh mula akaun: {summary['saved_date']}",
-        f"- Tarikh mula tabung: {tabung_start}",
-        f"- Initial Balance: USD {_usd(summary['initial_capital_usd'])}",
-        f"- Current Balance: USD {_usd(current_balance)}",
-        f"- Current Profit: USD {_usd(current_profit)}",
-        f"- Capital: USD {_usd(total_balance)}",
-        f"- Tabung Balance: USD {_usd(tabung_balance)}",
-        f"- Weekly P/L: USD {_usd(weekly)}",
-        f"- Monthly P/L: USD {_usd(monthly)}",
-        "",
-        "*Project Grow*",
-        f"- Mission: {'Active' if mission_state['active'] else 'Inactive'}",
-    ]
-
-    if target_capital > 0:
-        lines.extend(
-            [
-                f"- Target Capital: USD {_usd(target_capital)}",
-                f"- Grow Target: USD {_usd(grow_target)}",
-                f"- Tempoh Target: {target_label}",
-            ]
-        )
-    else:
-        lines.append("- Target Capital: belum diset")
-
-    if mission_state["active"]:
-        lines.extend(
-            [
-                "",
-                "*Mission Progress*",
-                f"- Mission Mode: {mission['mode_level']}",
-                f"- Mission Status: {mission['progress_count']}",
-                mission["mission_1"],
-                mission["mission_2"],
-                mission["mission_3"],
-                mission["mission_4"],
-            ]
-        )
-
-    return "\n".join(lines)
-
-
-def _build_records_reports_keyboard_for_user(user_id: int):
-    summary = get_initial_setup_summary(user_id)
+    target_label = str(goal.get("target_label") or "-")
+    opening_balance = float(get_month_start_balance_usd(user_id, reference_date))
+    opening_balance_label = "Opening Balance"
+    try:
+        setup_date = date.fromisoformat(str(summary.get("saved_date") or ""))
+        if setup_date.year == reference_date.year and setup_date.month == reference_date.month:
+            opening_balance_label = "Opening Balance (Initial)"
+        else:
+            opening_balance_label = "Opening Balance (Carry Forward)"
+    except ValueError:
+        opening_balance_label = "Opening Balance (Carry Forward)"
+    account_summary_url = get_account_summary_webapp_url(
+        name=summary["name"],
+        saved_date=summary["saved_date"],
+        tabung_start_date=tabung_start,
+        initial_balance_usd=opening_balance,
+        current_balance_usd=current_balance,
+        current_profit_usd=current_profit,
+        capital_usd=total_balance,
+        tabung_balance_usd=tabung_balance,
+        weekly_pl_usd=weekly,
+        monthly_pl_usd=monthly,
+        target_capital_usd=target_capital,
+        grow_target_usd=grow_target,
+        target_label=target_label,
+        mission_active=bool(mission_state.get("active")),
+        mission_mode_level=str(mission.get("mode_level") or "-"),
+        mission_status_text=str(mission.get("progress_count") or "-"),
+        opening_balance_label=opening_balance_label,
+    )
     tx_history_url = get_transaction_history_webapp_url(
         name=summary["name"],
         saved_date=summary["saved_date"],
-        reference_date=current_user_date(user_id).isoformat(),
+        reference_date=reference_date.isoformat(),
         records_7d=get_transaction_history_records(user_id, days=7, limit=100),
         records_30d=get_transaction_history_records(user_id, days=30, limit=100),
     )
-    return records_reports_keyboard(tx_history_url)
+    return records_reports_keyboard(account_summary_url, tx_history_url)
 
 
 def _build_project_grow_keyboard_for_user(user_id: int):
@@ -994,16 +971,6 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
             message.chat_id,
             SYSTEM_INFO_OPENED_TEXT,
             reply_markup=_build_mm_setting_keyboard_for_user(user.id),
-            parse_mode="Markdown",
-        )
-        return
-
-    if text == SUBMENU_STAT_BUTTON_ACCOUNT_SUMMARY:
-        await send_screen(
-            context,
-            message.chat_id,
-            _build_account_summary_text(user.id),
-            reply_markup=_build_records_reports_keyboard_for_user(user.id),
             parse_mode="Markdown",
         )
         return

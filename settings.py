@@ -46,6 +46,50 @@ def get_user_log_webapp_url(user_log_payload_json: str) -> str:
     return f"{page}?{query}"
 
 
+def get_account_summary_webapp_url(
+    name: str,
+    saved_date: str,
+    tabung_start_date: str,
+    initial_balance_usd: float,
+    current_balance_usd: float,
+    current_profit_usd: float,
+    capital_usd: float,
+    tabung_balance_usd: float,
+    weekly_pl_usd: float,
+    monthly_pl_usd: float,
+    target_capital_usd: float,
+    grow_target_usd: float,
+    target_label: str,
+    mission_active: bool,
+    mission_mode_level: str,
+    mission_status_text: str,
+    opening_balance_label: str = "Opening Balance",
+) -> str:
+    page = f"{_miniapp_base_url()}/account-summary.html"
+    query = urlencode(
+        {
+            "name": name,
+            "saved_date": saved_date,
+            "tabung_start_date": tabung_start_date,
+            "initial_balance_usd": f"{initial_balance_usd:.2f}",
+            "current_balance_usd": f"{current_balance_usd:.2f}",
+            "current_profit_usd": f"{current_profit_usd:.2f}",
+            "capital_usd": f"{capital_usd:.2f}",
+            "tabung_balance_usd": f"{tabung_balance_usd:.2f}",
+            "opening_balance_label": opening_balance_label,
+            "weekly_pl_usd": f"{weekly_pl_usd:.2f}",
+            "monthly_pl_usd": f"{monthly_pl_usd:.2f}",
+            "target_capital_usd": f"{target_capital_usd:.2f}",
+            "grow_target_usd": f"{grow_target_usd:.2f}",
+            "target_label": target_label,
+            "mission_active": "1" if mission_active else "0",
+            "mission_mode_level": mission_mode_level,
+            "mission_status_text": mission_status_text,
+        }
+    )
+    return f"{page}?{query}"
+
+
 def get_system_info_webapp_url() -> str:
     return f"{_miniapp_base_url()}/system-info.html"
 

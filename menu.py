@@ -210,9 +210,14 @@ def admin_panel_keyboard(notification_setting_url: str, date_override_url: str, 
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
 
-def records_reports_keyboard(transaction_history_url: str) -> ReplyKeyboardMarkup:
+def records_reports_keyboard(account_summary_url: str, transaction_history_url: str) -> ReplyKeyboardMarkup:
     rows = [
-        [SUBMENU_STAT_BUTTON_ACCOUNT_SUMMARY],
+        [
+            KeyboardButton(
+                SUBMENU_STAT_BUTTON_ACCOUNT_SUMMARY,
+                web_app=WebAppInfo(url=account_summary_url),
+            )
+        ],
         [
             KeyboardButton(
                 SUBMENU_STAT_BUTTON_TRANSACTION_HISTORY,
