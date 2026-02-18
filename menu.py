@@ -41,6 +41,7 @@ SUBMENU_ADMIN_BUTTON_USER_LOG = "👥 User Log"
 SUBMENU_ADMIN_BUTTON_STOP_ALL_NOTIFICATION = "⛔ Stop All Notification"
 
 SUBMENU_STAT_BUTTON_TRANSACTION_HISTORY = "🧾 Transaction History"
+SUBMENU_STAT_BUTTON_ACCOUNT_SUMMARY = "🧾 Account Summary"
 SUBMENU_STAT_BUTTON_WEEKLY_REPORTS = "📆 Weekly Reports"
 SUBMENU_STAT_BUTTON_MONTHLY_REPORTS = "🗓️ Monthly Reports"
 
@@ -163,7 +164,7 @@ def account_activity_keyboard(
     tabung_update_url: str,
     activity_hub_url: str = "",
 ) -> ReplyKeyboardMarkup:
-    rows = [[SUBMENU_ACCOUNT_BUTTON_SUMMARY]]
+    rows = []
     if activity_hub_url:
         rows.append([KeyboardButton(SUBMENU_ACCOUNT_BUTTON_ACTIVITY_HUB, web_app=WebAppInfo(url=activity_hub_url))])
     rows.extend(
@@ -261,6 +262,7 @@ def admin_panel_keyboard(notification_setting_url: str, date_override_url: str, 
 
 def records_reports_keyboard(transaction_history_url: str) -> ReplyKeyboardMarkup:
     rows = [
+        [SUBMENU_STAT_BUTTON_ACCOUNT_SUMMARY],
         [
             KeyboardButton(
                 SUBMENU_STAT_BUTTON_TRANSACTION_HISTORY,

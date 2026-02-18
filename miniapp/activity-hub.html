@@ -100,6 +100,9 @@
       font-weight: 700;
     }
 
+    .value-positive { color: #35d07f !important; }
+    .value-negative { color: #ff6c7f !important; }
+
     .tabs {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -109,7 +112,8 @@
 
     .tab-btn {
       margin: 0;
-      padding: 10px;
+      padding: 13px 10px;
+      min-height: 46px;
       border-radius: 10px;
       border: 1px solid rgba(129, 166, 225, 0.45);
       background: rgba(7, 24, 53, 0.92);
@@ -231,7 +235,7 @@
       .metric-label { font-size: 10px; }
       .metric-value { font-size: 12px; }
       .tabs { gap: 6px; }
-      .tab-btn { padding: 9px 4px; font-size: 10.5px; }
+      .tab-btn { padding: 11px 4px; min-height: 44px; font-size: 10.5px; }
       .actions button { width: 100%; }
     }
   </style>
@@ -285,7 +289,7 @@
         </div>
         <div class="field">
           <label for="tradingAmount">Amount (USD)</label>
-          <input id="tradingAmount" type="number" step="0.01" min="0" placeholder="Contoh: 25" />
+          <input id="tradingAmount" type="number" inputmode="decimal" step="0.01" min="0" placeholder="Contoh: 25" />
         </div>
       </section>
 
@@ -303,7 +307,7 @@
         </div>
         <div class="field">
           <label for="cashflowAmount">Amount (USD)</label>
-          <input id="cashflowAmount" type="number" step="0.01" min="0" placeholder="Contoh: 50" />
+          <input id="cashflowAmount" type="number" inputmode="decimal" step="0.01" min="0" placeholder="Contoh: 50" />
         </div>
       </section>
 
@@ -319,7 +323,7 @@
         </div>
         <div class="field">
           <label for="tabungAmount">Amount (USD)</label>
-          <input id="tabungAmount" type="number" step="0.01" min="0" placeholder="Contoh: 30" />
+          <input id="tabungAmount" type="number" inputmode="decimal" step="0.01" min="0" placeholder="Contoh: 30" />
         </div>
       </section>
 
@@ -337,7 +341,7 @@
 
       <div class="actions">
         <button id="submitBtn" type="submit" class="submit-btn">Submit</button>
-        <button id="backBtn" type="button">Back to Account Activity</button>
+        <button id="backBtn" type="button">Back to Main Menu</button>
       </div>
     </form>
   </main>

@@ -19,7 +19,6 @@ from menu import (
     SUBMENU_ADMIN_BUTTON_BETA_RESET,
     SUBMENU_ADMIN_BUTTON_NOTIFICATION_SETTING,
     SUBMENU_ADMIN_BUTTON_STOP_ALL_NOTIFICATION,
-    SUBMENU_ACCOUNT_BUTTON_SUMMARY,
     SUBMENU_ACCOUNT_BUTTON_TABUNG,
     SUBMENU_MM_BUTTON_BACK_MAIN,
     SUBMENU_MM_BUTTON_CORRECTION,
@@ -31,6 +30,7 @@ from menu import (
     SUBMENU_PROJECT_BUTTON_TABUNG_PROGRESS,
     SUBMENU_PROJECT_BUTTON_TABUNG_PROGRESS_LOCKED,
     SUBMENU_STAT_BUTTON_MONTHLY_REPORTS,
+    SUBMENU_STAT_BUTTON_ACCOUNT_SUMMARY,
     SUBMENU_STAT_BUTTON_TRANSACTION_HISTORY,
     SUBMENU_STAT_BUTTON_WEEKLY_REPORTS,
     admin_panel_keyboard,
@@ -1143,12 +1143,12 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
         return
 
-    if text == SUBMENU_ACCOUNT_BUTTON_SUMMARY:
+    if text == SUBMENU_STAT_BUTTON_ACCOUNT_SUMMARY:
         await send_screen(
             context,
             message.chat_id,
             _build_account_summary_text(user.id),
-            reply_markup=_build_account_activity_keyboard_for_user(user.id),
+            reply_markup=_build_records_reports_keyboard_for_user(user.id),
             parse_mode="Markdown",
         )
         return

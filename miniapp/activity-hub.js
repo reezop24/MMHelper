@@ -61,15 +61,40 @@
     return Number.isFinite(n) && n > 0 ? n : 0;
   }
 
+  function sanitizeNumericInput(el) {
+    var raw = String(el.value || "");
+    var cleaned = raw.replace(/[^0-9.]/g, "");
+    var parts = cleaned.split(".");
+    if (parts.length > 2) {
+      cleaned = parts[0] + "." + parts.slice(1).join("");
+    }
+    if (cleaned !== raw) {
+      el.value = cleaned;
+    }
+  }
+
+  function setSignedTone(el, value) {
+    el.classList.remove("value-positive", "value-negative");
+    if (value > 0) {
+      el.classList.add("value-positive");
+    } else if (value < 0) {
+      el.classList.add("value-negative");
+    }
+  }
+
   function syncSummary() {
     var capital = model.currentBalance + model.tabungBalance;
+    var weeklyEl = document.getElementById("summaryWeekly");
+    var monthlyEl = document.getElementById("summaryMonthly");
     document.getElementById("summaryName").textContent = model.name;
     document.getElementById("summaryDate").textContent = model.savedDate;
     document.getElementById("summaryBalance").textContent = formatUsd(model.currentBalance);
     document.getElementById("summaryTabung").textContent = formatUsd(model.tabungBalance);
     document.getElementById("summaryCapital").textContent = formatUsd(capital);
-    document.getElementById("summaryWeekly").textContent = formatPnl(model.weeklyPerformance);
-    document.getElementById("summaryMonthly").textContent = formatPnl(model.monthlyPerformance);
+    weeklyEl.textContent = formatPnl(model.weeklyPerformance);
+    monthlyEl.textContent = formatPnl(model.monthlyPerformance);
+    setSignedTone(weeklyEl, model.weeklyPerformance);
+    setSignedTone(monthlyEl, model.monthlyPerformance);
   }
 
   function syncMetrics() {
@@ -79,15 +104,21 @@
     var dailyTarget = tradingDays > 0 ? (model.growTarget / tradingDays) : 0;
     var progressPct = model.targetBalance > 0 ? Math.min((capital / model.targetBalance) * 100, 100) : 0;
     var leftToGoal = Math.max(model.targetBalance - capital, 0);
+    var dailyTargetEl = document.getElementById("metricDailyTarget");
+    var growProgressEl = document.getElementById("metricGrowProgress");
+    var leftToGoalEl = document.getElementById("metricLeftToGoal");
 
     document.getElementById("metricTargetCapital").textContent = "USD " + formatUsd(model.targetBalance);
     document.getElementById("metricGrowTarget").textContent = "USD " + formatUsd(model.growTarget);
     document.getElementById("metricTargetDays").textContent = String(model.targetDays || 0);
     document.getElementById("metricTradingDays").textContent = String(tradingDays);
-    document.getElementById("metricDailyTarget").textContent = "USD " + formatUsd(dailyTarget);
-    document.getElementById("metricGrowProgress").textContent = Number(progressPct).toFixed(2) + "%";
-    document.getElementById("metricLeftToGoal").textContent = "USD " + formatUsd(leftToGoal);
+    dailyTargetEl.textContent = "USD " + formatUsd(dailyTarget);
+    growProgressEl.textContent = Number(progressPct).toFixed(2) + "%";
+    leftToGoalEl.textContent = "USD " + formatUsd(leftToGoal);
     document.getElementById("metricGoalStatus").textContent = model.goalReached ? "Reached" : "Not Reached";
+    setSignedTone(dailyTargetEl, dailyTarget);
+    setSignedTone(growProgressEl, progressPct);
+    setSignedTone(leftToGoalEl, leftToGoal);
   }
 
   function syncLivePreview() {
@@ -127,10 +158,18 @@
 
     var capitalAfter = currentAfter + tabungAfter;
     var growLeftAfter = Math.max(model.targetBalance - capitalAfter, 0);
-    document.getElementById("previewCurrent").textContent = "USD " + formatUsd(currentAfter);
-    document.getElementById("previewTabung").textContent = "USD " + formatUsd(tabungAfter);
-    document.getElementById("previewCapital").textContent = "USD " + formatUsd(capitalAfter);
-    document.getElementById("previewGrowLeft").textContent = "USD " + formatUsd(growLeftAfter);
+    var previewCurrentEl = document.getElementById("previewCurrent");
+    var previewTabungEl = document.getElementById("previewTabung");
+    var previewCapitalEl = document.getElementById("previewCapital");
+    var previewGrowLeftEl = document.getElementById("previewGrowLeft");
+    previewCurrentEl.textContent = "USD " + formatUsd(currentAfter);
+    previewTabungEl.textContent = "USD " + formatUsd(tabungAfter);
+    previewCapitalEl.textContent = "USD " + formatUsd(capitalAfter);
+    previewGrowLeftEl.textContent = "USD " + formatUsd(growLeftAfter);
+    setSignedTone(previewCurrentEl, currentAfter);
+    setSignedTone(previewTabungEl, tabungAfter);
+    setSignedTone(previewCapitalEl, capitalAfter);
+    setSignedTone(previewGrowLeftEl, growLeftAfter);
   }
 
   function switchTab(tabId) {
@@ -179,8 +218,8 @@
     statusEl.textContent = "Preview mode: buka dari Telegram untuk submit.";
   }
 
-  function backToAccount() {
-    sendPayload({ type: "account_activity_back_to_menu" });
+  function backToMainMenu() {
+    sendPayload({ type: "risk_calculator_back_to_menu" });
   }
 
   tabButtons.forEach(function (btn) {
@@ -202,12 +241,21 @@
     statusEl.textContent = "";
     syncLivePreview();
   });
-  tradingAmountEl.addEventListener("input", syncLivePreview);
-  cashflowAmountEl.addEventListener("input", syncLivePreview);
-  tabungAmountEl.addEventListener("input", syncLivePreview);
+  tradingAmountEl.addEventListener("input", function () {
+    sanitizeNumericInput(tradingAmountEl);
+    syncLivePreview();
+  });
+  cashflowAmountEl.addEventListener("input", function () {
+    sanitizeNumericInput(cashflowAmountEl);
+    syncLivePreview();
+  });
+  tabungAmountEl.addEventListener("input", function () {
+    sanitizeNumericInput(tabungAmountEl);
+    syncLivePreview();
+  });
 
-  document.getElementById("topBackBtn").addEventListener("click", backToAccount);
-  document.getElementById("backBtn").addEventListener("click", backToAccount);
+  document.getElementById("topBackBtn").addEventListener("click", backToMainMenu);
+  document.getElementById("backBtn").addEventListener("click", backToMainMenu);
 
   document.getElementById("hubForm").addEventListener("submit", function (event) {
     event.preventDefault();
