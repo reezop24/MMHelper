@@ -193,6 +193,10 @@
     return String((el && el.value) || "").trim();
   }
 
+  function isValidWalletId(walletId) {
+    return /^[0-9]{7}$/.test(walletId);
+  }
+
   function submitVerification() {
     var walletId = readText(walletIdInput);
     var fullName = readText(fullNameInput);
@@ -200,6 +204,10 @@
 
     if (!walletId) {
       statusEl.textContent = "Sila isi AMarkets Wallet ID.";
+      return;
+    }
+    if (!isValidWalletId(walletId)) {
+      statusEl.textContent = "AMarkets Wallet ID mesti tepat 7 angka.";
       return;
     }
     if (hasDeposited100 === null) {
@@ -249,6 +257,10 @@
       statusEl.textContent = "Sila isi AMarkets Wallet ID.";
       return;
     }
+    if (!isValidWalletId(walletId)) {
+      statusEl.textContent = "AMarkets Wallet ID mesti tepat 7 angka.";
+      return;
+    }
     if (ibHasDeposited100 === null) {
       statusEl.textContent = "Sila pilih status deposit USD 100.";
       return;
@@ -292,6 +304,10 @@
 
     if (!walletId) {
       statusEl.textContent = "Sila isi AMarkets Wallet ID.";
+      return;
+    }
+    if (!isValidWalletId(walletId)) {
+      statusEl.textContent = "AMarkets Wallet ID mesti tepat 7 angka.";
       return;
     }
     if (reezoHasDeposited50 === null) {

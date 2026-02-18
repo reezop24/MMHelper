@@ -169,6 +169,10 @@ def get_required_deposit_amount(registration_flow: str) -> int:
     return 100
 
 
+def is_valid_wallet_id(wallet_id: str) -> bool:
+    return wallet_id.isdigit() and len(wallet_id) == 7
+
+
 def has_tnc_accepted(user_id: int) -> bool:
     state = load_state()
     users = state.get("users", {})
@@ -1003,6 +1007,9 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
         if not wallet_id or not full_name or not phone_number:
             await message.reply_text("❌ Data pengesahan tak lengkap. Sila isi semula dalam miniapp.")
+            return
+        if not is_valid_wallet_id(wallet_id):
+            await message.reply_text("❌ AMarkets Wallet ID mesti tepat 7 angka.")
             return
         if registration_flow == "ib_transfer" and ib_request_submitted is None:
             await message.reply_text("❌ Status submit request penukaran IB belum dipilih. Sila isi semula.")
