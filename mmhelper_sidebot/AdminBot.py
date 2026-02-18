@@ -55,6 +55,8 @@ VIP_WHITELIST_PATH = Path(__file__).with_name("sidebot_vip_whitelist.json")
 MENU_DAFTAR_NEXT_MEMBER = "Daftar NEXT member"
 MENU_BELI_EVIDEO26 = "Beli NEXT eVideo26"
 MENU_ALL_PRODUCT_PREVIEW = "All Product Preview"
+MENU_CHECK_UNDER_IB_REEZO = "🔎 Semak Under IB Reezo"
+MENU_OPEN_UNDER_IB_REEZO = "✅ Buka Client Under IB Reezo"
 MENU_ADMIN_PANEL = "Admin Panel"
 MENU_BETA_RESET = "🧪 BETA RESET"
 MENU_CHECK_UNDER_IB = "🔎 Check Under IB"
@@ -624,6 +626,7 @@ def main_menu_keyboard(user_id: int | None) -> ReplyKeyboardMarkup:
 
     rows = [
         [register_button],
+        [KeyboardButton(MENU_CHECK_UNDER_IB_REEZO)],
         [KeyboardButton(MENU_BELI_EVIDEO26)],
         [KeyboardButton(MENU_ALL_PRODUCT_PREVIEW)],
     ]
@@ -641,6 +644,27 @@ def admin_panel_keyboard() -> ReplyKeyboardMarkup:
         ],
         resize_keyboard=True,
     )
+
+
+def build_under_ib_reezo_webapp_url() -> str:
+    register_url = get_register_next_webapp_url()
+    if not register_url:
+        return ""
+    sep = "&" if "?" in register_url else "?"
+    return f"{register_url}{sep}entry=under_ib_reezo"
+
+
+def under_ib_quick_access_keyboard(user_id: int | None) -> ReplyKeyboardMarkup:
+    target_url = build_under_ib_reezo_webapp_url()
+    if target_url:
+        open_button = KeyboardButton(MENU_OPEN_UNDER_IB_REEZO, web_app=WebAppInfo(url=target_url))
+    else:
+        open_button = KeyboardButton(MENU_OPEN_UNDER_IB_REEZO)
+    rows = [
+        [open_button],
+        [KeyboardButton(MENU_BACK_MAIN)],
+    ]
+    return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
 
 def beta_reset_keyboard() -> InlineKeyboardMarkup:
@@ -1010,6 +1034,47 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         )
         return
 
+    awaiting_public_under_ib_check = bool(context.user_data.get("awaiting_public_under_ib_wallet_check"))
+    if awaiting_public_under_ib_check:
+        if text == MENU_BACK_MAIN:
+            context.user_data["awaiting_public_under_ib_wallet_check"] = False
+            await message.reply_text(MAIN_MENU_TEXT, reply_markup=main_menu_keyboard(user.id))
+            return
+        if text == MENU_ADMIN_PANEL:
+            context.user_data["awaiting_public_under_ib_wallet_check"] = False
+            if not is_admin_user(user.id):
+                await message.reply_text("❌ Akses ditolak.", reply_markup=main_menu_keyboard(user.id))
+                return
+            await message.reply_text(ADMIN_PANEL_TEXT, reply_markup=admin_panel_keyboard())
+            return
+
+        wallet_id = text
+        if not is_valid_wallet_id(wallet_id):
+            await message.reply_text("❌ Wallet ID mesti 7 angka. Sila masukkan semula atau tekan Back.")
+            return
+
+        context.user_data["awaiting_public_under_ib_wallet_check"] = False
+        is_client, check_message = amarkets_check_is_client(wallet_id)
+        if is_client is True:
+            await message.reply_text(
+                "✅ Wallet ini disahkan berada di bawah Affiliate/IB Reezo.\n"
+                "Anda boleh teruskan ke borang Client Under IB Reezo di bawah.",
+                reply_markup=under_ib_quick_access_keyboard(user.id),
+            )
+            return
+        if is_client is False:
+            await message.reply_text(
+                "❌ Wallet ini tidak berada di bawah Affiliate/IB Reezo.\n"
+                "Sila guna flow Pendaftaran Baru atau Penukaran IB.",
+                reply_markup=main_menu_keyboard(user.id),
+            )
+            return
+        await message.reply_text(
+            f"⚠️ Semakan gagal: {check_message}\nSila cuba semula kemudian.",
+            reply_markup=main_menu_keyboard(user.id),
+        )
+        return
+
     awaiting_wallet_check = bool(context.user_data.get("awaiting_under_ib_wallet_check"))
     if awaiting_wallet_check:
         if text == MENU_BACK_MAIN:
@@ -1047,6 +1112,25 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             await message.reply_text("❌ Akses ditolak.", reply_markup=main_menu_keyboard(user.id))
             return
         await message.reply_text(ADMIN_PANEL_TEXT, reply_markup=admin_panel_keyboard())
+        return
+
+    if text == MENU_CHECK_UNDER_IB_REEZO:
+        context.user_data["awaiting_public_under_ib_wallet_check"] = True
+        await message.reply_text(
+            "Masukkan AMarkets Wallet ID (7 angka) untuk semakan under IB Reezo.",
+            reply_markup=main_menu_keyboard(user.id),
+        )
+        return
+
+    if text == MENU_OPEN_UNDER_IB_REEZO:
+        url = build_under_ib_reezo_webapp_url()
+        if url:
+            await message.reply_text(
+                "Buka miniapp melalui butang web app untuk masuk terus ke Client Under IB Reezo.",
+                reply_markup=under_ib_quick_access_keyboard(user.id),
+            )
+            return
+        await message.reply_text("Miniapp URL belum diset. Isi SIDEBOT_REGISTER_WEBAPP_URL dalam .env dulu.")
         return
 
     if text == MENU_CHECK_UNDER_IB:

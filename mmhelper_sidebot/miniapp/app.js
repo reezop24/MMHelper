@@ -63,6 +63,15 @@
   var ibHasDeposited100 = null;
   var reezoHasDeposited50 = null;
 
+  function getEntryParam() {
+    try {
+      var params = new URLSearchParams(window.location.search || "");
+      return String(params.get("entry") || "").trim().toLowerCase();
+    } catch (err) {
+      return "";
+    }
+  }
+
   function updateBottomPrevState() {
     bottomPrevBtn.classList.toggle("hidden", activeView === "home");
   }
@@ -438,7 +447,12 @@
   });
   submitReezoVerificationBtn.addEventListener("click", submitReezoVerification);
 
-  showView("home");
+  var entry = getEntryParam();
+  if (entry === "under_ib_reezo") {
+    showView("under_ib_reezo");
+  } else {
+    showView("home");
+  }
   openTab("new");
   openIbTab("transfer");
   openIbGuideTab("web");
