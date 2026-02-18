@@ -114,9 +114,16 @@ def amarkets_check_is_client(wallet_id: str) -> tuple[bool | None, str]:
     base_url = get_amarkets_api_base_url()
     token = get_amarkets_api_token()
     if not base_url or not token:
+        logger.warning(
+            "AMarkets API config missing (base_url_set=%s token_set=%s)",
+            bool(base_url),
+            bool(token),
+        )
         return None, "AMarkets API belum dikonfigurasi"
 
     endpoint = f"{base_url}/partner/is_client/{quote(wallet_id)}"
+    token_hint = f"{token[:8]}...len={len(token)}" if len(token) >= 8 else f"len={len(token)}"
+    logger.info("AMarkets check start wallet_id=%s endpoint=%s token_hint=%s", wallet_id, endpoint, token_hint)
     req = Request(
         endpoint,
         method="GET",
@@ -128,11 +135,20 @@ def amarkets_check_is_client(wallet_id: str) -> tuple[bool | None, str]:
     try:
         with urlopen(req, timeout=12) as resp:
             raw = resp.read().decode("utf-8", errors="ignore").strip()
+            logger.info("AMarkets check response wallet_id=%s http=%s body_preview=%s", wallet_id, getattr(resp, "status", "?"), raw[:180])
     except HTTPError as exc:
+        err_body = ""
+        try:
+            err_body = exc.read().decode("utf-8", errors="ignore")[:180]
+        except Exception:
+            err_body = ""
+        logger.warning("AMarkets check HTTP error wallet_id=%s code=%s body_preview=%s", wallet_id, exc.code, err_body)
         return None, f"HTTP {exc.code}"
-    except URLError:
+    except URLError as exc:
+        logger.warning("AMarkets check connection error wallet_id=%s reason=%s", wallet_id, exc.reason)
         return None, "Connection failed"
     except Exception:
+        logger.exception("AMarkets check unknown error wallet_id=%s", wallet_id)
         return None, "Unknown error"
 
     lowered = raw.lower()
