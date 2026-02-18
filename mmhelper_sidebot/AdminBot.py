@@ -449,6 +449,45 @@ async def refresh_admin_submission_message(context: ContextTypes.DEFAULT_TYPE, s
     await send_submission_to_admin_group(context, item)
 
 
+async def send_user_deposit_request_message(
+    context: ContextTypes.DEFAULT_TYPE, submission_id: str, item: dict
+) -> None:
+    user_id = item.get("user_id")
+    if not isinstance(user_id, int):
+        return
+    await clear_user_deposit_prompt(context, item)
+    await clear_user_ib_prompt(context, item)
+    sent = await context.bot.send_message(
+        chat_id=user_id,
+        text=(
+            f"Sila buat deposit USD100 ke akaun Amarkets ({item.get('wallet_id')}) "
+            "untuk melengkapkan proses pendaftaran.\n\n"
+            "Tekan butang DEPOSIT SELESAI untuk pengesahan semula."
+        ),
+        reply_markup=user_deposit_keyboard(submission_id),
+    )
+    update_submission_fields(submission_id, {"user_deposit_prompt_message_id": sent.message_id})
+
+
+async def send_user_change_ib_request_message(
+    context: ContextTypes.DEFAULT_TYPE, submission_id: str, item: dict
+) -> None:
+    user_id = item.get("user_id")
+    if not isinstance(user_id, int):
+        return
+    await clear_user_ib_prompt(context, item)
+    await clear_user_deposit_prompt(context, item)
+    sent = await context.bot.send_message(
+        chat_id=user_id,
+        text=(
+            "Sila submit request penukaran IB di dashboard AMarkets terlebih dahulu.\n\n"
+            "Tekan butang CHANGE IB SELESAI untuk pengesahan semula."
+        ),
+        reply_markup=user_ib_request_keyboard(submission_id),
+    )
+    update_submission_fields(submission_id, {"user_ib_prompt_message_id": sent.message_id})
+
+
 def is_admin_user(user_id: int | None) -> bool:
     return user_id in ADMIN_USER_IDS
 
@@ -588,18 +627,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
             user_id = item.get("user_id")
             if isinstance(user_id, int):
                 try:
-                    await clear_user_deposit_prompt(context, item)
-                    await clear_user_ib_prompt(context, item)
-                    sent = await context.bot.send_message(
-                        chat_id=user_id,
-                        text=(
-                            f"Sila buat deposit USD100 ke akaun Amarkets ({item.get('wallet_id')}) "
-                            "untuk melengkapkan proses pendaftaran.\n\n"
-                            "Tekan butang DEPOSIT SELESAI untuk pengesahan semula."
-                        ),
-                        reply_markup=user_deposit_keyboard(submission_id),
-                    )
-                    update_submission_fields(submission_id, {"user_deposit_prompt_message_id": sent.message_id})
+                    await send_user_deposit_request_message(context, submission_id, item)
                 except Exception:
                     logger.exception("Failed to notify user for deposit request")
             await refresh_admin_submission_message(context, submission_id)
@@ -622,17 +650,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
             user_id = item.get("user_id")
             if isinstance(user_id, int):
                 try:
-                    await clear_user_ib_prompt(context, item)
-                    await clear_user_deposit_prompt(context, item)
-                    sent = await context.bot.send_message(
-                        chat_id=user_id,
-                        text=(
-                            "Sila submit request penukaran IB di dashboard AMarkets terlebih dahulu.\n\n"
-                            "Tekan butang CHANGE IB SELESAI untuk pengesahan semula."
-                        ),
-                        reply_markup=user_ib_request_keyboard(submission_id),
-                    )
-                    update_submission_fields(submission_id, {"user_ib_prompt_message_id": sent.message_id})
+                    await send_user_change_ib_request_message(context, submission_id, item)
                 except Exception:
                     logger.exception("Failed to notify user for change-IB request")
             await refresh_admin_submission_message(context, submission_id)
@@ -993,13 +1011,28 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
             f"Telefon: {phone_number}",
             reply_markup=main_menu_keyboard(user.id),
         )
-        if not has_deposit_100:
-            deposit_prompt = await message.reply_text(
-                "⏳ Status semasa: deposit USD100 masih belum lengkap.\n"
-                "Lepas deposit, tekan `Deposit Selesai` untuk hantar semakan semula.",
-                reply_markup=user_deposit_keyboard(submission_id),
-            )
-            update_submission_fields(submission_id, {"user_deposit_prompt_message_id": deposit_prompt.message_id})
+        if registration_flow == "ib_transfer":
+            if not ib_request_submitted:
+                try:
+                    latest = get_submission(submission_id)
+                    if latest:
+                        await send_user_change_ib_request_message(context, submission_id, latest)
+                except Exception:
+                    logger.exception("Failed to send change-IB request after IB verification submit")
+            elif not has_deposit_100:
+                try:
+                    latest = get_submission(submission_id)
+                    if latest:
+                        await send_user_deposit_request_message(context, submission_id, latest)
+                except Exception:
+                    logger.exception("Failed to send deposit request after IB verification submit")
+        elif not has_deposit_100:
+            try:
+                latest = get_submission(submission_id)
+                if latest:
+                    await send_user_deposit_request_message(context, submission_id, latest)
+            except Exception:
+                logger.exception("Failed to send deposit request after verification submit")
         return
 
     await message.reply_text("ℹ️ Miniapp demo diterima.", reply_markup=main_menu_keyboard(user.id))
