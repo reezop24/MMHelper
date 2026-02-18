@@ -34,8 +34,8 @@ SUBMENU_ADMIN_BUTTON_STOP_ALL_NOTIFICATION = "⛔ Stop All Notification"
 
 SUBMENU_STAT_BUTTON_TRANSACTION_HISTORY = "🧾 Transaction History"
 SUBMENU_STAT_BUTTON_ACCOUNT_SUMMARY = "🧾 Account Summary"
-SUBMENU_STAT_BUTTON_WEEKLY_REPORTS = "📆 Weekly Reports"
-SUBMENU_STAT_BUTTON_MONTHLY_REPORTS = "🗓️ Monthly Reports"
+SUBMENU_STAT_BUTTON_WEEKLY_REPORTS = "📆 Weekly Reports (beta)"
+SUBMENU_STAT_BUTTON_MONTHLY_REPORTS = "🗓️ Monthly Reports (beta)"
 
 def is_admin_user(user_id: int | None) -> bool:
     return user_id in ADMIN_USER_IDS

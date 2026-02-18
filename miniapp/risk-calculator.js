@@ -16,6 +16,7 @@
   var bottomBackBtn = document.getElementById("bottomBackBtn");
   var tabInputBtn = document.getElementById("tabInputBtn");
   var tabBalanceBtn = document.getElementById("tabBalanceBtn");
+  var tabRecommendationBtn = document.getElementById("tabRecommendationBtn");
   var resultInputCard = document.getElementById("resultInputCard");
   var resultBalanceCard = document.getElementById("resultBalanceCard");
   var resultBalanceRecommendationCard = document.getElementById("resultBalanceRecommendationCard");
@@ -38,11 +39,14 @@
 
   function setTab(tabName) {
     var showInput = tabName === "input";
+    var showBalance = tabName === "balance";
+    var showRecommendation = tabName === "recommendation";
     resultInputCard.classList.toggle("hidden", !showInput);
-    resultBalanceCard.classList.toggle("hidden", showInput);
-    resultBalanceRecommendationCard.classList.toggle("hidden", showInput);
+    resultBalanceCard.classList.toggle("hidden", !showBalance);
+    resultBalanceRecommendationCard.classList.toggle("hidden", !showRecommendation);
     tabInputBtn.classList.toggle("active", showInput);
-    tabBalanceBtn.classList.toggle("active", !showInput);
+    tabBalanceBtn.classList.toggle("active", showBalance);
+    tabRecommendationBtn.classList.toggle("active", showRecommendation);
   }
 
   function tradingDaysByTargetDays(targetDays) {
@@ -52,51 +56,60 @@
     return 0;
   }
 
-  function updateLiveRecommendation(balance, zonePips) {
+  function updateLiveRecommendation(balance, riskPct) {
     var dailyTargetUsdEl = document.getElementById("dailyTargetUsdLive");
     var perSetupTargetUsdEl = document.getElementById("perSetupTargetUsdLive");
-    var baseModal5UsdEl = document.getElementById("baseModal5UsdLive");
-    var baseModal10UsdEl = document.getElementById("baseModal10UsdLive");
-    var recommendedLot5El = document.getElementById("recommendedLot5Live");
-    var recommendedLot10El = document.getElementById("recommendedLot10Live");
-    var tpPips5El = document.getElementById("tpPips5Live");
-    var tpPips10El = document.getElementById("tpPips10Live");
+    var recommendedLotEl = document.getElementById("recommendedLotLive");
+    var fixedTpPipsEl = document.getElementById("fixedTpPipsLive");
+    var fixedSlPipsEl = document.getElementById("fixedSlPipsLive");
+    var expectedTpUsdEl = document.getElementById("expectedTpUsdLive");
+    var expectedSlUsdEl = document.getElementById("expectedSlUsdLive");
+    var riskBudgetUsdEl = document.getElementById("riskBudgetUsdLive");
     var noteEl = document.getElementById("liveRecommendationNote");
 
     var tradingDays = tradingDaysByTargetDays(liveTargetDays);
-    if (balance <= 0 || tradingDays <= 0 || liveGrowTargetUsd <= 0 || zonePips <= 0) {
+    if (balance <= 0 || tradingDays <= 0 || liveGrowTargetUsd <= 0 || riskPct <= 0) {
       dailyTargetUsdEl.textContent = "0.00";
       perSetupTargetUsdEl.textContent = "0.00";
-      baseModal5UsdEl.textContent = "0.00";
-      baseModal10UsdEl.textContent = "0.00";
-      recommendedLot5El.textContent = "0.00";
-      recommendedLot10El.textContent = "0.00";
-      tpPips5El.textContent = "0.00";
-      tpPips10El.textContent = "0.00";
-      noteEl.textContent = "Recommendation perlukan data goal aktif (30/90/180 hari).";
+      recommendedLotEl.textContent = "0.00";
+      fixedTpPipsEl.textContent = "40";
+      fixedSlPipsEl.textContent = "40";
+      expectedTpUsdEl.textContent = "0.00";
+      expectedSlUsdEl.textContent = "0.00";
+      riskBudgetUsdEl.textContent = "0.00";
+      noteEl.textContent = "Recommendation perlukan goal aktif dan risk% yang sah.";
       return;
     }
 
-    var pipValuePerLot = 10; // XAUUSD with pip=0.10
+    var pipValuePerLot = 10; // XAUUSD, 1.00 lot ~ USD10/pip
+    var fixedTpPips = 40;
+    var fixedSlPips = 40;
     var dailyTargetUsd = liveGrowTargetUsd / tradingDays;
     var perSetupTargetUsd = dailyTargetUsd / 2;
-    var baseModal5Usd = balance * 0.05;
-    var baseModal10Usd = balance * 0.10;
-    var usdPerLotAtZone = zonePips * pipValuePerLot;
-    var lot5 = usdPerLotAtZone > 0 ? floorToStep(baseModal5Usd / usdPerLotAtZone, 0.01) : 0;
-    var lot10 = usdPerLotAtZone > 0 ? floorToStep(baseModal10Usd / usdPerLotAtZone, 0.01) : 0;
-    var tpPips5 = lot5 > 0 ? perSetupTargetUsd / (lot5 * pipValuePerLot) : 0;
-    var tpPips10 = lot10 > 0 ? perSetupTargetUsd / (lot10 * pipValuePerLot) : 0;
+    var rawLot = perSetupTargetUsd / (fixedTpPips * pipValuePerLot);
+    var recommendedLot = floorToStep(rawLot, 0.01);
+    var expectedTpUsd = recommendedLot * fixedTpPips * pipValuePerLot;
+    var expectedSlUsd = recommendedLot * fixedSlPips * pipValuePerLot;
+    var riskBudgetUsd = balance * (riskPct / 100);
 
     dailyTargetUsdEl.textContent = f2(dailyTargetUsd);
     perSetupTargetUsdEl.textContent = f2(perSetupTargetUsd);
-    baseModal5UsdEl.textContent = f2(baseModal5Usd);
-    baseModal10UsdEl.textContent = f2(baseModal10Usd);
-    recommendedLot5El.textContent = f2(lot5);
-    recommendedLot10El.textContent = f2(lot10);
-    tpPips5El.textContent = f2(tpPips5);
-    tpPips10El.textContent = f2(tpPips10);
-    noteEl.textContent = "Formula recommendation: modal asas 5%/10% dari current balance, ikut zon user, target 2 setup sehari.";
+    recommendedLotEl.textContent = f2(recommendedLot);
+    fixedTpPipsEl.textContent = String(fixedTpPips);
+    fixedSlPipsEl.textContent = String(fixedSlPips);
+    expectedTpUsdEl.textContent = f2(expectedTpUsd);
+    expectedSlUsdEl.textContent = f2(expectedSlUsd);
+    riskBudgetUsdEl.textContent = f2(riskBudgetUsd);
+
+    if (recommendedLot <= 0) {
+      noteEl.textContent = "Lot jadi 0.00 selepas step 0.01. Daily target terlalu kecil untuk setup TP/SL 40 pips.";
+      return;
+    }
+    if (expectedSlUsd > riskBudgetUsd && riskBudgetUsd > 0) {
+      noteEl.textContent = "Amaran: risiko SL40 melebihi risk USD dari tetapan risk% anda.";
+      return;
+    }
+    noteEl.textContent = "Formula recommendation: lot dikira terus dari daily target (2 setup/hari) dengan TP40/SL40 tetap.";
   }
 
   function calculate(balance, riskPct, zonePips, layerCount, entryPrice, leverage, stopOutPct) {
@@ -124,7 +137,7 @@
       lotPerSelectedLayer: lotPerSelectedLayer,
       lotPerTwoLayer: lotPerTwoLayer,
       lotPerThreeLayer: lotPerThreeLayer,
-      zoneUsd: zone,
+      zonePriceMove: zone,
       usedMargin: usedMargin,
       maxLossBeforeStopOut: maxLossBeforeStopOut,
       maxMoveBeforeStopOut: maxMoveBeforeStopOut,
@@ -143,7 +156,7 @@
     document.getElementById("lotPerSelectedLayer" + suffix).textContent = f2(result.lotPerSelectedLayer);
     document.getElementById("lotPerTwoLayer" + suffix).textContent = f2(result.lotPerTwoLayer);
     document.getElementById("lotPerThreeLayer" + suffix).textContent = f2(result.lotPerThreeLayer);
-    document.getElementById("zoneUsd" + suffix).textContent = f2(result.zoneUsd);
+    document.getElementById("zonePriceMove" + suffix).textContent = f2(result.zonePriceMove);
     document.getElementById("usedMargin" + suffix).textContent = f2(result.usedMargin);
     document.getElementById("maxLossBeforeStopOut" + suffix).textContent = f2(result.maxLossBeforeStopOut);
     document.getElementById("maxMoveBeforeStopOut" + suffix).textContent = f2(result.maxMoveBeforeStopOut);
@@ -174,6 +187,10 @@
 
   tabBalanceBtn.addEventListener("click", function () {
     setTab("balance");
+  });
+
+  tabRecommendationBtn.addEventListener("click", function () {
+    setTab("recommendation");
   });
 
   form.addEventListener("submit", function (event) {
@@ -227,16 +244,16 @@
     if (Number.isFinite(liveBalance) && liveBalance > 0) {
       var liveResult = calculate(liveBalance, riskPct, zonePips, layerCount, entryPrice, leverage, stopOutPct);
       render(liveResult, "Live", layerCount, liveBalance);
-      updateLiveRecommendation(liveBalance, zonePips);
+      updateLiveRecommendation(liveBalance, riskPct);
       if (inputResult.floatingFull > inputResult.maxLossBeforeStopOut && inputResult.maxLossBeforeStopOut > 0) {
         statusEl.textContent = "Amaran: loss zon penuh (tab input) melebihi kapasiti sebelum stop-out.";
         return;
       }
-      statusEl.textContent = "Kiraan siap untuk dua tab. Lot dibundarkan ke bawah ikut step 0.01.";
+      statusEl.textContent = "Kiraan siap. Semak semua tab preview. Lot dibundarkan ke bawah ikut step 0.01.";
       return;
     }
 
-    updateLiveRecommendation(0, zonePips);
+    updateLiveRecommendation(0, riskPct);
     statusEl.textContent = "Kiraan tab input siap. Tab current balance perlukan data balance user aktif.";
   });
 })();

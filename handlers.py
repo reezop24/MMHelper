@@ -58,7 +58,6 @@ from storage import (
     get_current_profit_usd,
     get_initial_setup_summary,
     get_mission_progress_summary,
-    get_monthly_performance_usd,
     get_monthly_profit_loss_usd,
     get_current_balance_as_of,
     get_tabung_balance_as_of,
@@ -74,7 +73,6 @@ from storage import (
     get_month_start_balance_usd,
     get_total_balance_usd,
     get_weekly_frozen_daily_target_usd,
-    get_weekly_performance_usd,
     get_weekly_profit_loss_usd,
     has_tabung_save_today,
     has_reached_daily_target_today,
@@ -104,8 +102,6 @@ from texts import (
     SYSTEM_INFO_OPENED_TEXT,
     TABUNG_PROGRESS_OPENED_TEXT,
     TRANSACTION_HISTORY_OPENED_TEXT,
-    WEEKLY_REPORTS_OPENED_TEXT,
-    MONTHLY_REPORTS_OPENED_TEXT,
 )
 from ui import clear_last_screen, send_screen
 from welcome import start
@@ -203,6 +199,33 @@ def _previous_closed_report_period(reference_date: date) -> tuple[date, date]:
     current_start, _ = _bounded_report_week(reference_date)
     prev_ref = current_start - timedelta(days=1)
     return _bounded_report_week(prev_ref)
+
+
+def _month_range(reference_date: date) -> tuple[date, date]:
+    month_start = reference_date.replace(day=1)
+    next_month = (month_start.replace(day=28) + timedelta(days=4)).replace(day=1)
+    return month_start, next_month - timedelta(days=1)
+
+
+def _previous_closed_month_period(reference_date: date) -> tuple[date, date]:
+    current_month_start, _ = _month_range(reference_date)
+    prev_month_end = current_month_start - timedelta(days=1)
+    prev_month_start = prev_month_end.replace(day=1)
+    return prev_month_start, prev_month_end
+
+
+def _bounded_weeks_for_month(month_start: date, month_end: date) -> list[tuple[date, date]]:
+    weeks: list[tuple[date, date]] = []
+    cursor = month_start
+    while cursor <= month_end:
+        week_start, week_end = _bounded_report_week(cursor)
+        if week_start < month_start:
+            week_start = month_start
+        if week_end > month_end:
+            week_end = month_end
+        weeks.append((week_start, week_end))
+        cursor = week_end + timedelta(days=1)
+    return weeks
 
 
 def _build_weekly_report_pdf(user_id: int) -> tuple[bytes, str]:
@@ -328,7 +351,7 @@ def _build_weekly_report_pdf(user_id: int) -> tuple[bytes, str]:
         pl = float(daily_trading_pl.get(d_iso, 0.0))
         tabung_saved = float(daily_tabung_save.get(d_iso, 0.0))
         if goal_start_date is not None and cursor < goal_start_date:
-            status = "No Target (Before Goal Start)"
+            status = "No Target"
             target_text = "-"
         elif cursor.weekday() >= 5:
             status = "No Trade Day"
@@ -363,7 +386,7 @@ def _build_weekly_report_pdf(user_id: int) -> tuple[bytes, str]:
     cmds: list[str] = []
     # Header
     cmds.append(_pdf_rect(35, 770, 525, 48, fill_rgb=(0.09, 0.20, 0.42)))
-    cmds.append(_pdf_text(50, 798, "MM HELPER - WEEKLY REPORT (beta)", size=15, bold=True, rgb=(1, 1, 1)))
+    cmds.append(_pdf_text(50, 798, "MM HELPER - WEEKLY REPORT", size=15, bold=True, rgb=(1, 1, 1)))
     cmds.append(_pdf_text(50, 782, f"User: {summary['name']}  |  Report Date: {today.isoformat()}", size=9, rgb=(0.90, 0.95, 1.0)))
 
     # Meta
@@ -475,10 +498,271 @@ def _build_weekly_report_pdf(user_id: int) -> tuple[bytes, str]:
     cmds.append(_pdf_text(340, 106, "Ending Balance", size=9, bold=True, rgb=(0.08, 0.17, 0.30)))
     cmds.append(_pdf_text(340, 88, f"USD {ending_balance:.2f}", size=12, bold=True, rgb=(0.08, 0.17, 0.30)))
 
-    cmds.append(_pdf_text(48, 58, "Note: Beta report. Data is best effort and may differ from final audited totals.", size=8, rgb=(0.34, 0.38, 0.45)))
+    cmds.append(_pdf_text(48, 58, "Note: Summary generated from saved records for the selected period.", size=8, rgb=(0.34, 0.38, 0.45)))
 
     pdf_bytes = _build_styled_pdf(cmds)
     filename = f"weekly-report-{today.isoformat()}.pdf"
+    return pdf_bytes, filename
+
+
+def _build_monthly_report_pdf(user_id: int) -> tuple[bytes, str]:
+    summary = get_initial_setup_summary(user_id)
+    current_balance_now = get_current_balance_usd(user_id)
+    today = current_user_date(user_id)
+    month_start, month_end = _previous_closed_month_period(today)
+    records = get_transaction_history_records_between(
+        user_id,
+        month_start,
+        month_end,
+        limit=None,
+        include_hidden_adjustments=False,
+    )
+    db = load_core_db()
+    user_obj = db.get("users", {}).get(str(user_id), {})
+    sections = user_obj.get("sections", {}) if isinstance(user_obj, dict) else {}
+
+    progress = get_tabung_progress_summary(user_id)
+    goal = get_project_grow_goal_summary(user_id)
+    target_days = int(goal.get("target_days") or 0)
+    target_balance = float(goal.get("target_balance_usd") or 0.0)
+    goal_baseline_balance = float(goal.get("current_balance_usd") or 0.0)
+    grow_target_total = max(target_balance - goal_baseline_balance, 0.0)
+    tabung_balance_end = float(get_tabung_balance_as_of(user_id, month_end))
+    grow_target_remaining_end = max(grow_target_total - tabung_balance_end, 0.0)
+    grow_target_achieved_end = max(min(grow_target_total - grow_target_remaining_end, grow_target_total), 0.0)
+    achieved_pct_end = (grow_target_achieved_end / grow_target_total * 100.0) if grow_target_total > 0 else 0.0
+
+    goal_section = sections.get("project_grow_goal", {}) if isinstance(sections, dict) else {}
+    goal_saved_date_raw = str(goal_section.get("saved_date") or "").strip() if isinstance(goal_section, dict) else ""
+    goal_start_date: date | None = None
+    if goal_saved_date_raw:
+        try:
+            goal_start_date = date.fromisoformat(goal_saved_date_raw)
+        except ValueError:
+            goal_start_date = None
+    days_left_month_end = 0
+    if goal_start_date is not None and target_days > 0:
+        elapsed_days_month_end = max((month_end - goal_start_date).days, 0)
+        days_left_month_end = max(target_days - elapsed_days_month_end, 0)
+
+    setup_date = None
+    try:
+        setup_date = date.fromisoformat(str(summary.get("saved_date") or ""))
+    except ValueError:
+        setup_date = None
+    is_first_month = bool(setup_date and month_start <= setup_date <= month_end)
+    if is_first_month:
+        opening_balance = float(summary["initial_capital_usd"])
+        opening_balance_label = "Opening Balance This Month (Initial Balance)"
+    else:
+        opening_balance = float(get_current_balance_as_of(user_id, month_start - timedelta(days=1)))
+        opening_balance_label = "Opening Balance (Carry Forward)"
+
+    section_total = {
+        "deposit": 0.0,
+        "withdrawal": 0.0,
+        "trading": 0.0,
+        "adjustment": 0.0,
+        "tabung": 0.0,
+    }
+    section_count = {k: 0 for k in section_total}
+    daily_trading_pl: dict[str, float] = {}
+    for row in records:
+        row_date_raw = str(row.get("date") or "").strip()
+        try:
+            row_date = date.fromisoformat(row_date_raw)
+        except ValueError:
+            continue
+        if row_date < month_start or row_date > month_end:
+            continue
+        src = str(row.get("source") or "").strip().lower()
+        src_map = {
+            "deposit_activity": "deposit",
+            "withdrawal_activity": "withdrawal",
+            "trading_activity": "trading",
+            "balance_adjustment": "adjustment",
+            "tabung": "tabung",
+            "deposit": "deposit",
+            "withdrawal": "withdrawal",
+            "trading": "trading",
+            "adjustment": "adjustment",
+        }
+        src_norm = src_map.get(src, src)
+        amount = float(row.get("amount_usd") or 0.0)
+        if src_norm in section_total:
+            section_total[src_norm] += amount
+            section_count[src_norm] += 1
+        if src_norm == "trading":
+            daily_trading_pl[row_date_raw] = daily_trading_pl.get(row_date_raw, 0.0) + amount
+
+    monthly_pl = sum(daily_trading_pl.values())
+
+    tabung_records = []
+    tabung_section = sections.get("tabung", {}) if isinstance(sections, dict) else {}
+    tabung_data = tabung_section.get("data", {}) if isinstance(tabung_section, dict) else {}
+    raw_tabung_records = tabung_data.get("records", []) if isinstance(tabung_data, dict) else []
+    if isinstance(raw_tabung_records, list):
+        tabung_records = [r for r in raw_tabung_records if isinstance(r, dict)]
+
+    daily_tabung_save: dict[str, float] = {}
+    for rec in tabung_records:
+        mode = str(rec.get("mode") or "").strip().lower()
+        if mode != "save":
+            continue
+        rec_date = str(rec.get("saved_date") or "").strip()
+        try:
+            d = date.fromisoformat(rec_date)
+        except ValueError:
+            continue
+        if month_start <= d <= month_end:
+            amt = abs(float(rec.get("amount_usd") or 0.0))
+            daily_tabung_save[rec_date] = daily_tabung_save.get(rec_date, 0.0) + amt
+
+    weekly_rows: list[tuple[str, str, str, str, str]] = []
+    for wk_start, wk_end in _bounded_weeks_for_month(month_start, month_end):
+        week_label = f"{wk_start.isoformat()} to {wk_end.isoformat()}"
+        week_target = float(get_weekly_frozen_daily_target_usd(user_id, wk_start))
+        week_pl = 0.0
+        week_tabung = 0.0
+        reached_days = 0
+        trading_days = 0
+        cursor = wk_start
+        while cursor <= wk_end:
+            d_iso = cursor.isoformat()
+            if cursor.weekday() < 5:
+                trading_days += 1
+            day_pl = float(daily_trading_pl.get(d_iso, 0.0))
+            day_tabung = float(daily_tabung_save.get(d_iso, 0.0))
+            week_pl += day_pl
+            week_tabung += day_tabung
+
+            if goal_start_date is not None and cursor < goal_start_date:
+                cursor += timedelta(days=1)
+                continue
+            if cursor.weekday() >= 5:
+                cursor += timedelta(days=1)
+                continue
+            if week_target > 0 and day_pl > 0 and day_tabung >= week_target:
+                reached_days += 1
+            cursor += timedelta(days=1)
+
+        if goal_start_date is not None and wk_end < goal_start_date:
+            target_label = "No Target"
+            hit_label = "-"
+        elif week_target <= 0:
+            target_label = "No Target"
+            hit_label = "-"
+        else:
+            target_label = f"USD {week_target:.2f}"
+            hit_label = f"{reached_days}/{trading_days}"
+        weekly_rows.append(
+            (
+                week_label,
+                target_label,
+                f"USD {week_pl:.2f}",
+                f"USD {week_tabung:.2f}",
+                hit_label,
+            )
+        )
+
+    ending_balance = float(get_current_balance_as_of(user_id, month_end))
+    total_balance_end = ending_balance + tabung_balance_end
+
+    cmds: list[str] = []
+    cmds.append(_pdf_rect(35, 770, 525, 48, fill_rgb=(0.09, 0.20, 0.42)))
+    cmds.append(_pdf_text(50, 798, "MM HELPER - MONTHLY REPORT", size=15, bold=True, rgb=(1, 1, 1)))
+    cmds.append(_pdf_text(50, 782, f"User: {summary['name']}  |  Report Date: {today.isoformat()}", size=9, rgb=(0.90, 0.95, 1.0)))
+
+    cmds.append(_pdf_rect(35, 730, 525, 28, fill_rgb=(0.95, 0.97, 1.0), stroke_rgb=(0.80, 0.85, 0.93), line_w=0.8))
+    cmds.append(_pdf_text(48, 746, f"Report Period: {month_start.isoformat()} to {month_end.isoformat()}", size=9, bold=True, rgb=(0.16, 0.22, 0.33)))
+    cmds.append(_pdf_text(320, 746, "Weekly split: Sunday-Saturday (month-clipped)", size=8, rgb=(0.32, 0.38, 0.48)))
+
+    cmds.append(_pdf_rect(35, 676, 525, 48, fill_rgb=(1, 1, 1), stroke_rgb=(0.82, 0.85, 0.90), line_w=0.8))
+    cmds.append(_pdf_text(48, 700, "Opening Balance", size=11, bold=True, rgb=(0.10, 0.20, 0.35)))
+    cmds.append(_pdf_text(48, 686, opening_balance_label, size=8, rgb=(0.28, 0.34, 0.44)))
+    cmds.append(_pdf_text(340, 692, f"USD {opening_balance:.2f}", size=12, bold=True, rgb=(0.08, 0.17, 0.30)))
+
+    cmds.append(_pdf_rect(35, 500, 525, 166, fill_rgb=(1, 1, 1), stroke_rgb=(0.82, 0.85, 0.90), line_w=0.8))
+    cmds.append(_pdf_text(48, 650, "Grow Target Weekly Breakdown", size=11, bold=True, rgb=(0.10, 0.20, 0.35)))
+    col_x = [48, 215, 315, 395, 485]
+    col_titles = ["Week", "Daily Target", "Trading P/L", "Tabung", "Reached"]
+    cmds.append(_pdf_rect(45, 630, 505, 18, fill_rgb=(0.92, 0.95, 0.99), stroke_rgb=(0.84, 0.88, 0.93), line_w=0.5))
+    for title, x in zip(col_titles, col_x):
+        cmds.append(_pdf_text(x, 636, title, size=8, bold=True, rgb=(0.13, 0.22, 0.35)))
+
+    y = 610
+    for week_label, target_label, pl_label, tabung_label, reached_label in weekly_rows[:5]:
+        cmds.append(_pdf_rect(45, y - 3, 505, 20, fill_rgb=(0.985, 0.988, 0.995), stroke_rgb=(0.90, 0.92, 0.95), line_w=0.3))
+        pl_val = float(pl_label.replace("USD", "").strip())
+        tabung_val = float(tabung_label.replace("USD", "").strip())
+        pl_color = (0.65, 0.10, 0.10) if pl_val < 0 else (0.08, 0.25, 0.10)
+        tabung_color = (0.08, 0.25, 0.10) if tabung_val > 0 else (0.18, 0.25, 0.36)
+        cmds.append(_pdf_text(col_x[0], y + 2, week_label, size=8, rgb=(0.18, 0.25, 0.36)))
+        cmds.append(_pdf_text(col_x[1], y + 2, target_label, size=8, rgb=(0.18, 0.25, 0.36)))
+        cmds.append(_pdf_text(col_x[2], y + 2, pl_label, size=8, bold=True, rgb=pl_color))
+        cmds.append(_pdf_text(col_x[3], y + 2, tabung_label, size=8, bold=True, rgb=tabung_color))
+        cmds.append(_pdf_text(col_x[4], y + 2, reached_label, size=8, bold=True, rgb=(0.18, 0.25, 0.36)))
+        y -= 25
+
+    cmds.append(_pdf_rect(35, 368, 525, 122, fill_rgb=(1, 1, 1), stroke_rgb=(0.82, 0.85, 0.90), line_w=0.8))
+    cmds.append(_pdf_text(48, 474, "Monthly Transaction Totals by Category", size=11, bold=True, rgb=(0.10, 0.20, 0.35)))
+    tx_headers = [("Category", 52), ("Count", 310), ("Total (USD)", 420)]
+    cmds.append(_pdf_rect(45, 454, 505, 16, fill_rgb=(0.92, 0.95, 0.99), stroke_rgb=(0.84, 0.88, 0.93), line_w=0.5))
+    for txt, x in tx_headers:
+        cmds.append(_pdf_text(x, 459, txt, size=8, bold=True, rgb=(0.13, 0.22, 0.35)))
+    tx_rows = [
+        ("Deposit", section_count["deposit"], section_total["deposit"]),
+        ("Withdrawal", section_count["withdrawal"], section_total["withdrawal"]),
+        ("Trading (Net)", section_count["trading"], section_total["trading"]),
+        ("Balance Adjustment", section_count["adjustment"], section_total["adjustment"]),
+        ("Tabung", section_count["tabung"], section_total["tabung"]),
+    ]
+    y = 438
+    for cat, cnt, amt in tx_rows:
+        cmds.append(_pdf_rect(45, y - 2, 505, 13, fill_rgb=(0.985, 0.988, 0.995), stroke_rgb=(0.90, 0.92, 0.95), line_w=0.3))
+        cmds.append(_pdf_text(52, y + 2, cat, size=8, rgb=(0.18, 0.25, 0.36)))
+        cmds.append(_pdf_text(315, y + 2, str(cnt), size=8, bold=True, rgb=(0.18, 0.25, 0.36)))
+        amt_color = (0.65, 0.10, 0.10) if amt < 0 else (0.08, 0.25, 0.10)
+        cmds.append(_pdf_text(420, y + 2, f"{amt:.2f}", size=8, bold=True, rgb=amt_color))
+        y -= 14
+
+    cmds.append(_pdf_rect(35, 212, 525, 146, fill_rgb=(1, 1, 1), stroke_rgb=(0.82, 0.85, 0.90), line_w=0.8))
+    cmds.append(_pdf_text(48, 342, "Grow Target Summary (Month End)", size=10, bold=True, rgb=(0.10, 0.20, 0.35)))
+    summary_rows: list[tuple[str, str, tuple[float, float, float]]] = []
+    if grow_target_total <= 0:
+        summary_rows.append(("Goal Status", "New goal is not set yet", (0.62, 0.18, 0.10)))
+    else:
+        summary_rows.extend(
+            [
+                ("Selected Goal Duration", f"{target_days} days", (0.18, 0.25, 0.36)),
+                ("Days Left (Month End)", f"{days_left_month_end} hari", (0.18, 0.25, 0.36)),
+                ("Grow Target Total", f"USD {grow_target_total:.2f}", (0.18, 0.25, 0.36)),
+                ("Achieved by Month End", f"USD {grow_target_achieved_end:.2f}", (0.08, 0.40, 0.18)),
+                ("Remaining at Month End", f"USD {grow_target_remaining_end:.2f}", (0.62, 0.18, 0.10) if grow_target_remaining_end > 0 else (0.08, 0.40, 0.18)),
+                ("Progress at Month End", f"{achieved_pct_end:.2f}%", (0.08, 0.40, 0.18)),
+            ]
+        )
+    y = 322
+    for metric, value, color in summary_rows[:6]:
+        cmds.append(_pdf_rect(45, y - 2, 505, 16, fill_rgb=(0.985, 0.988, 0.995), stroke_rgb=(0.90, 0.92, 0.95), line_w=0.3))
+        cmds.append(_pdf_text(52, y + 2, metric, size=9, rgb=(0.18, 0.25, 0.36)))
+        cmds.append(_pdf_text(340, y + 2, value, size=9, bold=True, rgb=color))
+        y -= 18
+
+    pnl_color = (0.65, 0.10, 0.10) if monthly_pl < 0 else (0.08, 0.25, 0.10)
+    cmds.append(_pdf_rect(35, 70, 525, 128, fill_rgb=(0.96, 0.98, 1.0), stroke_rgb=(0.78, 0.84, 0.92), line_w=0.8))
+    cmds.append(_pdf_text(48, 178, "Ending Balance", size=11, bold=True, rgb=(0.10, 0.20, 0.35)))
+    cmds.append(_pdf_text(52, 160, f"Monthly P/L: USD {monthly_pl:.2f}", size=9, bold=True, rgb=pnl_color))
+    cmds.append(_pdf_text(52, 142, f"Tabung Balance at Month End: USD {tabung_balance_end:.2f}", size=9, bold=True, rgb=(0.08, 0.17, 0.30)))
+    cmds.append(_pdf_text(52, 124, f"Capital at Month End: USD {total_balance_end:.2f}", size=9, bold=True, rgb=(0.08, 0.17, 0.30)))
+    cmds.append(_pdf_text(52, 106, f"Current Balance (Now): USD {current_balance_now:.2f}", size=9, rgb=(0.32, 0.38, 0.48)))
+    cmds.append(_pdf_text(340, 142, "Ending Balance (Month End)", size=9, bold=True, rgb=(0.08, 0.17, 0.30)))
+    cmds.append(_pdf_text(340, 124, f"USD {ending_balance:.2f}", size=12, bold=True, rgb=(0.08, 0.17, 0.30)))
+
+    cmds.append(_pdf_text(48, 58, "Note: Summary generated from saved records for the selected period.", size=8, rgb=(0.34, 0.38, 0.45)))
+
+    pdf_bytes = _build_styled_pdf(cmds)
+    filename = f"monthly-report-{month_start.strftime('%Y-%m')}.pdf"
     return pdf_bytes, filename
 
 
@@ -668,8 +952,8 @@ def _build_records_reports_keyboard_for_user(user_id: int):
         name=summary["name"],
         saved_date=summary["saved_date"],
         reference_date=reference_date.isoformat(),
-        records_7d=get_transaction_history_records(user_id, days=7, limit=100),
-        records_30d=get_transaction_history_records(user_id, days=30, limit=100),
+        records_7d=get_transaction_history_records(user_id, days=7, limit=20),
+        records_30d=get_transaction_history_records(user_id, days=30, limit=20),
     )
     return records_reports_keyboard(account_summary_url, tx_history_url)
 
@@ -1020,24 +1304,58 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
                 context,
                 message.chat_id,
                 "Weekly report PDF dah dihantar. Boleh semak dan simpan fail tersebut.",
-                reply_markup=_build_records_reports_keyboard_for_user(user.id),
+                reply_markup=main_menu_keyboard(user.id),
             )
         except Exception:
             await send_screen(
                 context,
                 message.chat_id,
                 "Gagal jana Weekly report PDF. Cuba lagi sebentar.",
-                reply_markup=_build_records_reports_keyboard_for_user(user.id),
+                reply_markup=main_menu_keyboard(user.id),
             )
         return
 
     if text == SUBMENU_STAT_BUTTON_MONTHLY_REPORTS:
-        await send_screen(
-            context,
-            message.chat_id,
-            MONTHLY_REPORTS_OPENED_TEXT,
-            reply_markup=_build_records_reports_keyboard_for_user(user.id),
-        )
+        summary = get_initial_setup_summary(user.id)
+        today = current_user_date(user.id)
+        prev_month_start, prev_month_end = _previous_closed_month_period(today)
+        try:
+            setup_date = date.fromisoformat(str(summary.get("saved_date") or ""))
+        except ValueError:
+            setup_date = None
+        if setup_date is not None and setup_date > prev_month_end:
+            await send_screen(
+                context,
+                message.chat_id,
+                (
+                    "Monthly report belum tersedia.\n"
+                    "Report hanya untuk bulan sebelumnya yang sudah ditutup.\n"
+                    f"Bulan tersedia seterusnya bermula selepas {prev_month_end.isoformat()}."
+                ),
+                reply_markup=_build_records_reports_keyboard_for_user(user.id),
+            )
+            return
+        try:
+            pdf_bytes, filename = _build_monthly_report_pdf(user.id)
+            await context.bot.send_document(
+                chat_id=message.chat_id,
+                document=BytesIO(pdf_bytes),
+                filename=filename,
+                caption="Monthly report PDF siap. Ini ringkasan bulan sebelumnya.",
+            )
+            await send_screen(
+                context,
+                message.chat_id,
+                "Monthly report PDF dah dihantar. Boleh semak dan simpan fail tersebut.",
+                reply_markup=main_menu_keyboard(user.id),
+            )
+        except Exception:
+            await send_screen(
+                context,
+                message.chat_id,
+                "Gagal jana Monthly report PDF. Cuba lagi sebentar.",
+                reply_markup=main_menu_keyboard(user.id),
+            )
         return
 
     if text == SUBMENU_PROJECT_BUTTON_SET_NEW_GOAL:
