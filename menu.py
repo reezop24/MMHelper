@@ -24,6 +24,7 @@ SUBMENU_ACCOUNT_BUTTON_WITHDRAWAL_ACTIVITY = "💸 Update Withdrawal Activity"
 SUBMENU_ACCOUNT_BUTTON_TRADING_ACTIVITY = "📉 Update Trading Activity"
 SUBMENU_ACCOUNT_BUTTON_TABUNG = "🏦 Update Tabung"
 SUBMENU_ACCOUNT_BUTTON_SUMMARY = "🧾 Account Summary"
+SUBMENU_ACCOUNT_BUTTON_ACTIVITY_HUB = "🧭 Activity Hub"
 
 SUBMENU_PROJECT_BUTTON_SET_NEW_GOAL = "🎯 Set New Goal"
 SUBMENU_PROJECT_BUTTON_MISSION = "🧭 Mission"
@@ -123,30 +124,35 @@ def account_activity_keyboard(
     withdrawal_activity_url: str,
     trading_activity_url: str,
     tabung_update_url: str,
+    activity_hub_url: str = "",
 ) -> ReplyKeyboardMarkup:
-    rows = [
-        [SUBMENU_ACCOUNT_BUTTON_SUMMARY],
+    rows = [[SUBMENU_ACCOUNT_BUTTON_SUMMARY]]
+    if activity_hub_url:
+        rows.append([KeyboardButton(SUBMENU_ACCOUNT_BUTTON_ACTIVITY_HUB, web_app=WebAppInfo(url=activity_hub_url))])
+    rows.extend(
         [
-            KeyboardButton(
-                SUBMENU_ACCOUNT_BUTTON_TRADING_ACTIVITY,
-                web_app=WebAppInfo(url=trading_activity_url),
-            )
-        ],
-        [
-            KeyboardButton(
-                SUBMENU_ACCOUNT_BUTTON_DEPOSIT_ACTIVITY,
-                web_app=WebAppInfo(url=deposit_activity_url),
-            )
-        ],
-        [
-            KeyboardButton(
-                SUBMENU_ACCOUNT_BUTTON_WITHDRAWAL_ACTIVITY,
-                web_app=WebAppInfo(url=withdrawal_activity_url),
-            )
-        ],
-        [KeyboardButton(SUBMENU_ACCOUNT_BUTTON_TABUNG, web_app=WebAppInfo(url=tabung_update_url))],
-        [SUBMENU_MM_BUTTON_BACK_MAIN],
-    ]
+            [
+                KeyboardButton(
+                    SUBMENU_ACCOUNT_BUTTON_TRADING_ACTIVITY,
+                    web_app=WebAppInfo(url=trading_activity_url),
+                )
+            ],
+            [
+                KeyboardButton(
+                    SUBMENU_ACCOUNT_BUTTON_DEPOSIT_ACTIVITY,
+                    web_app=WebAppInfo(url=deposit_activity_url),
+                )
+            ],
+            [
+                KeyboardButton(
+                    SUBMENU_ACCOUNT_BUTTON_WITHDRAWAL_ACTIVITY,
+                    web_app=WebAppInfo(url=withdrawal_activity_url),
+                )
+            ],
+            [KeyboardButton(SUBMENU_ACCOUNT_BUTTON_TABUNG, web_app=WebAppInfo(url=tabung_update_url))],
+            [SUBMENU_MM_BUTTON_BACK_MAIN],
+        ]
+    )
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
 

@@ -270,6 +270,58 @@ def get_trading_activity_webapp_url(
     return f"{page}?{query}"
 
 
+def get_activity_hub_webapp_url(
+    name: str,
+    initial_capital_usd: float,
+    current_balance_usd: float,
+    saved_date: str,
+    tabung_start_date: str,
+    current_profit_usd: float,
+    total_balance_usd: float,
+    tabung_balance_usd: float,
+    weekly_performance_usd: float,
+    monthly_performance_usd: float,
+    target_balance_usd: float,
+    grow_target_usd: float,
+    target_days: int,
+    goal_reached: bool,
+    goal_baseline_balance_usd: float,
+    tabung_update_url: str,
+    daily_target_reached_today: bool,
+    has_tabung_save_today: bool,
+    emergency_left: int,
+    set_new_goal_url: str,
+) -> str:
+    page = f"{_miniapp_base_url()}/activity-hub.html"
+    base_query = _build_activity_query(
+        name=name,
+        initial_capital_usd=initial_capital_usd,
+        current_balance_usd=current_balance_usd,
+        saved_date=saved_date,
+        tabung_start_date=tabung_start_date,
+        current_profit_usd=current_profit_usd,
+        total_balance_usd=total_balance_usd,
+        tabung_balance_usd=tabung_balance_usd,
+        weekly_performance_usd=weekly_performance_usd,
+        monthly_performance_usd=monthly_performance_usd,
+        target_balance_usd=target_balance_usd,
+        grow_target_usd=grow_target_usd,
+        target_days=target_days,
+        goal_reached=goal_reached,
+        goal_baseline_balance_usd=goal_baseline_balance_usd,
+        tabung_update_url=tabung_update_url,
+        daily_target_reached_today=daily_target_reached_today,
+        has_tabung_save_today=has_tabung_save_today,
+    )
+    extra_query = urlencode(
+        {
+            "emergency_left": str(max(0, int(emergency_left))),
+            "set_new_goal_url": set_new_goal_url,
+        }
+    )
+    return f"{page}?{base_query}&{extra_query}"
+
+
 def get_set_new_goal_webapp_url(
     name: str,
     current_balance_usd: float,

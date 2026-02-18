@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Activity Hub</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <link rel="stylesheet" href="global.css" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 12px;
+      background: rgba(6, 20, 47, 0.55);
+      border: 1px solid var(--border-input);
+      border-radius: 12px;
+      padding: 12px;
+    }
+
+    .summary-item {
+      font-size: 13px;
+      color: #dce8ff;
+    }
+
+    .summary-item strong {
+      color: #fff;
+    }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .tab-btn {
+      margin: 0;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(129, 166, 225, 0.45);
+      background: rgba(7, 24, 53, 0.92);
+      color: #e7f0ff;
+      font-size: 12px;
+      font-weight: 700;
+      width: 100%;
+    }
+
+    .tab-btn.active {
+      border-color: #8cc7ff;
+      background: linear-gradient(180deg, rgba(33, 91, 169, 0.96), rgba(22, 65, 128, 0.94));
+      color: #fff;
+    }
+
+    .panel {
+      display: none;
+      border: 1px solid rgba(83, 127, 193, 0.45);
+      border-radius: 12px;
+      background: rgba(6, 20, 46, 0.78);
+      padding: 12px;
+    }
+
+    .panel.active {
+      display: block;
+    }
+
+    .field { margin-top: 10px; }
+    .field label {
+      display: block;
+      font-size: 13px;
+      margin-bottom: 6px;
+      color: #dce8ff;
+    }
+
+    .field input,
+    .field select {
+      width: 100%;
+      border: 1px solid var(--border-input);
+      background: #06142f;
+      color: var(--text);
+      border-radius: 10px;
+      padding: 11px 12px;
+      font-size: 14px;
+    }
+
+    .mode-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .mode-btn {
+      margin: 0;
+      width: 100%;
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      border: 1px solid rgba(129, 166, 225, 0.5);
+      background: rgba(8, 30, 63, 0.86);
+      color: #eaf3ff;
+    }
+
+    .mode-btn.active {
+      border-color: #8cc7ff;
+      background: linear-gradient(90deg, #cf2f47 0%, #ff5a70 100%);
+      color: #fff;
+    }
+
+    .hint {
+      margin: 8px 0 0;
+      color: #bfd2f7;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .actions {
+      margin-top: 12px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .actions button {
+      margin-top: 0;
+      width: auto;
+      min-width: 130px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid #496ea9;
+      background: rgba(12, 34, 71, 0.9);
+      color: #e7f0ff;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .actions .submit-btn {
+      border: 0;
+      background: linear-gradient(90deg, #cf2f47 0%, #ff5a70 100%);
+      color: #fff;
+    }
+
+    .hidden { display: none; }
+
+    @media (max-width: 640px) {
+      .summary { grid-template-columns: 1fr; }
+      .tabs { grid-template-columns: 1fr; }
+      .mode-grid { grid-template-columns: 1fr; }
+      .actions button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="top-nav">
+      <button id="topBackBtn" type="button" class="top-back-btn">← Back</button>
+    </div>
+
+    <header class="hero">
+      <img class="logo" src="logo.png" alt="MM HELPER Logo" />
+      <h1>Activity Hub</h1>
+      <p>1 miniapp, 3 tab: Trading P/L, Deposit/Withdraw, Tabung Grow.</p>
+    </header>
+
+    <section class="summary">
+      <div class="summary-item"><strong>Name:</strong> <span id="summaryName">-</span></div>
+      <div class="summary-item"><strong>Saved Date:</strong> <span id="summaryDate">-</span></div>
+      <div class="summary-item"><strong>Current Balance:</strong> USD <span id="summaryBalance">0.00</span></div>
+      <div class="summary-item"><strong>Tabung Balance:</strong> USD <span id="summaryTabung">0.00</span></div>
+      <div class="summary-item"><strong>Weekly P/L:</strong> <span id="summaryWeekly">USD 0.00</span></div>
+      <div class="summary-item"><strong>Monthly P/L:</strong> <span id="summaryMonthly">USD 0.00</span></div>
+    </section>
+
+    <section class="tabs">
+      <button type="button" class="tab-btn active" data-tab="trading">Trading P/L</button>
+      <button type="button" class="tab-btn" data-tab="cashflow">Deposit/Withdraw</button>
+      <button type="button" class="tab-btn" data-tab="tabung">Tabung Grow</button>
+    </section>
+
+    <form id="hubForm" class="card">
+      <section id="tab-trading" class="panel active">
+        <div class="field">
+          <label>Mode</label>
+          <div class="mode-grid">
+            <button type="button" id="modeProfit" class="mode-btn">Profit</button>
+            <button type="button" id="modeLoss" class="mode-btn">Loss</button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="tradingAmount">Amount (USD)</label>
+          <input id="tradingAmount" type="number" step="0.01" min="0" placeholder="Contoh: 25" />
+        </div>
+        <p class="hint">Submit akan hantar payload `trading_activity_update`.</p>
+      </section>
+
+      <section id="tab-cashflow" class="panel">
+        <div class="field">
+          <label for="cashflowType">Type</label>
+          <select id="cashflowType">
+            <option value="deposit">Deposit</option>
+            <option value="withdrawal">Withdrawal</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="cashflowReason">Reason</label>
+          <select id="cashflowReason"></select>
+        </div>
+        <div class="field">
+          <label for="cashflowAmount">Amount (USD)</label>
+          <input id="cashflowAmount" type="number" step="0.01" min="0" placeholder="Contoh: 50" />
+        </div>
+        <p class="hint">Submit akan hantar payload `deposit_activity` atau `withdrawal_activity`.</p>
+      </section>
+
+      <section id="tab-tabung" class="panel">
+        <div class="field">
+          <label for="tabungAction">Action</label>
+          <select id="tabungAction">
+            <option value="save">Save to Tabung</option>
+            <option value="emergency_withdrawal">Emergency Withdrawal</option>
+            <option value="goal_to_current">Goal Withdrawal to Current</option>
+            <option value="goal_direct_withdrawal">Goal Direct Withdrawal</option>
+            <option value="goal_keep_and_new_goal">Keep in Tabung + Set New Goal</option>
+          </select>
+        </div>
+        <div id="tabungAmountWrap" class="field">
+          <label for="tabungAmount">Amount (USD)</label>
+          <input id="tabungAmount" type="number" step="0.01" min="0" placeholder="Contoh: 30" />
+        </div>
+        <p id="tabungHint" class="hint">Submit akan hantar payload `tabung_update_action`.</p>
+      </section>
+
+      <p id="formStatus" class="status" aria-live="polite"></p>
+
+      <div class="actions">
+        <button id="submitBtn" type="submit" class="submit-btn">Submit</button>
+        <button id="backBtn" type="button">Back to Account Activity</button>
+      </div>
+    </form>
+  </main>
+
+  <script src="content.js"></script>
+  <script src="activity-hub.js"></script>
+</body>
+</html>
