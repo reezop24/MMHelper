@@ -37,6 +37,8 @@ from storage import (
     reset_project_grow_goal,
     reset_project_grow_mission,
     save_notification_settings,
+    set_beta_date_override,
+    clear_beta_date_override,
     save_user_setup_section,
     start_project_grow_mission,
     reset_user_all_settings,
@@ -965,6 +967,105 @@ async def _handle_notification_settings_save(payload: dict, update: Update, cont
     )
 
 
+async def _handle_date_override_save(payload: dict, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    user = update.effective_user
+    if not user:
+        return
+
+    if not is_admin_user(user.id):
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Akses ditolak.",
+            reply_markup=main_menu_keyboard(user.id),
+        )
+        return
+
+    action = str(payload.get("action") or "set").strip().lower()
+    raw_target = str(payload.get("target_user_id") or "").strip()
+    try:
+        target_user_id = int(raw_target)
+    except (TypeError, ValueError):
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Target user ID tak sah.",
+            reply_markup=_build_admin_panel_keyboard_for_user(user.id),
+        )
+        return
+
+    if action == "clear":
+        cleared = clear_beta_date_override(target_user_id)
+        if not cleared:
+            await send_screen(
+                context,
+                message.chat_id,
+                "❌ Tiada override untuk user tersebut.",
+                reply_markup=_build_admin_panel_keyboard_for_user(user.id),
+            )
+            return
+        await send_screen(
+            context,
+            message.chat_id,
+            f"✅ Date override dipadam untuk user `{target_user_id}`.",
+            reply_markup=_build_admin_panel_keyboard_for_user(user.id),
+            parse_mode="Markdown",
+        )
+        return
+
+    if action == "disable":
+        ok, msg = set_beta_date_override(
+            target_user_id=target_user_id,
+            override_date="",
+            enabled=False,
+            updated_by=user.id,
+        )
+        if not ok:
+            await send_screen(
+                context,
+                message.chat_id,
+                f"❌ {msg}",
+                reply_markup=_build_admin_panel_keyboard_for_user(user.id),
+            )
+            return
+        await send_screen(
+            context,
+            message.chat_id,
+            f"✅ Date override dimatikan untuk user `{target_user_id}`.",
+            reply_markup=_build_admin_panel_keyboard_for_user(user.id),
+            parse_mode="Markdown",
+        )
+        return
+
+    override_date = str(payload.get("override_date") or "").strip()
+    ok, msg = set_beta_date_override(
+        target_user_id=target_user_id,
+        override_date=override_date,
+        enabled=True,
+        updated_by=user.id,
+    )
+    if not ok:
+        await send_screen(
+            context,
+            message.chat_id,
+            f"❌ {msg}",
+            reply_markup=_build_admin_panel_keyboard_for_user(user.id),
+        )
+        return
+    await send_screen(
+        context,
+        message.chat_id,
+        (
+            "✅ Date override disimpan.\n"
+            f"- User ID: `{target_user_id}`\n"
+            f"- Tarikh override: `{override_date}`"
+        ),
+        reply_markup=_build_admin_panel_keyboard_for_user(user.id),
+        parse_mode="Markdown",
+    )
+
+
 async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     if not message or not message.web_app_data:
@@ -1076,6 +1177,10 @@ async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if payload_type == "notification_settings_save":
         await _handle_notification_settings_save(payload, update, context)
+        return
+
+    if payload_type == "date_override_save":
+        await _handle_date_override_save(payload, update, context)
         return
 
     await send_screen(

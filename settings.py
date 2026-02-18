@@ -385,9 +385,30 @@ def get_notification_setting_webapp_url(name: str, saved_date: str) -> str:
     return f"{page}?{query}"
 
 
+def get_date_override_webapp_url(
+    name: str,
+    saved_date: str,
+    users_payload_json: str,
+    selected_user_id: int,
+    overrides_payload_json: str,
+) -> str:
+    page = f"{_miniapp_base_url()}/date-override.html"
+    query = urlencode(
+        {
+            "name": name,
+            "saved_date": saved_date,
+            "users": users_payload_json,
+            "selected_user_id": str(selected_user_id),
+            "overrides": overrides_payload_json,
+        }
+    )
+    return f"{page}?{query}"
+
+
 def get_transaction_history_webapp_url(
     name: str,
     saved_date: str,
+    reference_date: str,
     records_7d: list[dict[str, object]],
     records_30d: list[dict[str, object]],
 ) -> str:
@@ -396,6 +417,7 @@ def get_transaction_history_webapp_url(
         {
             "name": name,
             "saved_date": saved_date,
+            "reference_date": reference_date,
             "records_7d": json.dumps(records_7d, separators=(",", ":")),
             "records_30d": json.dumps(records_30d, separators=(",", ":")),
         }

@@ -110,6 +110,116 @@ def _month_key_from_date(dt: date) -> str:
     return dt.strftime("%Y_%m")
 
 
+def _beta_date_override_bucket(db: dict[str, Any]) -> dict[str, Any]:
+    bucket = db.setdefault("beta_date_override", {})
+    if not isinstance(bucket, dict):
+        bucket = {}
+        db["beta_date_override"] = bucket
+    users = bucket.setdefault("users", {})
+    if not isinstance(users, dict):
+        users = {}
+        bucket["users"] = users
+    return bucket
+
+
+def _parse_override_date(raw: Any) -> date | None:
+    text = str(raw or "").strip()
+    if not text:
+        return None
+    try:
+        return date.fromisoformat(text)
+    except ValueError:
+        return None
+
+
+def get_beta_date_override(target_user_id: int) -> dict[str, Any]:
+    db = load_core_db()
+    bucket = _beta_date_override_bucket(db)
+    users = bucket.get("users", {})
+    row = users.get(str(target_user_id), {}) if isinstance(users, dict) else {}
+    if not isinstance(row, dict):
+        row = {}
+    return {
+        "enabled": bool(row.get("enabled")),
+        "override_date": str(row.get("override_date") or "").strip(),
+        "updated_by": _to_int(row.get("updated_by")),
+        "updated_at": str(row.get("updated_at") or "").strip(),
+    }
+
+
+def get_beta_date_overrides_snapshot() -> dict[str, dict[str, Any]]:
+    db = load_core_db()
+    bucket = _beta_date_override_bucket(db)
+    users = bucket.get("users", {})
+    if not isinstance(users, dict):
+        return {}
+    out: dict[str, dict[str, Any]] = {}
+    for key, value in users.items():
+        if not isinstance(value, dict):
+            continue
+        out[str(key)] = {
+            "enabled": bool(value.get("enabled")),
+            "override_date": str(value.get("override_date") or "").strip(),
+            "updated_by": _to_int(value.get("updated_by")),
+            "updated_at": str(value.get("updated_at") or "").strip(),
+        }
+    return out
+
+
+def set_beta_date_override(target_user_id: int, override_date: str, enabled: bool, updated_by: int) -> tuple[bool, str]:
+    db = load_core_db()
+    users = db.get("users", {})
+    if not isinstance(users, dict) or str(target_user_id) not in users:
+        return False, "Target user tak dijumpai."
+
+    if enabled:
+        parsed = _parse_override_date(override_date)
+        if parsed is None:
+            return False, "Tarikh override tak sah."
+        normalized_date = parsed.isoformat()
+    else:
+        normalized_date = ""
+
+    now = malaysia_now().isoformat()
+    bucket = _beta_date_override_bucket(db)
+    row_users = bucket.setdefault("users", {})
+    if not isinstance(row_users, dict):
+        row_users = {}
+        bucket["users"] = row_users
+    row_users[str(target_user_id)] = {
+        "enabled": bool(enabled),
+        "override_date": normalized_date,
+        "updated_by": int(updated_by),
+        "updated_at": now,
+    }
+    save_core_db(db)
+    return True, "ok"
+
+
+def clear_beta_date_override(target_user_id: int) -> bool:
+    db = load_core_db()
+    bucket = _beta_date_override_bucket(db)
+    users = bucket.get("users", {})
+    if not isinstance(users, dict):
+        return False
+    removed = users.pop(str(target_user_id), None)
+    save_core_db(db)
+    return removed is not None
+
+
+def current_user_date(user_id: int) -> date:
+    db = load_core_db()
+    bucket = _beta_date_override_bucket(db)
+    users = bucket.get("users", {})
+    if isinstance(users, dict):
+        row = users.get(str(user_id), {})
+        if isinstance(row, dict) and bool(row.get("enabled")):
+            parsed = _parse_override_date(row.get("override_date"))
+            if parsed is not None:
+                return parsed
+    return malaysia_now().date()
+
+
 def _activity_db_path(month_key: str) -> Path:
     return ACTIVITY_DB_DIR / f"{ACTIVITY_FILE_PREFIX}{month_key}.json"
 
@@ -287,6 +397,11 @@ def _sum_trading_net_between(user_id: int, start_date: date, end_date: date) -> 
     total = 0.0
     for record in _iter_section_records_between(user_id, "trading_activity", start_date, end_date):
         total += _record_net_usd(record)
+    return total
+
+
+def _sum_adjustment_net_between(user_id: int, start_date: date, end_date: date) -> float:
+    total = 0.0
     for record in _iter_section_records_between(user_id, "balance_adjustment", start_date, end_date):
         total += _record_net_usd(record)
     return total
@@ -835,6 +950,9 @@ def apply_tabung_update_action(user_id: int, action: str, amount_usd: float) -> 
     user["updated_at"] = saved_at_iso
     save_core_db(db)
 
+    if action == "save" and _is_daily_target_hit_on_date(user_id, now.date()):
+        mark_daily_target_reached_today(user_id)
+
     return True, "ok"
 
 
@@ -860,7 +978,7 @@ def _sum_net_usd_between(user_id: int, section_name: str, start_date: date, end_
 
 
 def get_current_balance_floor_usd(user_id: int, reference_date: date | None = None) -> float:
-    ref_date = reference_date or malaysia_now().date()
+    ref_date = reference_date or current_user_date(user_id)
     month_start, month_end = _month_range(ref_date)
     current_balance = get_current_balance_usd(user_id)
 
@@ -880,6 +998,68 @@ def get_current_balance_floor_usd(user_id: int, reference_date: date | None = No
 
     # Floor only reduced by withdrawal activity, never by balance adjustment.
     return month_start_balance - monthly_withdrawal
+
+
+def get_month_start_balance_usd(user_id: int, reference_date: date | None = None) -> float:
+    ref_date = reference_date or current_user_date(user_id)
+    month_start, month_end = _month_range(ref_date)
+    current_balance = get_current_balance_usd(user_id)
+
+    monthly_deposit = _sum_amount_usd_between(user_id, "deposit_activity", month_start, month_end)
+    monthly_withdrawal = _sum_amount_usd_between(user_id, "withdrawal_activity", month_start, month_end)
+    monthly_trading_net = _sum_net_usd_between(user_id, "trading_activity", month_start, month_end)
+    monthly_adjustment_net = _sum_net_usd_between(user_id, "balance_adjustment", month_start, month_end)
+
+    return (
+        current_balance
+        - monthly_deposit
+        + monthly_withdrawal
+        - monthly_trading_net
+        - monthly_adjustment_net
+    )
+
+
+def get_current_balance_as_of(user_id: int, as_of_date: date) -> float:
+    ref_date = current_user_date(user_id)
+    current_balance = get_current_balance_usd(user_id)
+    if as_of_date >= ref_date:
+        return current_balance
+
+    start = as_of_date + timedelta(days=1)
+    end = ref_date
+    if start > end:
+        return current_balance
+
+    dep = _sum_amount_usd_between(user_id, "deposit_activity", start, end)
+    wdr = _sum_amount_usd_between(user_id, "withdrawal_activity", start, end)
+    trd = _sum_net_usd_between(user_id, "trading_activity", start, end)
+    adj = _sum_net_usd_between(user_id, "balance_adjustment", start, end)
+
+    return current_balance - dep + wdr - trd - adj
+
+
+def get_tabung_balance_as_of(user_id: int, as_of_date: date) -> float:
+    sections = _get_user_sections(user_id)
+    tabung_section = sections.get("tabung", {})
+    tabung_data = tabung_section.get("data", {}) if isinstance(tabung_section, dict) else {}
+    records = tabung_data.get("records", []) if isinstance(tabung_data, dict) else []
+    if not isinstance(records, list):
+        return 0.0
+
+    latest_balance: float = 0.0
+    found = False
+    for rec in records:
+        if not isinstance(rec, dict):
+            continue
+        rec_date = _record_date_myt(rec)
+        if rec_date is None or rec_date > as_of_date:
+            continue
+        latest_balance = _to_float(rec.get("balance_after_usd", latest_balance))
+        found = True
+
+    if found:
+        return latest_balance
+    return 0.0
 
 
 def _trading_days_by_target_days(target_days: int) -> int:
@@ -925,19 +1105,174 @@ def _daily_target_tracker_dates_from_user(user_obj: dict[str, Any]) -> list[str]
     return out
 
 
+def _daily_target_tracker_weekly_targets_from_user(user_obj: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    sections = user_obj.get("sections", {})
+    tracker = sections.get("daily_target_tracker", {})
+    data = tracker.get("data", {}) if isinstance(tracker, dict) else {}
+    raw = data.get("weekly_targets", {})
+    if not isinstance(raw, dict):
+        return {}
+
+    out: dict[str, dict[str, Any]] = {}
+    for key, payload in raw.items():
+        week_key = str(key or "").strip()
+        if not week_key or not isinstance(payload, dict):
+            continue
+        out[week_key] = payload
+    return out
+
+
 def _is_daily_target_hit_now(user_id: int) -> bool:
+    today = current_user_date(user_id)
+    return _is_daily_target_hit_on_date(user_id, today)
+
+
+def _week_key(week_start: date, week_end: date) -> str:
+    return f"{week_start.isoformat()}__{week_end.isoformat()}"
+
+
+def _count_trading_days_between(start_date: date, end_date: date) -> int:
+    if end_date < start_date:
+        return 0
+    count = 0
+    cur = start_date
+    while cur <= end_date:
+        if cur.weekday() < 5:
+            count += 1
+        cur += timedelta(days=1)
+    return count
+
+
+def _goal_saved_date(user_id: int) -> date | None:
+    sections = _get_user_sections(user_id)
+    goal_section = sections.get("project_grow_goal", {})
+    return _parse_iso_date(goal_section.get("saved_date"))
+
+
+def _remaining_target_usd_before_date(user_id: int, before_date: date) -> float:
     goal = get_project_grow_goal_summary(user_id)
-    if _to_float(goal.get("target_balance_usd")) <= 0:
-        return False
-    daily_target = _daily_target_usd(user_id)
+    target_balance = _to_float(goal.get("target_balance_usd"))
+    baseline_balance = _to_float(goal.get("current_balance_usd"))
+    total_grow_target = max(target_balance - baseline_balance, 0.0)
+    achieved = max(get_tabung_balance_as_of(user_id, before_date), 0.0)
+    return max(total_grow_target - achieved, 0.0)
+
+
+def _get_or_create_weekly_daily_target_usd(user_id: int, reference_date: date) -> float:
+    week_start, week_end = _bounded_current_week(reference_date)
+    week_key = _week_key(week_start, week_end)
+
+    db = load_core_db()
+    user = db.get("users", {}).get(str(user_id))
+    if not isinstance(user, dict):
+        return 0.0
+
+    weekly_targets = _daily_target_tracker_weekly_targets_from_user(user)
+    existing = weekly_targets.get(week_key, {})
+    if isinstance(existing, dict):
+        existing_target = _to_float(existing.get("daily_target_usd"))
+        if existing_target > 0:
+            return existing_target
+
+    goal = get_project_grow_goal_summary(user_id)
+    target_days = _to_int(goal.get("target_days"))
+    if _to_float(goal.get("target_balance_usd")) <= 0 or target_days <= 0:
+        return 0.0
+
+    saved_date = _goal_saved_date(user_id) or week_start
+    deadline_exclusive = saved_date + timedelta(days=target_days)
+    remaining_trading_days = _count_trading_days_between(week_start, deadline_exclusive - timedelta(days=1))
+    if remaining_trading_days <= 0:
+        return 0.0
+
+    achieved_before_week = week_start - timedelta(days=1)
+    remaining_target = _remaining_target_usd_before_date(user_id, achieved_before_week)
+    if remaining_target <= 0:
+        return 0.0
+
+    daily_target_usd = remaining_target / float(remaining_trading_days)
+    now = malaysia_now()
+
+    sections = user.setdefault("sections", {})
+    tracker = sections.setdefault(
+        "daily_target_tracker",
+        {
+            "section": "daily_target_tracker",
+            "user_id": user_id,
+            "telegram_name": user.get("telegram_name") or str(user_id),
+            "saved_at": now.isoformat(),
+            "saved_date": now.strftime("%Y-%m-%d"),
+            "saved_time": now.strftime("%H:%M:%S"),
+            "timezone": "Asia/Kuala_Lumpur",
+            "data": {"reached_dates": [], "weekly_targets": {}},
+        },
+    )
+    tracker_data = tracker.setdefault("data", {})
+    reached_dates = tracker_data.get("reached_dates", [])
+    if not isinstance(reached_dates, list):
+        reached_dates = []
+    tracker_data["reached_dates"] = reached_dates
+
+    raw_targets = tracker_data.get("weekly_targets", {})
+    if not isinstance(raw_targets, dict):
+        raw_targets = {}
+    raw_targets[week_key] = {
+        "week_start": week_start.isoformat(),
+        "week_end": week_end.isoformat(),
+        "daily_target_usd": float(daily_target_usd),
+        "remaining_target_usd": float(remaining_target),
+        "remaining_trading_days": int(remaining_trading_days),
+        "saved_at": now.isoformat(),
+    }
+    tracker_data["weekly_targets"] = raw_targets
+
+    tracker["saved_at"] = now.isoformat()
+    tracker["saved_date"] = now.strftime("%Y-%m-%d")
+    tracker["saved_time"] = now.strftime("%H:%M:%S")
+    tracker["timezone"] = "Asia/Kuala_Lumpur"
+    user["updated_at"] = now.isoformat()
+    save_core_db(db)
+    return float(daily_target_usd)
+
+
+def get_weekly_frozen_daily_target_usd(user_id: int, reference_date: date | None = None) -> float:
+    ref = reference_date or current_user_date(user_id)
+    return _get_or_create_weekly_daily_target_usd(user_id, ref)
+
+
+def _trading_profit_usd_on_date(user_id: int, target_date: date) -> float:
+    net = _sum_trading_net_between(user_id, target_date, target_date)
+    if net <= 0:
+        return 0.0
+    return float(net)
+
+
+def _tabung_save_usd_on_date(user_id: int, target_date: date) -> float:
+    total = 0.0
+    for record in _tabung_records_since(user_id, target_date):
+        rec_date = _record_date_myt(record)
+        if rec_date != target_date:
+            continue
+        mode = str(record.get("mode") or "").strip().lower()
+        if mode != "save":
+            continue
+        total += abs(_to_float(record.get("amount_usd")))
+    return total
+
+
+def _is_daily_target_hit_on_date(user_id: int, target_date: date) -> bool:
+    daily_target = get_weekly_frozen_daily_target_usd(user_id, target_date)
     if daily_target <= 0:
         return False
-    floating = _floating_progress_usd(user_id)
-    return floating >= daily_target
+    trading_profit = _trading_profit_usd_on_date(user_id, target_date)
+    if trading_profit <= 0:
+        return False
+    tabung_saved = _tabung_save_usd_on_date(user_id, target_date)
+    return tabung_saved >= daily_target
 
 
 def has_reached_daily_target_today(user_id: int) -> bool:
-    today = malaysia_now().date().isoformat()
+    today = current_user_date(user_id).isoformat()
     db = load_core_db()
     user = db.get("users", {}).get(str(user_id))
     if not isinstance(user, dict):
@@ -945,7 +1280,10 @@ def has_reached_daily_target_today(user_id: int) -> bool:
 
     if today in _daily_target_tracker_dates_from_user(user):
         return True
-    return _is_daily_target_hit_now(user_id)
+    if _is_daily_target_hit_now(user_id):
+        mark_daily_target_reached_today(user_id)
+        return True
+    return False
 
 
 def is_daily_target_hit_now(user_id: int) -> bool:
@@ -959,7 +1297,7 @@ def mark_daily_target_reached_today(user_id: int) -> bool:
         return False
 
     now = malaysia_now()
-    today = now.date().isoformat()
+    today = current_user_date(user_id).isoformat()
     dates = _daily_target_tracker_dates_from_user(user)
     if today in dates:
         return False
@@ -999,15 +1337,27 @@ def _bounded_current_week(reference_date: date) -> tuple[date, date]:
 
 
 def get_weekly_performance_usd(user_id: int) -> float:
-    today = malaysia_now().date()
+    today = current_user_date(user_id)
     start_date, end_date = _bounded_current_week(today)
     return _sum_trading_net_between(user_id, start_date, end_date)
 
 
 def get_monthly_performance_usd(user_id: int) -> float:
-    today = malaysia_now().date()
+    today = current_user_date(user_id)
     month_start, month_end = _month_range(today)
     return _sum_trading_net_between(user_id, month_start, month_end)
+
+
+def get_weekly_adjustment_usd(user_id: int) -> float:
+    today = current_user_date(user_id)
+    start_date, end_date = _bounded_current_week(today)
+    return _sum_adjustment_net_between(user_id, start_date, end_date)
+
+
+def get_monthly_adjustment_usd(user_id: int) -> float:
+    today = current_user_date(user_id)
+    month_start, month_end = _month_range(today)
+    return _sum_adjustment_net_between(user_id, month_start, month_end)
 
 
 def get_weekly_profit_loss_usd(user_id: int) -> float:
@@ -1074,11 +1424,13 @@ def _build_transaction_history_entry(source: str, record: dict[str, Any]) -> dic
     }
 
 
-def get_transaction_history_records(user_id: int, days: int, limit: int = 100) -> list[dict[str, Any]]:
-    max_items = max(1, min(int(limit), 100))
-    day_window = max(1, int(days))
-    end_date = malaysia_now().date()
-    start_date = end_date - timedelta(days=day_window - 1)
+def _collect_transaction_history_rows(
+    user_id: int,
+    start_date: date,
+    end_date: date,
+    *,
+    include_hidden_adjustments: bool,
+) -> list[dict[str, Any]]:
     hidden_adjustment_modes = {
         "project_grow_unlock_transfer_out",
         "project_grow_goal_reset_transfer",
@@ -1091,7 +1443,7 @@ def get_transaction_history_records(user_id: int, days: int, limit: int = 100) -
         for record in _iter_section_records_between(user_id, section_name, start_date, end_date):
             if section_name == "balance_adjustment":
                 mode = str(record.get("mode") or "").strip().lower()
-                if mode in hidden_adjustment_modes:
+                if not include_hidden_adjustments and mode in hidden_adjustment_modes:
                     continue
             item = _build_transaction_history_entry(section_name, record)
             if item is not None:
@@ -1106,7 +1458,40 @@ def get_transaction_history_records(user_id: int, days: int, limit: int = 100) -
             rows.append(item)
 
     rows.sort(key=lambda r: str(r.get("ts") or ""), reverse=True)
+    return rows
+
+
+def get_transaction_history_records_between(
+    user_id: int,
+    start_date: date,
+    end_date: date,
+    *,
+    limit: int | None = None,
+    include_hidden_adjustments: bool = False,
+) -> list[dict[str, Any]]:
+    rows = _collect_transaction_history_rows(
+        user_id,
+        start_date,
+        end_date,
+        include_hidden_adjustments=include_hidden_adjustments,
+    )
+    if limit is None:
+        return rows
+    max_items = max(1, min(int(limit), 100))
     return rows[:max_items]
+
+
+def get_transaction_history_records(user_id: int, days: int, limit: int = 100) -> list[dict[str, Any]]:
+    day_window = max(1, int(days))
+    end_date = current_user_date(user_id)
+    start_date = end_date - timedelta(days=day_window - 1)
+    return get_transaction_history_records_between(
+        user_id,
+        start_date,
+        end_date,
+        limit=limit,
+        include_hidden_adjustments=False,
+    )
 
 
 def has_any_transactions(user_id: int) -> bool:
@@ -1898,8 +2283,6 @@ def add_trading_activity_update(user_id: int, mode: str, amount_usd: float) -> b
     _bump_rollup(user, saved_at_iso=saved_at_iso, trading_delta=net_usd, trading_count=1)
     user["updated_at"] = saved_at_iso
     save_core_db(db)
-    if _is_daily_target_hit_now(user_id):
-        mark_daily_target_reached_today(user_id)
     return True
 
 

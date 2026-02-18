@@ -1,6 +1,9 @@
 """Text handlers for MM HELPER."""
 
+from io import BytesIO
+from datetime import date, timedelta
 import json
+import re
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
@@ -40,6 +43,7 @@ from menu import (
 )
 from settings import (
     get_balance_adjustment_webapp_url,
+    get_date_override_webapp_url,
     get_deposit_activity_webapp_url,
     get_initial_capital_reset_webapp_url,
     get_notification_setting_webapp_url,
@@ -62,6 +66,8 @@ from storage import (
     get_mission_progress_summary,
     get_monthly_performance_usd,
     get_monthly_profit_loss_usd,
+    get_current_balance_as_of,
+    get_tabung_balance_as_of,
     get_project_grow_goal_summary,
     get_project_grow_mission_state,
     get_project_grow_mission_status_text,
@@ -69,8 +75,10 @@ from storage import (
     get_tabung_progress_summary,
     get_tabung_update_state,
     get_transaction_history_records,
+    get_transaction_history_records_between,
     get_tabung_balance_usd,
     get_total_balance_usd,
+    get_weekly_frozen_daily_target_usd,
     get_weekly_performance_usd,
     get_weekly_profit_loss_usd,
     has_tabung_save_today,
@@ -78,7 +86,10 @@ from storage import (
     has_project_grow_goal,
     has_initial_setup,
     is_project_grow_goal_reached,
+    current_user_date,
+    get_beta_date_overrides_snapshot,
     list_registered_user_logs,
+    load_core_db,
     reset_all_data,
     stop_all_notification_settings,
 )
@@ -112,6 +123,369 @@ BETA_RESET_CB_CANCEL = "BETA_RESET_CANCEL"
 BETA_RESET_CB_CONFIRM = "BETA_RESET_CONFIRM"
 
 
+def _pdf_escape(text: str) -> str:
+    safe = re.sub(r"[^\x20-\x7E]", " ", str(text))
+    return safe.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+
+
+def _pdf_text(x: float, y: float, text: str, size: int = 10, bold: bool = False, rgb: tuple[float, float, float] = (0, 0, 0)) -> str:
+    font = "F2" if bold else "F1"
+    r, g, b = rgb
+    return f"BT {r:.3f} {g:.3f} {b:.3f} rg /{font} {size} Tf {x:.2f} {y:.2f} Td ({_pdf_escape(text)}) Tj ET"
+
+
+def _pdf_rect(x: float, y: float, w: float, h: float, fill_rgb: tuple[float, float, float] | None = None, stroke_rgb: tuple[float, float, float] | None = None, line_w: float = 1.0) -> str:
+    cmds: list[str] = []
+    if fill_rgb is not None:
+        fr, fg, fb = fill_rgb
+        cmds.append(f"{fr:.3f} {fg:.3f} {fb:.3f} rg")
+    if stroke_rgb is not None:
+        sr, sg, sb = stroke_rgb
+        cmds.append(f"{sr:.3f} {sg:.3f} {sb:.3f} RG {line_w:.2f} w")
+    cmds.append(f"{x:.2f} {y:.2f} {w:.2f} {h:.2f} re")
+    if fill_rgb is not None and stroke_rgb is not None:
+        cmds.append("B")
+    elif fill_rgb is not None:
+        cmds.append("f")
+    else:
+        cmds.append("S")
+    return " ".join(cmds)
+
+
+def _build_styled_pdf(commands: list[str]) -> bytes:
+    stream = "\n".join(commands).encode("latin-1", errors="replace")
+
+    objects = [
+        b"1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj\n",
+        b"2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj\n",
+        b"3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >> endobj\n",
+        b"4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj\n",
+        b"5 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >> endobj\n",
+        f"6 0 obj << /Length {len(stream)} >> stream\n".encode("latin-1") + stream + b"\nendstream endobj\n",
+    ]
+
+    out = bytearray(b"%PDF-1.4\n")
+    offsets = [0]
+    for obj in objects:
+        offsets.append(len(out))
+        out.extend(obj)
+
+    xref_pos = len(out)
+    out.extend(f"xref\n0 {len(objects) + 1}\n".encode("latin-1"))
+    out.extend(b"0000000000 65535 f \n")
+    for off in offsets[1:]:
+        out.extend(f"{off:010d} 00000 n \n".encode("latin-1"))
+    out.extend(
+        f"trailer << /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_pos}\n%%EOF\n".encode("latin-1")
+    )
+    return bytes(out)
+
+
+def _trading_days_for_target_days(target_days: int) -> int:
+    mapping = {30: 22, 90: 66, 180: 132}
+    if target_days in mapping:
+        return mapping[target_days]
+    return max(1, round(float(target_days) * (22.0 / 30.0))) if target_days > 0 else 22
+
+
+def _bounded_report_week(reference_date: date) -> tuple[date, date]:
+    """Week window clipped to current month boundaries."""
+    sunday_offset = (reference_date.weekday() + 1) % 7
+    week_start = reference_date - timedelta(days=sunday_offset)
+    week_end = week_start + timedelta(days=6)
+
+    month_start = reference_date.replace(day=1)
+    next_month = (month_start.replace(day=28) + timedelta(days=4)).replace(day=1)
+    month_end = next_month - timedelta(days=1)
+
+    if week_start < month_start:
+        week_start = month_start
+    if week_end > month_end:
+        week_end = month_end
+    return week_start, week_end
+
+
+def _previous_closed_report_period(reference_date: date) -> tuple[date, date]:
+    """Return immediately previous closed report period (month-clipped week)."""
+    current_start, _ = _bounded_report_week(reference_date)
+    prev_ref = current_start - timedelta(days=1)
+    return _bounded_report_week(prev_ref)
+
+
+def _build_weekly_report_pdf(user_id: int) -> tuple[bytes, str]:
+    summary = get_initial_setup_summary(user_id)
+    current_balance_now = get_current_balance_usd(user_id)
+    tabung_balance = get_tabung_balance_usd(user_id)
+    total_balance = get_total_balance_usd(user_id)
+    progress = get_tabung_progress_summary(user_id)
+    goal = get_project_grow_goal_summary(user_id)
+    today = current_user_date(user_id)
+    week_start, week_end = _previous_closed_report_period(today)
+    weekly_pl = get_weekly_profit_loss_usd(user_id)
+    records = get_transaction_history_records_between(
+        user_id,
+        week_start,
+        week_end,
+        limit=None,
+        include_hidden_adjustments=False,
+    )
+    db = load_core_db()
+    user_obj = db.get("users", {}).get(str(user_id), {})
+    sections = user_obj.get("sections", {}) if isinstance(user_obj, dict) else {}
+
+    target_days = int(goal.get("target_days") or 0)
+    trading_days = _trading_days_for_target_days(target_days)
+    grow_target_remaining = float(progress.get("grow_target_usd") or 0.0)
+    daily_target_usd = float(get_weekly_frozen_daily_target_usd(user_id, week_start))
+    target_balance = float(goal.get("target_balance_usd") or 0.0)
+    goal_baseline_balance = float(goal.get("current_balance_usd") or 0.0)
+    grow_target_total = max(target_balance - goal_baseline_balance, 0.0)
+    grow_target_achieved = max(min(grow_target_total - grow_target_remaining, grow_target_total), 0.0)
+    remain_pct = (grow_target_remaining / grow_target_total * 100.0) if grow_target_total > 0 else 0.0
+
+    setup_date = None
+    try:
+        setup_date = date.fromisoformat(str(summary.get("saved_date") or ""))
+    except ValueError:
+        setup_date = None
+    is_first_month = bool(setup_date and setup_date > (week_start - timedelta(days=1)))
+    if is_first_month:
+        starting_balance = float(summary["initial_capital_usd"])
+        starting_balance_label = "Opening Balance This Month (Initial Balance)"
+    else:
+        starting_balance = float(get_current_balance_as_of(user_id, week_start - timedelta(days=1)))
+        starting_balance_label = "Opening Balance (Carry Forward)"
+
+    section_total = {
+        "deposit": 0.0,
+        "withdrawal": 0.0,
+        "trading": 0.0,
+        "adjustment": 0.0,
+        "tabung": 0.0,
+    }
+    section_count = {k: 0 for k in section_total}
+    daily_trading_pl: dict[str, float] = {}
+    for row in records:
+        row_date_raw = str(row.get("date") or "").strip()
+        try:
+            row_date = date.fromisoformat(row_date_raw)
+        except ValueError:
+            continue
+        if row_date < week_start or row_date > week_end:
+            continue
+        src = str(row.get("source") or "").strip().lower()
+        src_map = {
+            "deposit_activity": "deposit",
+            "withdrawal_activity": "withdrawal",
+            "trading_activity": "trading",
+            "balance_adjustment": "adjustment",
+            "tabung": "tabung",
+            "deposit": "deposit",
+            "withdrawal": "withdrawal",
+            "trading": "trading",
+            "adjustment": "adjustment",
+        }
+        src_norm = src_map.get(src, src)
+        amount = float(row.get("amount_usd") or 0.0)
+        if src_norm in section_total:
+            section_total[src_norm] += amount
+            section_count[src_norm] += 1
+        if src_norm == "trading":
+            daily_trading_pl[row_date_raw] = daily_trading_pl.get(row_date_raw, 0.0) + amount
+
+    weekly_pl = sum(daily_trading_pl.values())
+
+    tabung_records = []
+    tabung_section = sections.get("tabung", {}) if isinstance(sections, dict) else {}
+    tabung_data = tabung_section.get("data", {}) if isinstance(tabung_section, dict) else {}
+    raw_tabung_records = tabung_data.get("records", []) if isinstance(tabung_data, dict) else []
+    if isinstance(raw_tabung_records, list):
+        tabung_records = [r for r in raw_tabung_records if isinstance(r, dict)]
+
+    daily_tabung_save: dict[str, float] = {}
+    for rec in tabung_records:
+        mode = str(rec.get("mode") or "").strip().lower()
+        if mode != "save":
+            continue
+        rec_date = str(rec.get("saved_date") or "").strip()
+        try:
+            d = date.fromisoformat(rec_date)
+        except ValueError:
+            continue
+        if week_start <= d <= week_end:
+            amt = abs(float(rec.get("amount_usd") or 0.0))
+            daily_tabung_save[rec_date] = daily_tabung_save.get(rec_date, 0.0) + amt
+
+    day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+    daily_rows: list[tuple[str, str, str, str, str]] = []
+    reached_count = 0
+    cursor = week_start
+    while cursor <= week_end:
+        d_iso = cursor.isoformat()
+        d_name = day_names[cursor.weekday()]
+        pl = float(daily_trading_pl.get(d_iso, 0.0))
+        tabung_saved = float(daily_tabung_save.get(d_iso, 0.0))
+        if cursor.weekday() >= 5:
+            status = "No Trade Day"
+            target_text = "-"
+        elif daily_target_usd <= 0:
+            status = "No Target"
+            target_text = f"USD {daily_target_usd:.2f}"
+        else:
+            hit = pl > 0 and tabung_saved >= daily_target_usd
+            status = "Reached" if hit else "Not Reached"
+            target_text = f"USD {daily_target_usd:.2f}"
+            if hit:
+                reached_count += 1
+        daily_rows.append((f"{d_name} {d_iso}", target_text, f"USD {pl:.2f}", f"USD {tabung_saved:.2f}", status))
+        cursor += timedelta(days=1)
+
+    goal_section = sections.get("project_grow_goal", {}) if isinstance(sections, dict) else {}
+    goal_saved_date_raw = str(goal_section.get("saved_date") or "").strip() if isinstance(goal_section, dict) else ""
+    goal_start_date: date | None = None
+    if goal_saved_date_raw:
+        try:
+            goal_start_date = date.fromisoformat(goal_saved_date_raw)
+        except ValueError:
+            goal_start_date = None
+
+    remaining_calendar_days_now = 0
+    remaining_trading_days_now = 0
+    recalculated_daily_target_now = 0.0
+    selected_target_days = max(target_days, 0)
+    if grow_target_remaining > 0 and goal_start_date is not None and target_days > 0:
+        goal_deadline = goal_start_date + timedelta(days=target_days)
+        remaining_calendar_days_now = max((goal_deadline - today).days, 0)
+        remaining_trading_days_now = _trading_days_for_target_days(remaining_calendar_days_now)
+        if remaining_trading_days_now > 0:
+            recalculated_daily_target_now = grow_target_remaining / float(remaining_trading_days_now)
+
+    ending_balance = float(get_current_balance_as_of(user_id, week_end))
+    tabung_balance = float(get_tabung_balance_as_of(user_id, week_end))
+    total_balance = ending_balance + tabung_balance
+
+    cmds: list[str] = []
+    # Header
+    cmds.append(_pdf_rect(35, 770, 525, 48, fill_rgb=(0.09, 0.20, 0.42)))
+    cmds.append(_pdf_text(50, 798, "MM HELPER - WEEKLY REPORT", size=15, bold=True, rgb=(1, 1, 1)))
+    cmds.append(_pdf_text(50, 782, f"User: {summary['name']}  |  Report Date: {today.isoformat()}", size=9, rgb=(0.90, 0.95, 1.0)))
+
+    # Meta
+    cmds.append(_pdf_rect(35, 730, 525, 28, fill_rgb=(0.95, 0.97, 1.0), stroke_rgb=(0.80, 0.85, 0.93), line_w=0.8))
+    cmds.append(_pdf_text(48, 746, f"Report Period: {week_start.isoformat()} to {week_end.isoformat()}", size=9, bold=True, rgb=(0.16, 0.22, 0.33)))
+    cmds.append(_pdf_text(320, 746, "Target reference: 22 trading days per month", size=8, rgb=(0.32, 0.38, 0.48)))
+
+    # Starting balance section (full-width)
+    cmds.append(_pdf_rect(35, 676, 525, 48, fill_rgb=(1, 1, 1), stroke_rgb=(0.82, 0.85, 0.90), line_w=0.8))
+    cmds.append(_pdf_text(48, 700, "Opening Balance", size=11, bold=True, rgb=(0.10, 0.20, 0.35)))
+    cmds.append(_pdf_text(48, 686, starting_balance_label, size=8, rgb=(0.28, 0.34, 0.44)))
+    cmds.append(_pdf_text(340, 692, f"USD {starting_balance:.2f}", size=12, bold=True, rgb=(0.08, 0.17, 0.30)))
+
+    # Daily target status table
+    cmds.append(_pdf_rect(35, 420, 525, 248, fill_rgb=(1, 1, 1), stroke_rgb=(0.82, 0.85, 0.90), line_w=0.8))
+    cmds.append(_pdf_text(48, 652, "Daily Target Status by Day", size=11, bold=True, rgb=(0.10, 0.20, 0.35)))
+    cmds.append(_pdf_text(48, 638, f"Current Daily Target: USD {daily_target_usd:.2f}", size=9, bold=True, rgb=(0.08, 0.17, 0.30)))
+    cmds.append(_pdf_text(280, 638, f"Reached Days: {reached_count}", size=9, bold=True, rgb=(0.08, 0.17, 0.30)))
+
+    col_x = [48, 180, 290, 390, 485]
+    col_titles = ["Day", "Daily Target", "Trading P/L", "Tabung", "Status"]
+    cmds.append(_pdf_rect(45, 616, 505, 18, fill_rgb=(0.92, 0.95, 0.99), stroke_rgb=(0.84, 0.88, 0.93), line_w=0.5))
+    for title, x in zip(col_titles, col_x):
+        cmds.append(_pdf_text(x, 622, title, size=9, bold=True, rgb=(0.13, 0.22, 0.35)))
+
+    y = 595
+    for day_label, target_label, pl_label, tabung_label, status in daily_rows:
+        cmds.append(_pdf_rect(45, y - 3, 505, 20, fill_rgb=(0.985, 0.988, 0.995), stroke_rgb=(0.90, 0.92, 0.95), line_w=0.3))
+        pl_val = float(pl_label.replace("USD", "").strip())
+        tabung_val = float(tabung_label.replace("USD", "").strip())
+        pl_color = (0.65, 0.10, 0.10) if pl_val < 0 else (0.08, 0.25, 0.10)
+        tabung_color = (0.08, 0.25, 0.10) if tabung_val > 0 else (0.18, 0.25, 0.36)
+        status_color = (0.08, 0.40, 0.18) if status == "Reached" else (0.62, 0.18, 0.10) if status == "Not Reached" else (0.35, 0.35, 0.35)
+        cmds.append(_pdf_text(col_x[0], y + 2, day_label, size=9, rgb=(0.18, 0.25, 0.36)))
+        cmds.append(_pdf_text(col_x[1], y + 2, target_label, size=9, rgb=(0.18, 0.25, 0.36)))
+        cmds.append(_pdf_text(col_x[2], y + 2, pl_label, size=9, bold=True, rgb=pl_color))
+        cmds.append(_pdf_text(col_x[3], y + 2, tabung_label, size=9, bold=True, rgb=tabung_color))
+        cmds.append(_pdf_text(col_x[4], y + 2, status, size=9, bold=True, rgb=status_color))
+        y -= 25
+
+    # Weekly transaction totals (full-width)
+    cmds.append(_pdf_rect(35, 304, 525, 104, fill_rgb=(1, 1, 1), stroke_rgb=(0.82, 0.85, 0.90), line_w=0.8))
+    cmds.append(_pdf_text(48, 392, "Weekly Transaction Totals by Category", size=11, bold=True, rgb=(0.10, 0.20, 0.35)))
+    tx_headers = [("Category", 52), ("Count", 310), ("Total (USD)", 420)]
+    cmds.append(_pdf_rect(45, 372, 505, 16, fill_rgb=(0.92, 0.95, 0.99), stroke_rgb=(0.84, 0.88, 0.93), line_w=0.5))
+    for txt, x in tx_headers:
+        cmds.append(_pdf_text(x, 377, txt, size=8, bold=True, rgb=(0.13, 0.22, 0.35)))
+    tx_rows = [
+        ("Deposit", section_count["deposit"], section_total["deposit"]),
+        ("Withdrawal", section_count["withdrawal"], section_total["withdrawal"]),
+        ("Trading (Net)", section_count["trading"], section_total["trading"]),
+        ("Balance Adjustment", section_count["adjustment"], section_total["adjustment"]),
+        ("Tabung", section_count["tabung"], section_total["tabung"]),
+    ]
+    y = 356
+    for cat, cnt, amt in tx_rows:
+        cmds.append(_pdf_rect(45, y - 2, 505, 13, fill_rgb=(0.985, 0.988, 0.995), stroke_rgb=(0.90, 0.92, 0.95), line_w=0.3))
+        cmds.append(_pdf_text(52, y + 2, cat, size=8, rgb=(0.18, 0.25, 0.36)))
+        cmds.append(_pdf_text(315, y + 2, str(cnt), size=8, bold=True, rgb=(0.18, 0.25, 0.36)))
+        amt_color = (0.65, 0.10, 0.10) if amt < 0 else (0.08, 0.25, 0.10)
+        cmds.append(_pdf_text(420, y + 2, f"{amt:.2f}", size=8, bold=True, rgb=amt_color))
+        y -= 14
+
+    # Goal summary section
+    cmds.append(_pdf_rect(35, 168, 525, 124, fill_rgb=(1, 1, 1), stroke_rgb=(0.82, 0.85, 0.90), line_w=0.8))
+    cmds.append(_pdf_text(48, 276, "Current Goal Summary (calculated from tabung grow only)", size=10, bold=True, rgb=(0.10, 0.20, 0.35)))
+    cmds.append(_pdf_rect(45, 256, 505, 16, fill_rgb=(0.92, 0.95, 0.99), stroke_rgb=(0.84, 0.88, 0.93), line_w=0.5))
+    cmds.append(_pdf_text(52, 261, "Item", size=9, bold=True, rgb=(0.13, 0.22, 0.35)))
+    cmds.append(_pdf_text(340, 261, "Value", size=9, bold=True, rgb=(0.13, 0.22, 0.35)))
+
+    goal_rows: list[tuple[str, str, tuple[float, float, float]]] = []
+    if grow_target_total <= 0:
+        goal_rows.append(("Goal Status", "New goal is not set yet", (0.62, 0.18, 0.10)))
+    else:
+        goal_rows.extend(
+            [
+                ("Selected Goal Duration", f"{selected_target_days} days", (0.18, 0.25, 0.36)),
+                ("Remaining Grow Target", f"USD {grow_target_remaining:.2f}", (0.62, 0.18, 0.10) if grow_target_remaining > 0 else (0.08, 0.40, 0.18)),
+                ("Remaining Goal Percentage", f"{remain_pct:.2f}%", (0.62, 0.18, 0.10) if remain_pct > 0 else (0.08, 0.40, 0.18)),
+            ]
+        )
+        if grow_target_remaining <= 0:
+            goal_rows.append(("New Daily Target", "Target already achieved", (0.08, 0.40, 0.18)))
+        elif remaining_trading_days_now > 0:
+            goal_rows.append(
+                (
+                    "New Daily Target",
+                    f"USD {recalculated_daily_target_now:.2f} per day",
+                    (0.18, 0.25, 0.36),
+                )
+            )
+        else:
+            goal_rows.append(("New Daily Target", "Goal period is near end / no trading days left", (0.62, 0.18, 0.10)))
+
+    y = 240
+    for metric, value, color in goal_rows[:5]:
+        cmds.append(_pdf_rect(45, y - 2, 505, 16, fill_rgb=(0.985, 0.988, 0.995), stroke_rgb=(0.90, 0.92, 0.95), line_w=0.3))
+        cmds.append(_pdf_text(52, y + 2, metric, size=9, rgb=(0.18, 0.25, 0.36)))
+        cmds.append(_pdf_text(340, y + 2, value, size=9, bold=True, rgb=color))
+        y -= 18
+
+    # Final summary with ending balance
+    pnl_color = (0.65, 0.10, 0.10) if weekly_pl < 0 else (0.08, 0.25, 0.10)
+    cmds.append(_pdf_rect(35, 70, 525, 92, fill_rgb=(0.96, 0.98, 1.0), stroke_rgb=(0.78, 0.84, 0.92), line_w=0.8))
+    cmds.append(_pdf_text(48, 142, "Ending Balance", size=11, bold=True, rgb=(0.10, 0.20, 0.35)))
+    cmds.append(_pdf_text(52, 124, f"Weekly P/L: USD {weekly_pl:.2f}", size=9, bold=True, rgb=pnl_color))
+    cmds.append(_pdf_text(52, 106, f"Tabung Balance: USD {tabung_balance:.2f}", size=9, bold=True, rgb=(0.08, 0.17, 0.30)))
+    cmds.append(_pdf_text(52, 88, f"Capital: USD {total_balance:.2f}", size=9, bold=True, rgb=(0.08, 0.17, 0.30)))
+    cmds.append(_pdf_text(340, 106, "Ending Balance", size=9, bold=True, rgb=(0.08, 0.17, 0.30)))
+    cmds.append(_pdf_text(340, 88, f"USD {ending_balance:.2f}", size=12, bold=True, rgb=(0.08, 0.17, 0.30)))
+
+    cmds.append(_pdf_text(48, 58, "Note: 'Reached' status is marked only when same-day tabung save amount reaches daily target.", size=8, rgb=(0.34, 0.38, 0.45)))
+
+    pdf_bytes = _build_styled_pdf(cmds)
+    filename = f"weekly-report-{today.isoformat()}.pdf"
+    return pdf_bytes, filename
+
+
 def _beta_reset_begin_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         [
@@ -138,7 +512,11 @@ async def handle_admin_inline_actions(update: Update, context: ContextTypes.DEFA
 
     await query.answer()
     cb = str(query.data or "").strip()
-    if cb not in {BETA_RESET_CB_BEGIN, BETA_RESET_CB_CANCEL, BETA_RESET_CB_CONFIRM}:
+    if cb not in {
+        BETA_RESET_CB_BEGIN,
+        BETA_RESET_CB_CANCEL,
+        BETA_RESET_CB_CONFIRM,
+    }:
         return
 
     if not is_admin_user(user.id):
@@ -217,8 +595,16 @@ def _build_admin_panel_keyboard_for_user(user_id: int):
         saved_date=summary["saved_date"],
     )
     user_logs_json = json.dumps(list_registered_user_logs(), ensure_ascii=False, separators=(",", ":"))
+    overrides_json = json.dumps(get_beta_date_overrides_snapshot(), ensure_ascii=False, separators=(",", ":"))
+    date_override_url = get_date_override_webapp_url(
+        name=summary["name"],
+        saved_date=summary["saved_date"],
+        users_payload_json=user_logs_json,
+        selected_user_id=user_id,
+        overrides_payload_json=overrides_json,
+    )
     user_log_url = get_user_log_webapp_url(user_logs_json)
-    return admin_panel_keyboard(notification_url, user_log_url)
+    return admin_panel_keyboard(notification_url, date_override_url, user_log_url)
 
 
 def _build_account_activity_keyboard_for_user(user_id: int):
@@ -400,6 +786,7 @@ def _build_records_reports_keyboard_for_user(user_id: int):
     tx_history_url = get_transaction_history_webapp_url(
         name=summary["name"],
         saved_date=summary["saved_date"],
+        reference_date=current_user_date(user_id).isoformat(),
         records_7d=get_transaction_history_records(user_id, days=7, limit=100),
         records_30d=get_transaction_history_records(user_id, days=30, limit=100),
     )
@@ -751,12 +1138,46 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
 
     if text == SUBMENU_STAT_BUTTON_WEEKLY_REPORTS:
-        await send_screen(
-            context,
-            message.chat_id,
-            WEEKLY_REPORTS_OPENED_TEXT,
-            reply_markup=_build_records_reports_keyboard_for_user(user.id),
-        )
+        summary = get_initial_setup_summary(user.id)
+        today = current_user_date(user.id)
+        prev_week_start, prev_week_end = _previous_closed_report_period(today)
+        try:
+            setup_date = date.fromisoformat(str(summary.get("saved_date") or ""))
+        except ValueError:
+            setup_date = None
+        if setup_date is not None and setup_date > prev_week_end:
+            await send_screen(
+                context,
+                message.chat_id,
+                (
+                    "Weekly report belum tersedia.\n"
+                    "Report hanya untuk period sebelumnya yang sudah ditutup.\n"
+                    f"Period tersedia seterusnya bermula selepas {prev_week_end.isoformat()}."
+                ),
+                reply_markup=_build_records_reports_keyboard_for_user(user.id),
+            )
+            return
+        try:
+            pdf_bytes, filename = _build_weekly_report_pdf(user.id)
+            await context.bot.send_document(
+                chat_id=message.chat_id,
+                document=BytesIO(pdf_bytes),
+                filename=filename,
+                caption="Weekly report PDF siap. Ini ringkasan minggu semasa anda.",
+            )
+            await send_screen(
+                context,
+                message.chat_id,
+                "Weekly report PDF dah dihantar. Boleh semak dan simpan fail tersebut.",
+                reply_markup=_build_records_reports_keyboard_for_user(user.id),
+            )
+        except Exception:
+            await send_screen(
+                context,
+                message.chat_id,
+                "Gagal jana Weekly report PDF. Cuba lagi sebentar.",
+                reply_markup=_build_records_reports_keyboard_for_user(user.id),
+            )
         return
 
     if text == SUBMENU_STAT_BUTTON_MONTHLY_REPORTS:
