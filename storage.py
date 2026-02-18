@@ -2700,6 +2700,16 @@ def list_registered_user_logs(limit: int = 500) -> list[dict[str, str]]:
     return trimmed
 
 
+def list_registered_user_logs_grouped_by_month(limit_total: int = 2000) -> dict[str, list[dict[str, str]]]:
+    rows = list_registered_user_logs(limit=limit_total)
+    grouped: dict[str, list[dict[str, str]]] = {}
+    for row in rows:
+        registered_at = str(row.get("registered_at") or "").strip()
+        month_key = registered_at[:7] if len(registered_at) >= 7 else "unknown"
+        grouped.setdefault(month_key, []).append(row)
+    return grouped
+
+
 def was_notification_sent(user_id: int, category: str, marker: str) -> bool:
     if not category or not marker:
         return False

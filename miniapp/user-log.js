@@ -6,6 +6,7 @@
   }
 
   var params = new URLSearchParams(window.location.search);
+  var monthTabsEl = document.getElementById("monthTabs");
   var summaryText = document.getElementById("summaryText");
   var logList = document.getElementById("logList");
   var statusEl = document.getElementById("status");
@@ -17,13 +18,55 @@
     return text || fallback;
   }
 
-  function parseUsersPayload() {
-    var raw = params.get("users") || "[]";
+  function parsePayload() {
+    var raw = params.get("data") || "";
+    if (!raw) {
+      raw = params.get("users") || "[]";
+      try {
+        var legacyUsers = JSON.parse(raw);
+        return {
+          logsByMonth: { all: Array.isArray(legacyUsers) ? legacyUsers : [] },
+          monthOrder: ["all"],
+          selectedMonth: "all",
+        };
+      } catch (errLegacy) {
+        return { logsByMonth: {}, monthOrder: [], selectedMonth: "" };
+      }
+    }
+
     try {
       var parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
+      var logsByMonth = {};
+      if (parsed && typeof parsed === "object" && parsed.m && typeof parsed.m === "object") {
+        Object.keys(parsed.m).forEach(function (monthKey) {
+          var monthRows = parsed.m[monthKey];
+          if (!Array.isArray(monthRows)) {
+            logsByMonth[monthKey] = [];
+            return;
+          }
+          logsByMonth[monthKey] = monthRows.map(function (row) {
+            if (!Array.isArray(row)) {
+              return { name: "-", user_id: "-", telegram_username: "-", registered_at: "-" };
+            }
+            return {
+              name: safeText(row[0], "-"),
+              user_id: safeText(row[1], "-"),
+              telegram_username: safeText(row[2], "-"),
+              registered_at: safeText(row[3], "-"),
+            };
+          });
+        });
+      } else if (parsed && typeof parsed === "object" && parsed.logs_by_month && typeof parsed.logs_by_month === "object") {
+        logsByMonth = parsed.logs_by_month;
+      }
+      var monthOrder = Object.keys(logsByMonth).sort().reverse();
+      return {
+        logsByMonth: logsByMonth,
+        monthOrder: monthOrder,
+        selectedMonth: monthOrder[0] || "",
+      };
     } catch (err) {
-      return [];
+      return { logsByMonth: {}, monthOrder: [], selectedMonth: "" };
     }
   }
 
@@ -33,15 +76,38 @@
     return p;
   }
 
-  function renderUsers(users) {
-    logList.innerHTML = "";
+  function renderMonths(state) {
+    monthTabsEl.innerHTML = "";
+    state.monthOrder.forEach(function (monthKey) {
+      var monthUsers = state.logsByMonth[monthKey];
+      var count = Array.isArray(monthUsers) ? monthUsers.length : 0;
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "month-tab" + (state.selectedMonth === monthKey ? " active" : "");
+      btn.textContent = monthKey + " (" + count + ")";
+      btn.addEventListener("click", function () {
+        state.selectedMonth = monthKey;
+        renderMonths(state);
+        renderUsersForMonth(state);
+      });
+      monthTabsEl.appendChild(btn);
+    });
+  }
 
-    if (!users.length) {
-      summaryText.innerHTML = "<em>Tiada user berdaftar lagi.</em>";
+  function renderUsersForMonth(state) {
+    logList.innerHTML = "";
+    if (!state.selectedMonth) {
+      summaryText.innerHTML = "<em>Tiada data bulan pendaftaran.</em>";
       return;
     }
 
-    summaryText.innerHTML = "<em>Jumlah user berdaftar: " + users.length + "</em>";
+    var users = state.logsByMonth[state.selectedMonth];
+    if (!Array.isArray(users) || users.length === 0) {
+      summaryText.innerHTML = "<em>Bulan " + state.selectedMonth + " tiada user berdaftar.</em>";
+      return;
+    }
+
+    summaryText.innerHTML = "<em>Bulan " + state.selectedMonth + ": " + users.length + " user berdaftar</em>";
 
     users.forEach(function (user) {
       var card = document.createElement("article");
@@ -75,5 +141,7 @@
   topBackBtn.addEventListener("click", backToAdminPanel);
   bottomBackBtn.addEventListener("click", backToAdminPanel);
 
-  renderUsers(parseUsersPayload());
+  var state = parsePayload();
+  renderMonths(state);
+  renderUsersForMonth(state);
 })();

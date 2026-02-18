@@ -89,10 +89,10 @@ from storage import (
     is_project_grow_goal_reached,
     current_user_date,
     get_beta_date_override,
-    list_registered_user_logs,
     load_core_db,
     reset_all_data,
     stop_all_notification_settings,
+    list_registered_user_logs_grouped_by_month,
 )
 from texts import (
     ACCOUNT_ACTIVITY_OPENED_TEXT,
@@ -595,8 +595,21 @@ def _build_admin_panel_keyboard_for_user(user_id: int):
         name=summary["name"],
         saved_date=summary["saved_date"],
     )
-    # Keep URL payload small enough for Telegram reply markup limits.
-    user_logs_json = json.dumps(list_registered_user_logs(limit=5), ensure_ascii=False, separators=(",", ":"))
+    logs_by_month = list_registered_user_logs_grouped_by_month(limit_total=2000)
+    compact_logs: dict[str, list[list[str]]] = {}
+    for month_key, rows in logs_by_month.items():
+        compact_rows: list[list[str]] = []
+        for row in rows:
+            compact_rows.append(
+                [
+                    str(row.get("name") or ""),
+                    str(row.get("user_id") or ""),
+                    str(row.get("telegram_username") or ""),
+                    str(row.get("registered_at") or ""),
+                ]
+            )
+        compact_logs[str(month_key)] = compact_rows
+    user_logs_payload_json = json.dumps({"m": compact_logs}, ensure_ascii=False, separators=(",", ":"))
     current_override = get_beta_date_override(user_id)
     date_override_url = get_date_override_webapp_url(
         name=summary["name"],
@@ -606,7 +619,7 @@ def _build_admin_panel_keyboard_for_user(user_id: int):
         current_override_date=str(current_override.get("override_date") or ""),
         current_updated_at=str(current_override.get("updated_at") or ""),
     )
-    user_log_url = get_user_log_webapp_url(user_logs_json)
+    user_log_url = get_user_log_webapp_url(user_logs_payload_json)
     return admin_panel_keyboard(notification_url, date_override_url, user_log_url)
 
 

@@ -6,6 +6,34 @@
   <title>User Log</title>
   <link rel="stylesheet" href="global.css" />
   <style>
+    .month-tabs {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      margin-bottom: 10px;
+    }
+
+    .month-tab {
+      margin: 0;
+      border: 1px solid rgba(95, 145, 215, 0.45);
+      background: rgba(8, 26, 55, 0.8);
+      color: #dce9ff;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+      width: auto;
+      min-width: unset;
+    }
+
+    .month-tab.active {
+      border-color: #89bdff;
+      background: linear-gradient(180deg, rgba(35, 95, 174, 0.95), rgba(18, 58, 122, 0.92));
+      color: #ffffff;
+    }
+
     .log-list {
       display: grid;
       gap: 8px;
@@ -63,6 +91,7 @@
     </header>
 
     <section class="card">
+      <div id="monthTabs" class="month-tabs"></div>
       <p id="summaryText" class="hint"><em>0 user.</em></p>
       <div id="logList" class="log-list"></div>
       <p id="status" class="status" aria-live="polite"></p>
