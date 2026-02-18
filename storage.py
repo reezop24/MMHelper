@@ -220,6 +220,14 @@ def current_user_date(user_id: int) -> date:
     return malaysia_now().date()
 
 
+def _user_now(user_id: int) -> datetime:
+    real_now = malaysia_now()
+    target_date = current_user_date(user_id)
+    if target_date == real_now.date():
+        return real_now
+    return real_now.replace(year=target_date.year, month=target_date.month, day=target_date.day)
+
+
 def _activity_db_path(month_key: str) -> Path:
     return ACTIVITY_DB_DIR / f"{ACTIVITY_FILE_PREFIX}{month_key}.json"
 
@@ -550,7 +558,7 @@ def has_tnc_accepted(user_id: int) -> bool:
 
 
 def save_tnc_acceptance(user_id: int, telegram_name: str, accepted: bool, telegram_username: str = "") -> None:
-    now = malaysia_now()
+    now = _user_now(user_id)
     saved_at_iso = now.isoformat()
     saved_date = now.strftime("%Y-%m-%d")
     saved_time = now.strftime("%H:%M:%S")
@@ -701,15 +709,15 @@ def get_current_balance_usd(user_id: int) -> float:
     return total_balance + current_profit + total_adjustment
 
 
-def _current_tabung_month_range() -> tuple[date, date]:
-    today = malaysia_now().date()
+def _current_tabung_month_range(user_id: int) -> tuple[date, date]:
+    today = current_user_date(user_id)
     first_day = today.replace(day=1)
     next_month = (first_day.replace(day=28) + timedelta(days=4)).replace(day=1)
     return first_day, next_month - timedelta(days=1)
 
 
 def _count_tabung_mode_this_month(user_id: int, mode: str) -> int:
-    start_date, end_date = _current_tabung_month_range()
+    start_date, end_date = _current_tabung_month_range(user_id)
     count = 0
     for record in _tabung_records_since(user_id, start_date):
         rec_date = _record_date_myt(record)
@@ -826,7 +834,7 @@ def apply_tabung_update_action(user_id: int, action: str, amount_usd: float) -> 
     if not user:
         return False, "User tak dijumpai."
 
-    now = malaysia_now()
+    now = _user_now(user_id)
     saved_at_iso = now.isoformat()
     saved_date = now.strftime("%Y-%m-%d")
     saved_time = now.strftime("%H:%M:%S")
@@ -1191,7 +1199,7 @@ def _get_or_create_weekly_daily_target_usd(user_id: int, reference_date: date) -
         return 0.0
 
     daily_target_usd = remaining_target / float(remaining_trading_days)
-    now = malaysia_now()
+    now = _user_now(user_id)
 
     sections = user.setdefault("sections", {})
     tracker = sections.setdefault(
@@ -1296,7 +1304,7 @@ def mark_daily_target_reached_today(user_id: int) -> bool:
     if not isinstance(user, dict):
         return False
 
-    now = malaysia_now()
+    now = _user_now(user_id)
     today = current_user_date(user_id).isoformat()
     dates = _daily_target_tracker_dates_from_user(user)
     if today in dates:
@@ -1582,7 +1590,7 @@ def get_tabung_progress_summary(user_id: int) -> dict[str, Any]:
 
     target_days = int(goal.get("target_days") or 0)
     saved_date = _parse_iso_date(goal_section.get("saved_date"))
-    today = malaysia_now().date()
+    today = current_user_date(user_id)
     if saved_date is None:
         saved_date = today
 
@@ -1727,7 +1735,7 @@ def _tabung_records_since(user_id: int, start_date: date) -> list[dict[str, Any]
 
 
 def has_tabung_save_today(user_id: int) -> bool:
-    today = malaysia_now().date()
+    today = current_user_date(user_id)
     for record in _tabung_records_since(user_id, today):
         mode = str(record.get("mode") or "").strip().lower()
         if mode == "save":
@@ -1751,8 +1759,8 @@ def get_mission_progress_summary(user_id: int) -> dict[str, str]:
             "mission_4": "Mission 4 : in progress 0%",
         }
 
-    start_date = _mission_start_date(user_id) or malaysia_now().date()
-    today = malaysia_now().date()
+    start_date = _mission_start_date(user_id) or current_user_date(user_id)
+    today = current_user_date(user_id)
     if start_date > today:
         start_date = today
 
@@ -1853,7 +1861,7 @@ def apply_project_grow_unlock_to_tabung(user_id: int, unlock_amount_usd: float) 
     if not user:
         return False
 
-    now = malaysia_now()
+    now = _user_now(user_id)
     saved_at_iso = now.isoformat()
     saved_date = now.strftime("%Y-%m-%d")
     saved_time = now.strftime("%H:%M:%S")
@@ -1959,7 +1967,7 @@ def start_project_grow_mission(user_id: int, mode: str) -> bool:
     if not user:
         return False
 
-    now = malaysia_now()
+    now = _user_now(user_id)
     saved_at_iso = now.isoformat()
     saved_date = now.strftime("%Y-%m-%d")
     saved_time = now.strftime("%H:%M:%S")
@@ -1997,7 +2005,7 @@ def reset_project_grow_mission(user_id: int) -> bool:
         return False
 
     sections.pop("project_grow_mission", None)
-    user["updated_at"] = malaysia_now().isoformat()
+    user["updated_at"] = _user_now(user_id).isoformat()
     save_core_db(db)
     return True
 
@@ -2015,7 +2023,7 @@ def reset_project_grow_goal(user_id: int) -> bool:
         return False
 
     changed = False
-    now = malaysia_now()
+    now = _user_now(user_id)
     saved_at_iso = now.isoformat()
     saved_date = now.strftime("%Y-%m-%d")
     saved_time = now.strftime("%H:%M:%S")
@@ -2124,7 +2132,7 @@ def save_user_setup_section(
     payload: dict[str, Any],
     telegram_username: str = "",
 ) -> None:
-    now = malaysia_now()
+    now = _user_now(user_id)
     saved_at_iso = now.isoformat()
     saved_date = now.strftime("%Y-%m-%d")
     saved_time = now.strftime("%H:%M:%S")
@@ -2171,7 +2179,7 @@ def _append_activity_record(user_id: int, section_name: str, reason: str, amount
     if not user:
         return False
 
-    now = malaysia_now()
+    now = _user_now(user_id)
     saved_at_iso = now.isoformat()
     saved_date = now.strftime("%Y-%m-%d")
     saved_time = now.strftime("%H:%M:%S")
@@ -2238,7 +2246,7 @@ def add_trading_activity_update(user_id: int, mode: str, amount_usd: float) -> b
     if not user:
         return False
 
-    now = malaysia_now()
+    now = _user_now(user_id)
     saved_at_iso = now.isoformat()
     saved_date = now.strftime("%Y-%m-%d")
     saved_time = now.strftime("%H:%M:%S")
@@ -2303,7 +2311,7 @@ def apply_initial_capital_reset(user_id: int, new_initial_capital: float) -> boo
     if has_any_transactions(user_id):
         return False
 
-    now = malaysia_now()
+    now = _user_now(user_id)
     saved_at_iso = now.isoformat()
     saved_date = now.strftime("%Y-%m-%d")
     saved_time = now.strftime("%H:%M:%S")
@@ -2349,7 +2357,7 @@ def reset_user_all_settings(user_id: int) -> bool:
 
 
 def get_balance_adjustment_rules(user_id: int) -> dict[str, Any]:
-    today = malaysia_now().date()
+    today = current_user_date(user_id)
     month_start, month_end = _month_range(today)
     window_start = month_end - timedelta(days=6)
     window_open = window_start <= today <= month_end
@@ -2394,7 +2402,7 @@ def apply_balance_adjustment(user_id: int, mode: str, amount_usd: float) -> tupl
     if rules["used_this_month"]:
         return False, "Bulan ni dah guna balance adjustment sekali."
 
-    now = malaysia_now()
+    now = _user_now(user_id)
     saved_at_iso = now.isoformat()
     saved_date = now.strftime("%Y-%m-%d")
     saved_time = now.strftime("%H:%M:%S")
