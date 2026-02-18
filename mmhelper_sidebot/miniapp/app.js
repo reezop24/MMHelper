@@ -55,6 +55,8 @@
   var reezoFullNameInput = document.getElementById("reezoFullNameInput");
   var reezoPhoneInput = document.getElementById("reezoPhoneInput");
   var submitReezoVerificationBtn = document.getElementById("submitReezoVerificationBtn");
+  var btnCheckUnderIbReezoMiniapp = document.getElementById("btnCheckUnderIbReezoMiniapp");
+  var reezoCheckStatus = document.getElementById("reezoCheckStatus");
   var AMARKETS_SIGNUP_URL = "https://amarketstrading.co/sign-up/real-en/?g=REEZO24";
 
   var activeView = "home";
@@ -354,6 +356,35 @@
     statusEl.textContent = "Preview mode: borang pengesahan client under IB Reezo dihantar.";
   }
 
+  function checkUnderIbReezoMiniapp() {
+    var walletId = readText(reezoWalletIdInput);
+    if (!walletId) {
+      reezoCheckStatus.textContent = "Sila isi AMarkets Wallet ID dahulu.";
+      return;
+    }
+    if (!isValidWalletId(walletId)) {
+      reezoCheckStatus.textContent = "AMarkets Wallet ID mesti tepat 7 angka.";
+      return;
+    }
+
+    var payload = {
+      type: "sidebot_check_under_ib_reezo",
+      wallet_id: walletId
+    };
+
+    if (tg) {
+      try {
+        tg.sendData(JSON.stringify(payload));
+      } catch (err) {
+        // no-op
+      }
+      reezoCheckStatus.textContent = "Semakan dihantar. Sila semak result di chat bot.";
+      return;
+    }
+
+    reezoCheckStatus.textContent = "Preview mode: semakan dihantar ke bot.";
+  }
+
   topBackBtn.addEventListener("click", backToPreviousMenu);
   bottomBackBtn.addEventListener("click", sendToMainMenu);
   bottomPrevBtn.addEventListener("click", backToPreviousMenu);
@@ -446,6 +477,7 @@
     setReezoDepositChoice(false);
   });
   submitReezoVerificationBtn.addEventListener("click", submitReezoVerification);
+  btnCheckUnderIbReezoMiniapp.addEventListener("click", checkUnderIbReezoMiniapp);
 
   var entry = getEntryParam();
   if (entry === "under_ib_reezo") {
@@ -460,4 +492,5 @@
   setIbRequestChoice(null);
   setIbDepositChoice(null);
   setReezoDepositChoice(null);
+  reezoCheckStatus.textContent = "";
 })();
