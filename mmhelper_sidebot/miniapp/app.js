@@ -50,6 +50,7 @@
   var ibPhoneInput = document.getElementById("ibPhoneInput");
   var submitIbVerificationBtn = document.getElementById("submitIbVerificationBtn");
   var reezoWalletIdInput = document.getElementById("reezoWalletIdInput");
+  var reezoCheckWalletInput = document.getElementById("reezoCheckWalletInput");
   var reezoDepositYesBtn = document.getElementById("reezoDepositYesBtn");
   var reezoDepositNoBtn = document.getElementById("reezoDepositNoBtn");
   var reezoFullNameInput = document.getElementById("reezoFullNameInput");
@@ -357,7 +358,7 @@
   }
 
   function checkUnderIbReezoMiniapp() {
-    var walletId = readText(reezoWalletIdInput);
+    var walletId = readText(reezoCheckWalletInput) || readText(reezoWalletIdInput);
     if (!walletId) {
       reezoCheckStatus.textContent = "Sila isi AMarkets Wallet ID dahulu.";
       return;
@@ -378,7 +379,12 @@
       } catch (err) {
         // no-op
       }
-      reezoCheckStatus.textContent = "Semakan dihantar. Sila semak result di chat bot.";
+      reezoCheckStatus.textContent = "Semakan dihantar. Kembali ke chat untuk lihat keputusan.";
+      try {
+        tg.close();
+      } catch (err2) {
+        // no-op
+      }
       return;
     }
 
@@ -477,6 +483,16 @@
     setReezoDepositChoice(false);
   });
   submitReezoVerificationBtn.addEventListener("click", submitReezoVerification);
+  if (reezoCheckWalletInput && reezoWalletIdInput) {
+    reezoCheckWalletInput.addEventListener("input", function () {
+      reezoWalletIdInput.value = reezoCheckWalletInput.value;
+    });
+    reezoWalletIdInput.addEventListener("input", function () {
+      if (!readText(reezoCheckWalletInput)) {
+        reezoCheckWalletInput.value = reezoWalletIdInput.value;
+      }
+    });
+  }
   btnCheckUnderIbReezoMiniapp.addEventListener("click", checkUnderIbReezoMiniapp);
 
   var entry = getEntryParam();
