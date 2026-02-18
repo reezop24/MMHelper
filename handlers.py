@@ -724,6 +724,10 @@ def _build_account_activity_keyboard_for_user(user_id: int):
             weekly_performance_usd=weekly_performance,
             monthly_performance_usd=monthly_performance,
             emergency_left=emergency_left,
+            target_balance_usd=target_balance_usd,
+            grow_target_usd=set_goal_grow_target,
+            target_days=target_days,
+            goal_reached=goal_reached,
         )
 
     return account_activity_keyboard(

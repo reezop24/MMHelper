@@ -26,6 +26,9 @@
     savedDate: params.get("saved_date") || "-",
     currentBalance: asNum("current_balance_usd"),
     tabungBalance: asNum("tabung_balance_usd"),
+    targetBalance: asNum("target_balance_usd"),
+    growTarget: asNum("grow_target_usd"),
+    targetDays: asNum("target_days"),
     weeklyPerformance: asNum("weekly_performance_usd"),
     monthlyPerformance: asNum("monthly_performance_usd"),
     goalReached: (params.get("goal_reached") || "0") === "1",
@@ -49,16 +52,85 @@
   var cashflowTypeEl = document.getElementById("cashflowType");
   var cashflowReasonEl = document.getElementById("cashflowReason");
   var tabungActionEl = document.getElementById("tabungAction");
-  var tabungAmountWrapEl = document.getElementById("tabungAmountWrap");
-  var tabungHintEl = document.getElementById("tabungHint");
+  var tradingAmountEl = document.getElementById("tradingAmount");
+  var cashflowAmountEl = document.getElementById("cashflowAmount");
+  var tabungAmountEl = document.getElementById("tabungAmount");
+
+  function readAmount(el) {
+    var n = Number((el.value || "").trim());
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }
 
   function syncSummary() {
+    var capital = model.currentBalance + model.tabungBalance;
     document.getElementById("summaryName").textContent = model.name;
     document.getElementById("summaryDate").textContent = model.savedDate;
     document.getElementById("summaryBalance").textContent = formatUsd(model.currentBalance);
     document.getElementById("summaryTabung").textContent = formatUsd(model.tabungBalance);
+    document.getElementById("summaryCapital").textContent = formatUsd(capital);
     document.getElementById("summaryWeekly").textContent = formatPnl(model.weeklyPerformance);
     document.getElementById("summaryMonthly").textContent = formatPnl(model.monthlyPerformance);
+  }
+
+  function syncMetrics() {
+    var capital = model.currentBalance + model.tabungBalance;
+    var tradingDaysMap = { 30: 22, 90: 66, 180: 132 };
+    var tradingDays = tradingDaysMap[model.targetDays] || 0;
+    var dailyTarget = tradingDays > 0 ? (model.growTarget / tradingDays) : 0;
+    var progressPct = model.targetBalance > 0 ? Math.min((capital / model.targetBalance) * 100, 100) : 0;
+    var leftToGoal = Math.max(model.targetBalance - capital, 0);
+
+    document.getElementById("metricTargetCapital").textContent = "USD " + formatUsd(model.targetBalance);
+    document.getElementById("metricGrowTarget").textContent = "USD " + formatUsd(model.growTarget);
+    document.getElementById("metricTargetDays").textContent = String(model.targetDays || 0);
+    document.getElementById("metricTradingDays").textContent = String(tradingDays);
+    document.getElementById("metricDailyTarget").textContent = "USD " + formatUsd(dailyTarget);
+    document.getElementById("metricGrowProgress").textContent = Number(progressPct).toFixed(2) + "%";
+    document.getElementById("metricLeftToGoal").textContent = "USD " + formatUsd(leftToGoal);
+    document.getElementById("metricGoalStatus").textContent = model.goalReached ? "Reached" : "Not Reached";
+  }
+
+  function syncLivePreview() {
+    var currentAfter = model.currentBalance;
+    var tabungAfter = model.tabungBalance;
+    var amount = 0;
+
+    if (model.activeTab === "trading") {
+      amount = readAmount(tradingAmountEl);
+      if (model.tradingMode === "profit") {
+        currentAfter += amount;
+      } else if (model.tradingMode === "loss") {
+        currentAfter -= amount;
+      }
+    } else if (model.activeTab === "cashflow") {
+      amount = readAmount(cashflowAmountEl);
+      if (model.cashflowType === "withdrawal") {
+        currentAfter -= amount;
+      } else {
+        currentAfter += amount;
+      }
+    } else {
+      amount = readAmount(tabungAmountEl);
+      var action = String(tabungActionEl.value || "save").trim();
+      if (action === "save") {
+        currentAfter -= amount;
+        tabungAfter += amount;
+      } else if (action === "emergency_withdrawal") {
+        tabungAfter -= amount;
+      } else if (action === "goal_to_current") {
+        currentAfter += amount;
+        tabungAfter -= amount;
+      } else if (action === "goal_direct_withdrawal") {
+        tabungAfter -= amount;
+      }
+    }
+
+    var capitalAfter = currentAfter + tabungAfter;
+    var growLeftAfter = Math.max(model.targetBalance - capitalAfter, 0);
+    document.getElementById("previewCurrent").textContent = "USD " + formatUsd(currentAfter);
+    document.getElementById("previewTabung").textContent = "USD " + formatUsd(tabungAfter);
+    document.getElementById("previewCapital").textContent = "USD " + formatUsd(capitalAfter);
+    document.getElementById("previewGrowLeft").textContent = "USD " + formatUsd(growLeftAfter);
   }
 
   function switchTab(tabId) {
@@ -70,6 +142,7 @@
       panels[id].classList.toggle("active", id === tabId);
     });
     statusEl.textContent = "";
+    syncLivePreview();
   }
 
   function setTradingMode(mode) {
@@ -77,6 +150,7 @@
     modeProfitBtn.classList.toggle("active", mode === "profit");
     modeLossBtn.classList.toggle("active", mode === "loss");
     statusEl.textContent = "";
+    syncLivePreview();
   }
 
   function fillCashflowReasons(kind) {
@@ -94,22 +168,6 @@
       fallback.textContent = "Manual";
       cashflowReasonEl.appendChild(fallback);
     }
-  }
-
-  function syncTabungModeView() {
-    var action = (tabungActionEl.value || "save").trim();
-    tabungAmountWrapEl.classList.toggle("hidden", false);
-    if (action === "emergency_withdrawal") {
-      tabungHintEl.textContent = "Emergency left bulan ini: " + model.emergencyLeft + " kali.";
-      return;
-    }
-    if (action === "goal_to_current" || action === "goal_direct_withdrawal") {
-      tabungHintEl.textContent = model.goalReached
-        ? "Goal reached: action ini dibenarkan."
-        : "Goal belum capai: action ini akan ditolak oleh backend.";
-      return;
-    }
-    tabungHintEl.textContent = "Submit akan hantar payload tabung_update_action.";
   }
 
   function sendPayload(payload) {
@@ -137,12 +195,16 @@
   cashflowTypeEl.addEventListener("change", function () {
     model.cashflowType = cashflowTypeEl.value;
     fillCashflowReasons(model.cashflowType);
+    syncLivePreview();
   });
 
   tabungActionEl.addEventListener("change", function () {
-    syncTabungModeView();
     statusEl.textContent = "";
+    syncLivePreview();
   });
+  tradingAmountEl.addEventListener("input", syncLivePreview);
+  cashflowAmountEl.addEventListener("input", syncLivePreview);
+  tabungAmountEl.addEventListener("input", syncLivePreview);
 
   document.getElementById("topBackBtn").addEventListener("click", backToAccount);
   document.getElementById("backBtn").addEventListener("click", backToAccount);
@@ -203,7 +265,8 @@
   });
 
   syncSummary();
+  syncMetrics();
   fillCashflowReasons(model.cashflowType);
-  syncTabungModeView();
+  syncLivePreview();
   switchTab("trading");
 })();

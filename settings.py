@@ -278,6 +278,10 @@ def get_activity_hub_webapp_url(
     weekly_performance_usd: float,
     monthly_performance_usd: float,
     emergency_left: int,
+    target_balance_usd: float = 0.0,
+    grow_target_usd: float = 0.0,
+    target_days: int = 0,
+    goal_reached: bool = False,
 ) -> str:
     page = f"{_miniapp_base_url()}/activity-hub.html"
     query = urlencode(
@@ -289,6 +293,10 @@ def get_activity_hub_webapp_url(
             "weekly_performance_usd": f"{weekly_performance_usd:.2f}",
             "monthly_performance_usd": f"{monthly_performance_usd:.2f}",
             "emergency_left": str(max(0, int(emergency_left))),
+            "target_balance_usd": f"{target_balance_usd:.2f}",
+            "grow_target_usd": f"{grow_target_usd:.2f}",
+            "target_days": str(max(0, int(target_days))),
+            "goal_reached": "1" if goal_reached else "0",
         }
     )
     return f"{page}?{query}"

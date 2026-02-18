@@ -3,7 +3,15 @@ window.MMHELPER_CONTENT = {
     "Take profit sikit",
     "Emergency / komitmen",
     "Pindah modal ke akaun lain",
-    "Simpan sebagai cash reserve"
+    "Simpan sebagai cash reserve",
+    "Bayar bil / komitmen bulanan",
+    "Guna untuk perbelanjaan harian",
+    "Pusing modal bisnes lain",
+    "Keluarkan modal asal",
+    "Lock profit hujung minggu",
+    "Bayar yuran / subscription",
+    "Simpan ke akaun simpanan",
+    "Lain-lain"
   ],
 
   getWithdrawalIntro: function (profitUsdFormatted) {
@@ -30,7 +38,15 @@ window.MMHELPER_CONTENT = {
     "Top up modal trading",
     "Tambah reserve account",
     "Simpan hasil payout",
-    "Kumpul modal untuk setup baru"
+    "Kumpul modal untuk setup baru",
+    "Tambah modal untuk capai target",
+    "Masuk semula profit sebelum ni",
+    "Modal baru dari gaji",
+    "Modal dari bisnes lain",
+    "Deposit untuk test setup",
+    "Tambah margin buffer",
+    "Pindahan dari akaun lain",
+    "Lain-lain"
   ],
 
   getDepositIntro: function (profitUsdFormatted) {

@@ -11,21 +11,93 @@
     .summary {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 8px;
-      margin-bottom: 12px;
+      gap: 6px 8px;
+      margin-bottom: 10px;
       background: rgba(6, 20, 47, 0.55);
       border: 1px solid var(--border-input);
       border-radius: 12px;
-      padding: 12px;
+      padding: 10px;
     }
 
     .summary-item {
-      font-size: 13px;
+      font-size: 11.5px;
+      line-height: 1.25;
       color: #dce8ff;
     }
 
     .summary-item strong {
       color: #fff;
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 12px;
+      background: rgba(6, 20, 46, 0.78);
+      border: 1px solid rgba(83, 127, 193, 0.45);
+      border-radius: 12px;
+      padding: 10px;
+    }
+
+    .metric-item {
+      background: rgba(9, 28, 60, 0.82);
+      border: 1px solid rgba(83, 127, 193, 0.38);
+      border-radius: 10px;
+      padding: 8px;
+    }
+
+    .metric-label {
+      font-size: 11px;
+      color: #bfd2f7;
+      margin-bottom: 4px;
+    }
+
+    .metric-value {
+      font-size: 13px;
+      font-weight: 700;
+      color: #ffffff;
+      line-height: 1.2;
+    }
+
+    .preview-card {
+      margin-top: 10px;
+      border: 1px solid rgba(83, 127, 193, 0.45);
+      border-radius: 12px;
+      background: rgba(6, 20, 46, 0.78);
+      padding: 10px;
+    }
+
+    .preview-title {
+      margin: 0 0 8px;
+      font-size: 12px;
+      color: #bfd2f7;
+      font-weight: 700;
+    }
+
+    .preview-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .preview-item {
+      background: rgba(9, 28, 60, 0.82);
+      border: 1px solid rgba(83, 127, 193, 0.38);
+      border-radius: 10px;
+      padding: 8px;
+    }
+
+    .preview-label {
+      font-size: 10.5px;
+      color: #bfd2f7;
+      margin-bottom: 3px;
+    }
+
+    .preview-value {
+      font-size: 12.5px;
+      color: #fff;
+      font-weight: 700;
     }
 
     .tabs {
@@ -109,6 +181,16 @@
       color: #fff;
     }
 
+    .mode-btn.profit.active {
+      border-color: #58d890;
+      background: linear-gradient(90deg, #148a50 0%, #26bf72 100%);
+    }
+
+    .mode-btn.loss.active {
+      border-color: #ff7b8e;
+      background: linear-gradient(90deg, #cf2f47 0%, #ff5a70 100%);
+    }
+
     .hint {
       margin: 8px 0 0;
       color: #bfd2f7;
@@ -145,9 +227,11 @@
     .hidden { display: none; }
 
     @media (max-width: 640px) {
-      .summary { grid-template-columns: 1fr; }
-      .tabs { grid-template-columns: 1fr; }
-      .mode-grid { grid-template-columns: 1fr; }
+      .summary-item { font-size: 10.5px; }
+      .metric-label { font-size: 10px; }
+      .metric-value { font-size: 12px; }
+      .tabs { gap: 6px; }
+      .tab-btn { padding: 9px 4px; font-size: 10.5px; }
       .actions button { width: 100%; }
     }
   </style>
@@ -161,7 +245,6 @@
     <header class="hero">
       <img class="logo" src="logo.png" alt="MM HELPER Logo" />
       <h1>Activity Hub</h1>
-      <p>1 miniapp, 3 tab: Trading P/L, Deposit/Withdraw, Tabung Grow.</p>
     </header>
 
     <section class="summary">
@@ -169,8 +252,20 @@
       <div class="summary-item"><strong>Saved Date:</strong> <span id="summaryDate">-</span></div>
       <div class="summary-item"><strong>Current Balance:</strong> USD <span id="summaryBalance">0.00</span></div>
       <div class="summary-item"><strong>Tabung Balance:</strong> USD <span id="summaryTabung">0.00</span></div>
+      <div class="summary-item"><strong>Capital Balance:</strong> USD <span id="summaryCapital">0.00</span></div>
       <div class="summary-item"><strong>Weekly P/L:</strong> <span id="summaryWeekly">USD 0.00</span></div>
       <div class="summary-item"><strong>Monthly P/L:</strong> <span id="summaryMonthly">USD 0.00</span></div>
+    </section>
+
+    <section class="metrics">
+      <div class="metric-item"><div class="metric-label">Target Capital</div><div id="metricTargetCapital" class="metric-value">USD 0.00</div></div>
+      <div class="metric-item"><div class="metric-label">Grow Target</div><div id="metricGrowTarget" class="metric-value">USD 0.00</div></div>
+      <div class="metric-item"><div class="metric-label">Target Days</div><div id="metricTargetDays" class="metric-value">0</div></div>
+      <div class="metric-item"><div class="metric-label">Trading Days (Est)</div><div id="metricTradingDays" class="metric-value">0</div></div>
+      <div class="metric-item"><div class="metric-label">Daily Target (Est)</div><div id="metricDailyTarget" class="metric-value">USD 0.00</div></div>
+      <div class="metric-item"><div class="metric-label">Grow Progress</div><div id="metricGrowProgress" class="metric-value">0.00%</div></div>
+      <div class="metric-item"><div class="metric-label">Baki Grow Target</div><div id="metricLeftToGoal" class="metric-value">USD 0.00</div></div>
+      <div class="metric-item"><div class="metric-label">Goal Status</div><div id="metricGoalStatus" class="metric-value">Not Reached</div></div>
     </section>
 
     <section class="tabs">
@@ -184,15 +279,14 @@
         <div class="field">
           <label>Mode</label>
           <div class="mode-grid">
-            <button type="button" id="modeProfit" class="mode-btn">Profit</button>
-            <button type="button" id="modeLoss" class="mode-btn">Loss</button>
+            <button type="button" id="modeProfit" class="mode-btn profit">Profit</button>
+            <button type="button" id="modeLoss" class="mode-btn loss">Loss</button>
           </div>
         </div>
         <div class="field">
           <label for="tradingAmount">Amount (USD)</label>
           <input id="tradingAmount" type="number" step="0.01" min="0" placeholder="Contoh: 25" />
         </div>
-        <p class="hint">Submit akan hantar payload `trading_activity_update`.</p>
       </section>
 
       <section id="tab-cashflow" class="panel">
@@ -211,7 +305,6 @@
           <label for="cashflowAmount">Amount (USD)</label>
           <input id="cashflowAmount" type="number" step="0.01" min="0" placeholder="Contoh: 50" />
         </div>
-        <p class="hint">Submit akan hantar payload `deposit_activity` atau `withdrawal_activity`.</p>
       </section>
 
       <section id="tab-tabung" class="panel">
@@ -224,11 +317,20 @@
             <option value="goal_direct_withdrawal">Goal Direct Withdrawal</option>
           </select>
         </div>
-        <div id="tabungAmountWrap" class="field">
+        <div class="field">
           <label for="tabungAmount">Amount (USD)</label>
           <input id="tabungAmount" type="number" step="0.01" min="0" placeholder="Contoh: 30" />
         </div>
-        <p id="tabungHint" class="hint">Submit akan hantar payload `tabung_update_action`.</p>
+      </section>
+
+      <section class="preview-card">
+        <p class="preview-title">Live Preview Baki Lepas Update</p>
+        <div class="preview-grid">
+          <div class="preview-item"><div class="preview-label">Current Balance</div><div id="previewCurrent" class="preview-value">USD 0.00</div></div>
+          <div class="preview-item"><div class="preview-label">Tabung Balance</div><div id="previewTabung" class="preview-value">USD 0.00</div></div>
+          <div class="preview-item"><div class="preview-label">Capital Balance</div><div id="previewCapital" class="preview-value">USD 0.00</div></div>
+          <div class="preview-item"><div class="preview-label">Baki Grow Target</div><div id="previewGrowLeft" class="preview-value">USD 0.00</div></div>
+        </div>
       </section>
 
       <p id="formStatus" class="status" aria-live="polite"></p>

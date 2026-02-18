@@ -2,7 +2,7 @@
 
 from telegram import KeyboardButton, ReplyKeyboardMarkup, WebAppInfo
 
-from settings import get_risk_calculator_webapp_url
+from settings import get_activity_hub_webapp_url, get_risk_calculator_webapp_url
 
 ADMIN_USER_IDS = {627116869}
 
@@ -13,6 +13,7 @@ MAIN_MENU_BUTTON_PROJECT_GROW = "📈 Project Grow"
 MAIN_MENU_BUTTON_STATISTIC = "📊 Records & Reports"
 MAIN_MENU_BUTTON_EXTRA = "🧰 Extra"
 MAIN_MENU_BUTTON_ADMIN_PANEL = "🛡️ Admin Panel"
+MAIN_MENU_BUTTON_ACTIVITY_HUB = "🧭 Activity Hub"
 
 SUBMENU_MM_BUTTON_INITIAL_CAPITAL_RESET = "♻️ Reset All Setting"
 SUBMENU_MM_BUTTON_CORRECTION = "⚖️ Balance Adjustment"
@@ -56,12 +57,23 @@ def is_admin_user(user_id: int | None) -> bool:
 
 def main_menu_keyboard(user_id: int | None = None) -> ReplyKeyboardMarkup:
     risk_url = get_risk_calculator_webapp_url()
+    activity_hub_url = ""
     if user_id is not None:
         try:
-            from storage import get_current_balance_usd, get_project_grow_goal_summary, get_tabung_balance_usd
+            from storage import (
+                get_current_balance_usd,
+                get_initial_setup_summary,
+                get_monthly_performance_usd,
+                get_project_grow_goal_summary,
+                get_tabung_balance_usd,
+                get_tabung_update_state,
+                get_weekly_performance_usd,
+                is_project_grow_goal_reached,
+            )
 
             current_balance = get_current_balance_usd(user_id)
             goal = get_project_grow_goal_summary(user_id)
+            summary = get_initial_setup_summary(user_id)
             target_days = int(goal.get("target_days") or 0)
             target_balance = float(goal.get("target_balance_usd") or 0.0)
             baseline_balance = float(goal.get("current_balance_usd") or 0.0)
@@ -73,8 +85,24 @@ def main_menu_keyboard(user_id: int | None = None) -> ReplyKeyboardMarkup:
                 target_days=target_days,
                 grow_target_usd=remaining_grow_target,
             )
+            if is_admin_user(user_id):
+                tabung_state = get_tabung_update_state(user_id)
+                activity_hub_url = get_activity_hub_webapp_url(
+                    name=summary["name"],
+                    current_balance_usd=current_balance,
+                    saved_date=summary["saved_date"],
+                    tabung_balance_usd=tabung_balance,
+                    weekly_performance_usd=get_weekly_performance_usd(user_id),
+                    monthly_performance_usd=get_monthly_performance_usd(user_id),
+                    emergency_left=int(tabung_state.get("emergency_left") or 0),
+                    target_balance_usd=target_balance,
+                    grow_target_usd=remaining_grow_target,
+                    target_days=target_days,
+                    goal_reached=is_project_grow_goal_reached(user_id),
+                )
         except Exception:
             risk_url = get_risk_calculator_webapp_url()
+            activity_hub_url = ""
 
     rows = [
         [
@@ -88,6 +116,15 @@ def main_menu_keyboard(user_id: int | None = None) -> ReplyKeyboardMarkup:
         [MAIN_MENU_BUTTON_STATISTIC, MAIN_MENU_BUTTON_EXTRA],
     ]
     if is_admin_user(user_id):
+        if activity_hub_url:
+            rows.append(
+                [
+                    KeyboardButton(
+                        MAIN_MENU_BUTTON_ACTIVITY_HUB,
+                        web_app=WebAppInfo(url=activity_hub_url),
+                    )
+                ]
+            )
         rows.append([MAIN_MENU_BUTTON_ADMIN_PANEL])
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
