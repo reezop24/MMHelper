@@ -12,7 +12,6 @@ from menu import (
     main_menu_keyboard,
 )
 from handlers import (
-    _build_account_activity_keyboard_for_user,
     _build_admin_panel_keyboard_for_user,
     _build_mm_setting_keyboard_for_user,
     _build_project_grow_keyboard_for_user,
@@ -44,7 +43,6 @@ from storage import (
     reset_user_all_settings,
 )
 from texts import (
-    ACCOUNT_ACTIVITY_OPENED_TEXT,
     MAIN_MENU_OPENED_TEXT,
     MM_HELPER_SETTING_OPENED_TEXT,
     NOTIFICATION_SETTING_SAVED_TEXT,
@@ -460,7 +458,7 @@ async def _handle_withdrawal_activity(payload: dict, update: Update, context: Co
             context,
             message.chat_id,
             "❌ Pilih reason dulu bro.",
-            reply_markup=_build_account_activity_keyboard_for_user(user_id),
+            reply_markup=main_menu_keyboard(user_id),
         )
         return
 
@@ -471,7 +469,7 @@ async def _handle_withdrawal_activity(payload: dict, update: Update, context: Co
             context,
             message.chat_id,
             "❌ Jumlah withdraw tak sah.",
-            reply_markup=_build_account_activity_keyboard_for_user(user_id),
+            reply_markup=main_menu_keyboard(user_id),
         )
         return
 
@@ -486,7 +484,7 @@ async def _handle_withdrawal_activity(payload: dict, update: Update, context: Co
             context,
             message.chat_id,
             "❌ Gagal simpan withdrawal activity.",
-            reply_markup=_build_account_activity_keyboard_for_user(user_id),
+            reply_markup=main_menu_keyboard(user_id),
         )
         return
 
@@ -494,7 +492,7 @@ async def _handle_withdrawal_activity(payload: dict, update: Update, context: Co
         context,
         message.chat_id,
         _build_withdrawal_saved_text(user_id, amount_usd),
-        reply_markup=_build_account_activity_keyboard_for_user(user_id),
+        reply_markup=main_menu_keyboard(user_id),
         parse_mode="Markdown",
     )
 
@@ -509,7 +507,7 @@ async def _handle_deposit_activity(payload: dict, update: Update, context: Conte
             context,
             message.chat_id,
             "❌ Pilih reason dulu bro.",
-            reply_markup=_build_account_activity_keyboard_for_user(user_id),
+            reply_markup=main_menu_keyboard(user_id),
         )
         return
 
@@ -520,7 +518,7 @@ async def _handle_deposit_activity(payload: dict, update: Update, context: Conte
             context,
             message.chat_id,
             "❌ Jumlah deposit tak sah.",
-            reply_markup=_build_account_activity_keyboard_for_user(user_id),
+            reply_markup=main_menu_keyboard(user_id),
         )
         return
 
@@ -535,7 +533,7 @@ async def _handle_deposit_activity(payload: dict, update: Update, context: Conte
             context,
             message.chat_id,
             "❌ Gagal simpan deposit activity.",
-            reply_markup=_build_account_activity_keyboard_for_user(user_id),
+            reply_markup=main_menu_keyboard(user_id),
         )
         return
 
@@ -543,7 +541,7 @@ async def _handle_deposit_activity(payload: dict, update: Update, context: Conte
         context,
         message.chat_id,
         _build_deposit_saved_text(user_id, amount_usd),
-        reply_markup=_build_account_activity_keyboard_for_user(user_id),
+        reply_markup=main_menu_keyboard(user_id),
         parse_mode="Markdown",
     )
 
@@ -561,7 +559,7 @@ async def _handle_trading_activity_update(payload: dict, update: Update, context
             context,
             message.chat_id,
             "❌ Jumlah update tak sah.",
-            reply_markup=_build_account_activity_keyboard_for_user(user_id),
+            reply_markup=main_menu_keyboard(user_id),
         )
         return
 
@@ -575,7 +573,7 @@ async def _handle_trading_activity_update(payload: dict, update: Update, context
             context,
             message.chat_id,
             "❌ Gagal simpan trading activity.",
-            reply_markup=_build_account_activity_keyboard_for_user(user_id),
+            reply_markup=main_menu_keyboard(user_id),
         )
         return
 
@@ -588,7 +586,7 @@ async def _handle_trading_activity_update(payload: dict, update: Update, context
         context,
         message.chat_id,
         response_text,
-        reply_markup=_build_account_activity_keyboard_for_user(user_id),
+        reply_markup=main_menu_keyboard(user_id),
         parse_mode="Markdown",
     )
 
@@ -605,7 +603,7 @@ async def _handle_tabung_update_action(payload: dict, update: Update, context: C
             context,
             message.chat_id,
             "❌ Jumlah tabung tak sah.",
-            reply_markup=_build_account_activity_keyboard_for_user(user_id),
+            reply_markup=main_menu_keyboard(user_id),
         )
         return
 
@@ -615,7 +613,7 @@ async def _handle_tabung_update_action(payload: dict, update: Update, context: C
             context,
             message.chat_id,
             f"❌ {status}",
-            reply_markup=_build_account_activity_keyboard_for_user(user_id),
+            reply_markup=main_menu_keyboard(user_id),
         )
         return
 
@@ -623,7 +621,7 @@ async def _handle_tabung_update_action(payload: dict, update: Update, context: C
         context,
         message.chat_id,
         _build_tabung_saved_text(user_id, action, amount_usd),
-        reply_markup=_build_account_activity_keyboard_for_user(user_id),
+        reply_markup=main_menu_keyboard(user_id),
         parse_mode="Markdown",
     )
 
@@ -858,8 +856,8 @@ async def _handle_account_activity_back_to_menu(update: Update, context: Context
     await send_screen(
         context,
         message.chat_id,
-        ACCOUNT_ACTIVITY_OPENED_TEXT,
-        reply_markup=_build_account_activity_keyboard_for_user(user.id),
+        MAIN_MENU_OPENED_TEXT,
+        reply_markup=main_menu_keyboard(user.id),
         parse_mode="Markdown",
     )
 

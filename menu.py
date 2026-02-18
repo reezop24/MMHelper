@@ -8,7 +8,6 @@ ADMIN_USER_IDS = {627116869}
 
 MAIN_MENU_BUTTON_MM_SETTING = "⚙️ MM Helper Setting"
 MAIN_MENU_BUTTON_RISK = "🧮 Risk Calculator"
-MAIN_MENU_BUTTON_ACCOUNT_ACTIVITY = "📒 Account Activity"
 MAIN_MENU_BUTTON_PROJECT_GROW = "📈 Project Grow"
 MAIN_MENU_BUTTON_STATISTIC = "📊 Records & Reports"
 MAIN_MENU_BUTTON_EXTRA = "🧰 Extra"
@@ -19,13 +18,6 @@ SUBMENU_MM_BUTTON_INITIAL_CAPITAL_RESET = "♻️ Reset All Setting"
 SUBMENU_MM_BUTTON_CORRECTION = "⚖️ Balance Adjustment"
 SUBMENU_MM_BUTTON_SYSTEM_INFO = "ℹ️ System Info"
 SUBMENU_MM_BUTTON_BACK_MAIN = "⬅️ Back to Main Menu"
-
-SUBMENU_ACCOUNT_BUTTON_DEPOSIT_ACTIVITY = "💵 Update Deposit Activitiy"
-SUBMENU_ACCOUNT_BUTTON_WITHDRAWAL_ACTIVITY = "💸 Update Withdrawal Activity"
-SUBMENU_ACCOUNT_BUTTON_TRADING_ACTIVITY = "📉 Update Trading Activity"
-SUBMENU_ACCOUNT_BUTTON_TABUNG = "🏦 Update Tabung"
-SUBMENU_ACCOUNT_BUTTON_SUMMARY = "🧾 Account Summary"
-SUBMENU_ACCOUNT_BUTTON_ACTIVITY_HUB = "🧭 Activity Hub"
 
 SUBMENU_PROJECT_BUTTON_SET_NEW_GOAL = "🎯 Set New Goal"
 SUBMENU_PROJECT_BUTTON_MISSION = "🧭 Mission"
@@ -44,13 +36,6 @@ SUBMENU_STAT_BUTTON_TRANSACTION_HISTORY = "🧾 Transaction History"
 SUBMENU_STAT_BUTTON_ACCOUNT_SUMMARY = "🧾 Account Summary"
 SUBMENU_STAT_BUTTON_WEEKLY_REPORTS = "📆 Weekly Reports"
 SUBMENU_STAT_BUTTON_MONTHLY_REPORTS = "🗓️ Monthly Reports"
-
-BASE_MAIN_MENU_ROWS = [
-    [MAIN_MENU_BUTTON_MM_SETTING, MAIN_MENU_BUTTON_RISK],
-    [MAIN_MENU_BUTTON_ACCOUNT_ACTIVITY, MAIN_MENU_BUTTON_PROJECT_GROW],
-    [MAIN_MENU_BUTTON_STATISTIC, MAIN_MENU_BUTTON_EXTRA],
-]
-
 
 def is_admin_user(user_id: int | None) -> bool:
     return user_id in ADMIN_USER_IDS
@@ -86,46 +71,48 @@ def main_menu_keyboard(user_id: int | None = None) -> ReplyKeyboardMarkup:
                 target_days=target_days,
                 grow_target_usd=remaining_grow_target,
             )
-            if is_admin_user(user_id):
-                tabung_state = get_tabung_update_state(user_id)
-                activity_hub_url = get_activity_hub_webapp_url(
-                    name=summary["name"],
-                    current_balance_usd=current_balance,
-                    saved_date=summary["saved_date"],
-                    tabung_balance_usd=tabung_balance,
-                    weekly_performance_usd=get_weekly_performance_usd(user_id),
-                    monthly_performance_usd=get_monthly_performance_usd(user_id),
-                    emergency_left=int(tabung_state.get("emergency_left") or 0),
-                    target_balance_usd=target_balance,
-                    grow_target_usd=remaining_grow_target,
-                    target_days=target_days,
-                    goal_reached=is_project_grow_goal_reached(user_id),
-                )
+            tabung_state = get_tabung_update_state(user_id)
+            activity_hub_url = get_activity_hub_webapp_url(
+                name=summary["name"],
+                current_balance_usd=current_balance,
+                saved_date=summary["saved_date"],
+                tabung_balance_usd=tabung_balance,
+                weekly_performance_usd=get_weekly_performance_usd(user_id),
+                monthly_performance_usd=get_monthly_performance_usd(user_id),
+                emergency_left=int(tabung_state.get("emergency_left") or 0),
+                target_balance_usd=target_balance,
+                grow_target_usd=remaining_grow_target,
+                target_days=target_days,
+                goal_reached=is_project_grow_goal_reached(user_id),
+            )
         except Exception:
             risk_url = get_risk_calculator_webapp_url()
             activity_hub_url = ""
 
+    activity_hub_button: KeyboardButton | str
+    if activity_hub_url:
+        activity_hub_button = KeyboardButton(
+            MAIN_MENU_BUTTON_ACTIVITY_HUB,
+            web_app=WebAppInfo(url=activity_hub_url),
+        )
+    else:
+        activity_hub_button = MAIN_MENU_BUTTON_ACTIVITY_HUB
+
     rows = [
         [
-            MAIN_MENU_BUTTON_MM_SETTING,
+            activity_hub_button,
+            MAIN_MENU_BUTTON_PROJECT_GROW,
+        ],
+        [
+            MAIN_MENU_BUTTON_STATISTIC,
             KeyboardButton(
                 MAIN_MENU_BUTTON_RISK,
                 web_app=WebAppInfo(url=risk_url),
             ),
         ],
-        [MAIN_MENU_BUTTON_ACCOUNT_ACTIVITY, MAIN_MENU_BUTTON_PROJECT_GROW],
-        [MAIN_MENU_BUTTON_STATISTIC, MAIN_MENU_BUTTON_EXTRA],
+        [MAIN_MENU_BUTTON_EXTRA, MAIN_MENU_BUTTON_MM_SETTING],
     ]
     if is_admin_user(user_id):
-        if activity_hub_url:
-            rows.append(
-                [
-                    KeyboardButton(
-                        MAIN_MENU_BUTTON_ACTIVITY_HUB,
-                        web_app=WebAppInfo(url=activity_hub_url),
-                    )
-                ]
-            )
         rows.append([MAIN_MENU_BUTTON_ADMIN_PANEL])
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
@@ -154,43 +141,6 @@ def mm_helper_setting_keyboard(
         ],
         [SUBMENU_MM_BUTTON_BACK_MAIN],
     ]
-    return ReplyKeyboardMarkup(rows, resize_keyboard=True)
-
-
-def account_activity_keyboard(
-    deposit_activity_url: str,
-    withdrawal_activity_url: str,
-    trading_activity_url: str,
-    tabung_update_url: str,
-    activity_hub_url: str = "",
-) -> ReplyKeyboardMarkup:
-    rows = []
-    if activity_hub_url:
-        rows.append([KeyboardButton(SUBMENU_ACCOUNT_BUTTON_ACTIVITY_HUB, web_app=WebAppInfo(url=activity_hub_url))])
-    rows.extend(
-        [
-            [
-                KeyboardButton(
-                    SUBMENU_ACCOUNT_BUTTON_TRADING_ACTIVITY,
-                    web_app=WebAppInfo(url=trading_activity_url),
-                )
-            ],
-            [
-                KeyboardButton(
-                    SUBMENU_ACCOUNT_BUTTON_DEPOSIT_ACTIVITY,
-                    web_app=WebAppInfo(url=deposit_activity_url),
-                )
-            ],
-            [
-                KeyboardButton(
-                    SUBMENU_ACCOUNT_BUTTON_WITHDRAWAL_ACTIVITY,
-                    web_app=WebAppInfo(url=withdrawal_activity_url),
-                )
-            ],
-            [KeyboardButton(SUBMENU_ACCOUNT_BUTTON_TABUNG, web_app=WebAppInfo(url=tabung_update_url))],
-            [SUBMENU_MM_BUTTON_BACK_MAIN],
-        ]
-    )
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
 

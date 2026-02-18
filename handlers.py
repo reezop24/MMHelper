@@ -9,7 +9,6 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
 from menu import (
-    MAIN_MENU_BUTTON_ACCOUNT_ACTIVITY,
     MAIN_MENU_BUTTON_ADMIN_PANEL,
     MAIN_MENU_BUTTON_EXTRA,
     MAIN_MENU_BUTTON_MM_SETTING,
@@ -19,7 +18,6 @@ from menu import (
     SUBMENU_ADMIN_BUTTON_BETA_RESET,
     SUBMENU_ADMIN_BUTTON_NOTIFICATION_SETTING,
     SUBMENU_ADMIN_BUTTON_STOP_ALL_NOTIFICATION,
-    SUBMENU_ACCOUNT_BUTTON_TABUNG,
     SUBMENU_MM_BUTTON_BACK_MAIN,
     SUBMENU_MM_BUTTON_CORRECTION,
     SUBMENU_MM_BUTTON_SYSTEM_INFO,
@@ -34,7 +32,6 @@ from menu import (
     SUBMENU_STAT_BUTTON_TRANSACTION_HISTORY,
     SUBMENU_STAT_BUTTON_WEEKLY_REPORTS,
     admin_panel_keyboard,
-    account_activity_keyboard,
     is_admin_user,
     main_menu_keyboard,
     mm_helper_setting_keyboard,
@@ -43,9 +40,7 @@ from menu import (
 )
 from settings import (
     get_balance_adjustment_webapp_url,
-    get_activity_hub_webapp_url,
     get_date_override_webapp_url,
-    get_deposit_activity_webapp_url,
     get_initial_capital_reset_webapp_url,
     get_notification_setting_webapp_url,
     get_project_grow_mission_webapp_url,
@@ -53,8 +48,6 @@ from settings import (
     get_tabung_update_webapp_url,
     get_tabung_progress_webapp_url,
     get_transaction_history_webapp_url,
-    get_trading_activity_webapp_url,
-    get_withdrawal_activity_webapp_url,
     get_user_log_webapp_url,
     get_system_info_webapp_url,
 )
@@ -95,7 +88,6 @@ from storage import (
     list_registered_user_logs_grouped_by_month,
 )
 from texts import (
-    ACCOUNT_ACTIVITY_OPENED_TEXT,
     ACHIEVEMENT_OPENED_TEXT,
     ADMIN_PANEL_OPENED_TEXT,
     CORRECTION_OPENED_TEXT,
@@ -109,7 +101,6 @@ from texts import (
     SET_NEW_GOAL_OPENED_TEXT,
     STATISTIC_OPENED_TEXT,
     SYSTEM_INFO_OPENED_TEXT,
-    TABUNG_OPENED_TEXT,
     TABUNG_PROGRESS_OPENED_TEXT,
     TRANSACTION_HISTORY_OPENED_TEXT,
     WEEKLY_REPORTS_OPENED_TEXT,
@@ -623,135 +614,6 @@ def _build_admin_panel_keyboard_for_user(user_id: int):
     return admin_panel_keyboard(notification_url, date_override_url, user_log_url)
 
 
-def _build_account_activity_keyboard_for_user(user_id: int):
-    summary = get_initial_setup_summary(user_id)
-    current_balance = get_current_balance_usd(user_id)
-    current_profit = get_current_profit_usd(user_id)
-    total_balance = get_total_balance_usd(user_id)
-    tabung_balance = get_tabung_balance_usd(user_id)
-    weekly_performance = get_weekly_performance_usd(user_id)
-    monthly_performance = get_monthly_performance_usd(user_id)
-    goal_summary = get_project_grow_goal_summary(user_id)
-    tabung_update_state = get_tabung_update_state(user_id)
-    tabung_start_date = get_tabung_start_date(user_id)
-    total_grow_target = max(float(goal_summary["target_balance_usd"]) - float(goal_summary["current_balance_usd"]), 0.0)
-    set_goal_grow_target = max(total_grow_target - tabung_balance, 0.0)
-    daily_target_reached_today = has_reached_daily_target_today(user_id)
-    tabung_saved_today = has_tabung_save_today(user_id)
-
-    mission_status = get_project_grow_mission_status_text(user_id)
-    goal_reached = is_project_grow_goal_reached(user_id)
-    target_balance_usd = float(goal_summary["target_balance_usd"])
-    goal_baseline_balance_usd = float(goal_summary["current_balance_usd"])
-    target_days = int(goal_summary["target_days"])
-    emergency_left = int(tabung_update_state["emergency_left"])
-
-    set_new_goal_url = get_set_new_goal_webapp_url(
-        name=summary["name"],
-        current_balance_usd=current_balance,
-        saved_date=summary["saved_date"],
-        tabung_start_date=tabung_start_date,
-        mission_status=mission_status,
-        has_goal=target_balance_usd > 0,
-        goal_reached=goal_reached,
-        target_balance_usd=target_balance_usd,
-        grow_target_usd=set_goal_grow_target,
-        target_days=target_days,
-        target_label=goal_summary["target_label"],
-        tabung_update_url="",
-        goal_baseline_balance_usd=goal_baseline_balance_usd,
-        daily_target_reached_today=daily_target_reached_today,
-        has_tabung_save_today=tabung_saved_today,
-    )
-    tabung_update_url = get_tabung_update_webapp_url(
-        name=summary["name"],
-        saved_date=summary["saved_date"],
-        current_balance_usd=current_balance,
-        tabung_balance_usd=tabung_balance,
-        total_balance_usd=total_balance,
-        target_balance_usd=target_balance_usd,
-        goal_reached=bool(tabung_update_state["goal_reached"]),
-        emergency_left=emergency_left,
-        set_new_goal_url=set_new_goal_url,
-    )
-    set_new_goal_url = get_set_new_goal_webapp_url(
-        name=summary["name"],
-        current_balance_usd=current_balance,
-        saved_date=summary["saved_date"],
-        tabung_start_date=tabung_start_date,
-        mission_status=mission_status,
-        has_goal=target_balance_usd > 0,
-        goal_reached=goal_reached,
-        target_balance_usd=target_balance_usd,
-        grow_target_usd=set_goal_grow_target,
-        target_days=target_days,
-        target_label=goal_summary["target_label"],
-        tabung_update_url=tabung_update_url,
-        goal_baseline_balance_usd=goal_baseline_balance_usd,
-        daily_target_reached_today=daily_target_reached_today,
-        has_tabung_save_today=tabung_saved_today,
-    )
-    tabung_update_url = get_tabung_update_webapp_url(
-        name=summary["name"],
-        saved_date=summary["saved_date"],
-        current_balance_usd=current_balance,
-        tabung_balance_usd=tabung_balance,
-        total_balance_usd=total_balance,
-        target_balance_usd=target_balance_usd,
-        goal_reached=bool(tabung_update_state["goal_reached"]),
-        emergency_left=emergency_left,
-        set_new_goal_url=set_new_goal_url,
-    )
-
-    common_kwargs = {
-        "name": summary["name"],
-        "initial_capital_usd": summary["initial_capital_usd"],
-        "current_balance_usd": current_balance,
-        "saved_date": summary["saved_date"],
-        "tabung_start_date": tabung_start_date,
-        "current_profit_usd": current_profit,
-        "total_balance_usd": total_balance,
-        "tabung_balance_usd": tabung_balance,
-        "weekly_performance_usd": weekly_performance,
-        "monthly_performance_usd": monthly_performance,
-        "target_balance_usd": target_balance_usd,
-        "grow_target_usd": set_goal_grow_target,
-        "target_days": target_days,
-        "goal_reached": goal_reached,
-        "goal_baseline_balance_usd": goal_baseline_balance_usd,
-        "tabung_update_url": tabung_update_url,
-        "daily_target_reached_today": daily_target_reached_today,
-        "has_tabung_save_today": tabung_saved_today,
-    }
-
-    deposit_url = get_deposit_activity_webapp_url(**common_kwargs)
-    withdrawal_url = get_withdrawal_activity_webapp_url(**common_kwargs)
-    trading_url = get_trading_activity_webapp_url(**common_kwargs)
-    activity_hub_url = ""
-    if is_admin_user(user_id):
-        activity_hub_url = get_activity_hub_webapp_url(
-            name=summary["name"],
-            current_balance_usd=current_balance,
-            saved_date=summary["saved_date"],
-            tabung_balance_usd=tabung_balance,
-            weekly_performance_usd=weekly_performance,
-            monthly_performance_usd=monthly_performance,
-            emergency_left=emergency_left,
-            target_balance_usd=target_balance_usd,
-            grow_target_usd=set_goal_grow_target,
-            target_days=target_days,
-            goal_reached=goal_reached,
-        )
-
-    return account_activity_keyboard(
-        deposit_activity_url=deposit_url,
-        withdrawal_activity_url=withdrawal_url,
-        trading_activity_url=trading_url,
-        tabung_update_url=tabung_update_url,
-        activity_hub_url=activity_hub_url,
-    )
-
-
 def _build_account_summary_text(user_id: int) -> str:
     summary = get_initial_setup_summary(user_id)
     current_balance = get_current_balance_usd(user_id)
@@ -1066,16 +928,6 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
         return
 
-    if text == MAIN_MENU_BUTTON_ACCOUNT_ACTIVITY:
-        await send_screen(
-            context,
-            message.chat_id,
-            ACCOUNT_ACTIVITY_OPENED_TEXT,
-            reply_markup=_build_account_activity_keyboard_for_user(user.id),
-            parse_mode="Markdown",
-        )
-        return
-
     if text == MAIN_MENU_BUTTON_RISK:
         await send_screen(
             context,
@@ -1142,16 +994,6 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
             message.chat_id,
             SYSTEM_INFO_OPENED_TEXT,
             reply_markup=_build_mm_setting_keyboard_for_user(user.id),
-            parse_mode="Markdown",
-        )
-        return
-
-    if text == SUBMENU_ACCOUNT_BUTTON_TABUNG:
-        await send_screen(
-            context,
-            message.chat_id,
-            TABUNG_OPENED_TEXT,
-            reply_markup=_build_account_activity_keyboard_for_user(user.id),
             parse_mode="Markdown",
         )
         return

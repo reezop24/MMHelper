@@ -63,7 +63,6 @@ CORRECTION_OPENED_TEXT = "Balance Adjustment _dibuka_."
 SYSTEM_INFO_OPENED_TEXT = "System Info _dibuka_."
 
 RISK_CALCULATOR_OPENED_TEXT = "Risk Calculator _dibuka_."
-ACCOUNT_ACTIVITY_OPENED_TEXT = "Account Activity _dibuka_."
 PROJECT_GROW_OPENED_TEXT = "Project Grow _dibuka_."
 SET_NEW_GOAL_OPENED_TEXT = "Set New Goal _dibuka_."
 MISSION_OPENED_TEXT = "Mission _dibuka_."
@@ -82,7 +81,6 @@ EXTRA_OPENED_TEXT = "Extra _dibuka_."
 DEPOSIT_ACTIVITY_SAVED_TEXT = "Update Deposit Activitiy _dikemas kini_."
 WITHDRAWAL_ACTIVITY_SAVED_TEXT = "Update Withdrawal Activity _dikemas kini_."
 TRADING_ACTIVITY_SAVED_TEXT = "Update Trading Activity _dikemas kini_."
-TABUNG_OPENED_TEXT = "Update Tabung _dibuka_."
 
 SETUP_SAVED_TEXT = MAIN_MENU_OPENED_TEXT
 RETURNING_USER_TEXT = MAIN_MENU_OPENED_TEXT
