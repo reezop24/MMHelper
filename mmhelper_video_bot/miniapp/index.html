@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NEXT eVideo26</title>
+  <link rel="stylesheet" href="global.css" />
+  <style>
+    .brand-strip {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 10px;
+    }
+
+    .brand-strip img {
+      width: 150px;
+      max-width: 70%;
+      height: auto;
+      display: block;
+      border-radius: 10px;
+    }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .tab-btn {
+      margin: 0;
+      width: 100%;
+      border: 1px solid #7f1d1d;
+      border-radius: 10px;
+      padding: 10px 8px;
+      background: rgba(41, 17, 21, 0.88);
+      color: #fee2e2;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .tab-btn.active {
+      border-color: #ef4444;
+      background: linear-gradient(90deg, #b91c1c 0%, #ef4444 100%);
+      color: #fff;
+    }
+
+    .panel {
+      display: none;
+    }
+
+    .panel.active {
+      display: block;
+    }
+
+    .panel h2 {
+      margin: 0 0 8px;
+      font-size: 17px;
+      color: #fff5f6;
+    }
+
+    .panel ul {
+      margin: 0;
+      padding-left: 18px;
+      line-height: 1.5;
+      color: #fecdd3;
+      font-size: 14px;
+    }
+
+    .panel li + li {
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <img class="logo" src="logo.png" alt="NEXTexclusive Logo" />
+      <h1>NEXT eVideo26</h1>
+      <p>Full silibus ikut level pembelajaran.</p>
+    </header>
+
+    <section class="card">
+      <div class="brand-strip">
+        <img src="nextexc.png" alt="NEXTexclusive" />
+      </div>
+
+      <div class="tabs">
+        <button id="tabBasic" class="tab-btn active" type="button">Basic</button>
+        <button id="tabIntermediate" class="tab-btn" type="button">Intermediate</button>
+        <button id="tabAdvanced" class="tab-btn" type="button">Advanced</button>
+      </div>
+
+      <div id="panelBasic" class="panel active">
+        <h2>Basic</h2>
+        <ul>
+          <li>Video 01 - Placeholder</li>
+          <li>Video 02 - Placeholder</li>
+          <li>Video 03 - Placeholder</li>
+        </ul>
+      </div>
+
+      <div id="panelIntermediate" class="panel">
+        <h2>Intermediate</h2>
+        <ul>
+          <li>Video 01 - Placeholder</li>
+          <li>Video 02 - Placeholder</li>
+          <li>Video 03 - Placeholder</li>
+        </ul>
+      </div>
+
+      <div id="panelAdvanced" class="panel">
+        <h2>Advanced</h2>
+        <ul>
+          <li>Video 01 - Placeholder</li>
+          <li>Video 02 - Placeholder</li>
+          <li>Video 03 - Placeholder</li>
+        </ul>
+      </div>
+
+      <p id="status" class="status" aria-live="polite"></p>
+    </section>
+  </main>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
+

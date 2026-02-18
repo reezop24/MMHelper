@@ -1,0 +1,82 @@
+:root {
+  --bg: #090607;
+  --panel: #161012;
+  --panel-soft: #261418;
+  --text: #f3f4f6;
+  --muted: #d1b8bf;
+  --accent-main: #c62828;
+  --accent-main-2: #ef4444;
+  --border-card: #5a2a33;
+  --border-input: #6f3741;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background:
+    radial-gradient(circle at 82% 12%, rgba(153, 27, 27, 0.25) 0%, rgba(153, 27, 27, 0) 42%),
+    radial-gradient(circle at 18% 26%, rgba(127, 29, 29, 0.2) 0%, rgba(127, 29, 29, 0) 38%),
+    linear-gradient(180deg, #070405 0%, #0a0607 52%, var(--bg) 100%);
+  color: var(--text);
+}
+
+.page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px 16px 44px;
+}
+
+.hero {
+  margin-bottom: 14px;
+  text-align: center;
+}
+
+.logo {
+  width: 140px;
+  height: 140px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto 10px;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: 30px;
+}
+
+.hero p {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
+.card {
+  background: linear-gradient(160deg, var(--panel) 0%, var(--panel-soft) 100%);
+  border: 1px solid var(--border-card);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow:
+    0 10px 24px rgba(0, 0, 0, 0.38),
+    0 0 0 1px rgba(132, 49, 61, 0.22) inset;
+}
+
+.status {
+  min-height: 20px;
+  margin: 8px 0 0;
+  color: #fda4af;
+}
+
+@media (max-width: 640px) {
+  .logo {
+    width: 120px;
+    height: 120px;
+  }
+
+  .hero h1 {
+    font-size: 24px;
+  }
+}
+

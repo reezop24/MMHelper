@@ -1,0 +1,16 @@
+[Unit]
+Description=MMHELPER Video Telegram Bot
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/mmhelper/mmhelper_video_bot
+ExecStart=/root/mmhelper/mmhelper_video_bot/run_video_bot.sh
+Restart=always
+RestartSec=3
+User=root
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
+
