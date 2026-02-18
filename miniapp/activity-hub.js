@@ -182,6 +182,10 @@
     });
     statusEl.textContent = "";
     syncLivePreview();
+    var activePanel = panels[tabId];
+    if (activePanel && typeof activePanel.scrollIntoView === "function") {
+      activePanel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   }
 
   function setTradingMode(mode) {
