@@ -353,7 +353,11 @@ def update_submission_fields(submission_id: str, fields: dict) -> dict | None:
 
 
 def render_admin_submission_text(item: dict) -> str:
-    status_text = str(item.get("status") or "pending").upper()
+    raw_status = str(item.get("status") or "pending").lower()
+    status_text = {
+        "approved": "✅ APPROVED",
+        "rejected": "❌ REJECTED",
+    }.get(raw_status, raw_status.upper())
     user_id = item.get("user_id")
     username = item.get("telegram_username") or "-"
     username_text = f"@{username}" if username != "-" else "-"
@@ -734,9 +738,9 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 logger.exception("Failed to send status update to user")
 
         status_label = {
-            "approved": "APPROVED",
+            "approved": "✅ APPROVED",
             "pending": "PENDING",
-            "rejected": "REJECTED",
+            "rejected": "❌ REJECTED",
         }.get(status, status.upper())
         if status == "approved":
             refreshed = get_submission(submission_id)
@@ -745,6 +749,12 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                     render_admin_submission_text(refreshed),
                     reply_markup=approved_admin_keyboard(submission_id),
                 )
+            return
+
+        if status == "rejected":
+            refreshed = get_submission(submission_id)
+            if refreshed:
+                await query.message.edit_text(render_admin_submission_text(refreshed))
             return
 
         await refresh_admin_submission_message(context, submission_id)
