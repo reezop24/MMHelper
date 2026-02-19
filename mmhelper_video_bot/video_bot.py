@@ -11,7 +11,7 @@ from pathlib import Path
 from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
-from telegram import KeyboardButton, ReplyKeyboardMarkup, Update, WebAppInfo
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, Update, WebAppInfo
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
 
 from texts import (
@@ -55,6 +55,7 @@ KNOWN_USERS_PATH = Path(__file__).with_name("known_users.json")
 SCHEDULED_NOTIFICATIONS_PATH = Path(__file__).with_name("scheduled_notifications.json")
 AUTO_DELETE_NOTICES_PATH = Path(__file__).with_name("auto_delete_notices.json")
 VIDEO_STATUS_PATH = Path(__file__).with_name("video_status.json")
+DEFAULT_VIP_WHITELIST_PATH = Path(__file__).resolve().parent.parent / "mmhelper_sidebot" / "sidebot_vip_whitelist.json"
 
 
 def load_local_env() -> None:
@@ -157,12 +158,61 @@ def get_daftar_next_webapp_url() -> str:
     return f"{base}{sep}admin_bot_url={quote(admin_bot_url, safe='')}"
 
 
+def get_mmhelper_bot_url() -> str:
+    raw = (os.getenv("VIDEO_MMHELPER_BOT_URL") or "").strip()
+    if raw.startswith("https://t.me/"):
+        return raw
+    return ""
+
+
 def get_bot_timezone() -> ZoneInfo:
     raw = (os.getenv("VIDEO_BOT_TIMEZONE") or "Asia/Kuala_Lumpur").strip()
     try:
         return ZoneInfo(raw)
     except Exception:
         return ZoneInfo("UTC")
+
+
+def get_vip_whitelist_path() -> Path:
+    raw = (os.getenv("VIDEO_VIP_WHITELIST_PATH") or "").strip()
+    if raw:
+        return Path(raw).expanduser()
+    return DEFAULT_VIP_WHITELIST_PATH
+
+
+def _load_vip_whitelist_data() -> dict:
+    path = get_vip_whitelist_path()
+    if not path.exists():
+        return {}
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def has_next_topic_access(user_id: int | None) -> bool:
+    if not isinstance(user_id, int):
+        return False
+    # Admin always has access.
+    if get_admin_user_id() == user_id:
+        return True
+
+    data = _load_vip_whitelist_data()
+    user_key = str(user_id)
+    for tier in ("vip2", "vip3"):
+        tier_obj = data.get(tier)
+        if not isinstance(tier_obj, dict):
+            continue
+        users = tier_obj.get("users")
+        if not isinstance(users, dict):
+            continue
+        row = users.get(user_key)
+        if isinstance(row, dict):
+            status = str(row.get("status") or "active").strip().lower()
+            if status in {"", "active"}:
+                return True
+    return False
 
 
 def parse_local_schedule_to_epoch(date_value: str, time_value: str) -> int:
@@ -264,18 +314,19 @@ def _video_status_payload() -> str:
     return json.dumps(data, separators=(",", ":"))
 
 
-def get_evideo_webapp_url_with_topic_ids() -> str:
+def get_evideo_webapp_url_with_topic_ids(user_id: int | None = None) -> str:
     base = get_evideo_webapp_url()
     if not base:
         return ""
     encoded_payload = quote(_topic_message_ids_payload(), safe="")
     encoded_status = quote(_video_status_payload(), safe="")
+    next_access = "1" if has_next_topic_access(user_id) else "0"
     sep = "&" if "?" in base else "?"
-    return f"{base}{sep}topic_ids={encoded_payload}&video_status={encoded_status}"
+    return f"{base}{sep}topic_ids={encoded_payload}&video_status={encoded_status}&next_access={next_access}"
 
 
-def main_menu_keyboard(show_admin_panel: bool = False) -> ReplyKeyboardMarkup:
-    evideo_url = get_evideo_webapp_url_with_topic_ids()
+def main_menu_keyboard(show_admin_panel: bool = False, user_id: int | None = None) -> ReplyKeyboardMarkup:
+    evideo_url = get_evideo_webapp_url_with_topic_ids(user_id)
     if evideo_url:
         evideo_button = KeyboardButton(MENU_EVIDEO, web_app=WebAppInfo(url=evideo_url))
     else:
@@ -333,8 +384,8 @@ def level_menu_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
 
-def topic_navigation_keyboard() -> ReplyKeyboardMarkup:
-    evideo_url = get_evideo_webapp_url_with_topic_ids()
+def topic_navigation_keyboard(user_id: int | None = None) -> ReplyKeyboardMarkup:
+    evideo_url = get_evideo_webapp_url_with_topic_ids(user_id)
     if evideo_url:
         pick_button = KeyboardButton(MENU_TOPIC_PICK, web_app=WebAppInfo(url=evideo_url))
     else:
@@ -674,13 +725,27 @@ async def _send_topic_video(
     chat_id: int,
     level: str,
     topic_no: int,
+    user_id: int | None = None,
 ) -> None:
     topic = _find_level_topic(level, topic_no)
     if not topic:
         await context.bot.send_message(
             chat_id=chat_id,
             text="Topik tak dijumpai.",
-            reply_markup=topic_navigation_keyboard(),
+            reply_markup=topic_navigation_keyboard(user_id),
+        )
+        return
+
+    if bool(topic.get("next_only")) and not has_next_topic_access(user_id):
+        context.user_data["last_topic_level"] = level
+        context.user_data["last_topic_no"] = topic_no
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=(
+                "🔒 Topik ini khas untuk NEXT access.\n"
+                "Akses dibuka untuk VIP2 atau VIP3."
+            ),
+            reply_markup=topic_navigation_keyboard(user_id),
         )
         return
 
@@ -689,7 +754,7 @@ async def _send_topic_video(
         await context.bot.send_message(
             chat_id=chat_id,
             text="VIDEO_DB_GROUP_ID belum diset dalam .env.",
-            reply_markup=topic_navigation_keyboard(),
+            reply_markup=topic_navigation_keyboard(user_id),
         )
         return
 
@@ -701,7 +766,7 @@ async def _send_topic_video(
         await context.bot.send_message(
             chat_id=chat_id,
             text="❌ Video ini belum tersedia, akan dikemaskini kemudian.",
-            reply_markup=topic_navigation_keyboard(),
+            reply_markup=topic_navigation_keyboard(user_id),
         )
         return
 
@@ -717,7 +782,7 @@ async def _send_topic_video(
         await context.bot.send_message(
             chat_id=chat_id,
             text=f"Gagal tarik video Topik {topic_no}. Semak message_id/group id.",
-            reply_markup=topic_navigation_keyboard(),
+            reply_markup=topic_navigation_keyboard(user_id),
         )
         return
 
@@ -740,7 +805,7 @@ async def _send_topic_video(
     await context.bot.send_message(
         chat_id=chat_id,
         text=f"✅ Topik {topic_no}: {topic_title}",
-        reply_markup=topic_navigation_keyboard(),
+        reply_markup=topic_navigation_keyboard(user_id),
     )
 
 
@@ -750,9 +815,10 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     _register_known_user_from_update(update)
     await _purge_auto_delete_notices_for_chat(context, message.chat_id)
+    user_id = update.effective_user.id if update.effective_user else None
     await message.reply_text(
         MAIN_MENU_TEXT,
-        reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update)),
+        reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update), user_id=user_id),
     )
 
 
@@ -775,6 +841,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
     _register_known_user_from_update(update)
     await _purge_auto_delete_notices_for_chat(context, message.chat_id)
+    user_id = update.effective_user.id if update.effective_user else None
     text = message.text.strip()
     lowered = text.lower()
 
@@ -785,14 +852,14 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if text == MENU_TOPIC_MAIN:
         await message.reply_text(
             MAIN_MENU_TEXT,
-            reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update)),
+            reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update), user_id=user_id),
         )
         return
     if text == MENU_TOPIC_PICK:
         if not bool(context.user_data.get("topic_session_active")):
             await message.reply_text(
                 "Sila buka miniapp eVideo dulu dan pilih topik.",
-                reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update)),
+                reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update), user_id=user_id),
             )
             return
         await message.reply_text(EVIDEO_MENU_TEXT, reply_markup=level_menu_keyboard())
@@ -801,7 +868,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         if not bool(context.user_data.get("topic_session_active")):
             await message.reply_text(
                 "Sila pilih topik melalui miniapp terlebih dahulu.",
-                reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update)),
+                reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update), user_id=user_id),
             )
             return
         level = str(context.user_data.get("last_topic_level") or "basic")
@@ -809,7 +876,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         if current_topic <= 0:
             await message.reply_text(
                 "Belum ada topik dipilih. Pilih topik dulu dari miniapp.",
-                reply_markup=topic_navigation_keyboard(),
+                reply_markup=topic_navigation_keyboard(user_id),
             )
             return
         next_topic = current_topic - 1 if text == MENU_TOPIC_PREV else current_topic + 1
@@ -817,10 +884,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         if next_topic < 1 or next_topic > len(level_topics):
             await message.reply_text(
                 "Tiada topik lagi untuk arah ini.",
-                reply_markup=topic_navigation_keyboard(),
+                reply_markup=topic_navigation_keyboard(user_id),
             )
             return
-        await _send_topic_video(context, message.chat_id, level, next_topic)
+        await _send_topic_video(context, message.chat_id, level, next_topic, user_id=user_id)
         return
 
     if text == MENU_EVIDEO:
@@ -829,20 +896,28 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if text == MENU_INTRADAY:
         await message.reply_text(
             COMING_SOON_INTRADAY,
-            reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update)),
+            reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update), user_id=user_id),
         )
         return
     if text == MENU_FIBO:
         await message.reply_text(
             COMING_SOON_FIBO,
-            reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update)),
+            reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update), user_id=user_id),
         )
         return
     if text == MENU_MMHELPER:
+        mmhelper_url = get_mmhelper_bot_url()
+        if not mmhelper_url:
+            await message.reply_text(
+                "Link MM Helper belum diset (VIDEO_MMHELPER_BOT_URL).",
+                reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update), user_id=user_id),
+            )
+            return
         await message.reply_text(
-            "🤖 MM Helper <i>(coming soon)</i>",
-            reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update)),
-            parse_mode="HTML",
+            "Tekan butang di bawah untuk buka MM Helper.",
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton(text="Buka MM Helper", url=mmhelper_url)]]
+            ),
         )
         return
     if text == MENU_ADMIN:
@@ -850,12 +925,12 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         if not daftar_url:
             await message.reply_text(
                 "Daftar NEXT miniapp URL belum diset.",
-                reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update)),
+                reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update), user_id=user_id),
             )
             return
         await message.reply_text(
             "Sila buka miniapp Daftar NEXT untuk teruskan pendaftaran.",
-            reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update)),
+            reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update), user_id=user_id),
         )
         return
     if text == MENU_ADMIN_PANEL:
@@ -956,13 +1031,13 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if text == MENU_BACK_MAIN:
         await message.reply_text(
             MAIN_MENU_TEXT,
-            reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update)),
+            reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update), user_id=user_id),
         )
         return
     if text == MENU_ADMIN_BACK:
         await message.reply_text(
             MAIN_MENU_TEXT,
-            reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update)),
+            reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update), user_id=user_id),
         )
         return
 
@@ -983,7 +1058,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
     await message.reply_text(
         MAIN_MENU_TEXT,
-        reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update)),
+        reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update), user_id=user_id),
     )
 
 
@@ -993,6 +1068,7 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
     _register_known_user_from_update(update)
     await _purge_auto_delete_notices_for_chat(context, message.chat_id)
+    user_id = update.effective_user.id if update.effective_user else None
     raw = str(message.web_app_data.data or "").strip()
     if not raw:
         return
@@ -1002,14 +1078,14 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
     except json.JSONDecodeError:
         await message.reply_text(
             "Data miniapp tak sah.",
-            reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update)),
+            reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update), user_id=user_id),
         )
         return
 
     if not isinstance(payload, dict):
         await message.reply_text(
             "Data miniapp tak sah.",
-            reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update)),
+            reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update), user_id=user_id),
         )
         return
 
@@ -1017,7 +1093,7 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if payload_type == "video_bot_back_to_main_menu":
         await message.reply_text(
             MAIN_MENU_TEXT,
-            reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update)),
+            reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update), user_id=user_id),
         )
         return
 
@@ -1032,11 +1108,11 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if not level or topic_no <= 0:
             await message.reply_text(
                 "Pilihan topik tak sah.",
-                reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update)),
+                reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update), user_id=user_id),
             )
             return
         context.user_data["topic_session_active"] = True
-        await _send_topic_video(context, message.chat_id, level, topic_no)
+        await _send_topic_video(context, message.chat_id, level, topic_no, user_id=user_id)
         return
 
     if payload_type == "push_notification_schedule":
@@ -1151,7 +1227,7 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     await message.reply_text(
         "Action miniapp diterima.",
-        reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update)),
+        reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update), user_id=user_id),
     )
 
 

@@ -435,10 +435,20 @@
     }
   }
 
+  function parseNextAccessFromUrl() {
+    try {
+      var raw = new URLSearchParams(window.location.search).get("next_access");
+      return String(raw || "0") === "1";
+    } catch (err) {
+      return false;
+    }
+  }
+
   // UI availability comes from bot-injected URL param topic_ids.
   // Bot-side validation remains authoritative (video_catalog.py).
   var TOPIC_MESSAGE_IDS = parseTopicMessageIdsFromUrl();
   var VIDEO_STATUS = parseVideoStatusFromUrl();
+  var HAS_NEXT_ACCESS = parseNextAccessFromUrl();
 
   var tabs = [
     { btn: document.getElementById("tabBasic"), panel: document.getElementById("panelBasic") },
@@ -519,6 +529,10 @@
         badge.alt = "NEXT only";
         badge.className = "next-badge";
         btn.appendChild(badge);
+        if (!HAS_NEXT_ACCESS) {
+          btn.classList.add("is-unavailable");
+          btn.disabled = true;
+        }
       }
 
       btn.addEventListener("click", function () {
