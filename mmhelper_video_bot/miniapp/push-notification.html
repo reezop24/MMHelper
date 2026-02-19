@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Push Notification</title>
+  <link rel="stylesheet" href="global.css" />
+  <style>
+    .top-nav {
+      display: flex;
+      justify-content: flex-start;
+      margin-bottom: 8px;
+    }
+
+    .top-back-btn {
+      margin: 0;
+      width: auto;
+      min-width: 0;
+      border: 1px solid #6a2d36;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #fee2e2;
+      background: rgba(39, 16, 20, 0.92);
+      line-height: 1;
+    }
+
+    .hero {
+      margin-bottom: 14px;
+      text-align: center;
+    }
+
+    .logo {
+      width: 120px;
+      height: 120px;
+      object-fit: contain;
+      display: block;
+      margin: 0 auto 10px;
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+
+    .hero p {
+      margin: 8px 0 0;
+      color: #d1b8bf;
+    }
+
+    .field {
+      margin-bottom: 12px;
+    }
+
+    .field label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #ffe4e6;
+    }
+
+    input[type="date"],
+    input[type="time"],
+    textarea {
+      width: 100%;
+      border: 1px solid #6f3741;
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: #0f0b0d;
+      color: #f3f4f6;
+      font-size: 14px;
+    }
+
+    textarea {
+      min-height: 120px;
+      resize: vertical;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      border: 1px solid #5a2a33;
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: rgba(20, 13, 15, 0.8);
+      margin-bottom: 12px;
+    }
+
+    .submit-btn {
+      width: 100%;
+      border: 1px solid #ef4444;
+      border-radius: 10px;
+      padding: 11px 12px;
+      background: linear-gradient(90deg, #991b1b 0%, #dc2626 100%);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .status {
+      min-height: 20px;
+      margin-top: 10px;
+      color: #fda4af;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="top-nav">
+      <button id="topBackBtn" type="button" class="top-back-btn">← Back</button>
+    </div>
+
+    <header class="hero">
+      <img class="logo" src="logo.png" alt="NEXTexclusive Logo" />
+      <h1>Push Notification</h1>
+      <p>Hantar mesej ikut tarikh dan masa yang anda tetapkan.</p>
+    </header>
+
+    <section class="card">
+      <div class="field">
+        <label for="pushDate">Tarikh</label>
+        <input id="pushDate" type="date" required />
+      </div>
+
+      <div class="field">
+        <label for="pushTime">Masa</label>
+        <input id="pushTime" type="time" required />
+      </div>
+
+      <div class="field">
+        <label for="pushMessage">Mesej</label>
+        <textarea id="pushMessage" maxlength="3500" placeholder="Tulis mesej push notification..."></textarea>
+      </div>
+
+      <div class="toggle-row">
+        <label for="autoDeleteToggle">Auto delete bila user tekan menu</label>
+        <input id="autoDeleteToggle" type="checkbox" />
+      </div>
+
+      <button id="submitBtn" class="submit-btn" type="button">Submit Push Notification</button>
+      <p id="status" class="status" aria-live="polite"></p>
+    </section>
+  </main>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    (function () {
+      var tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+      if (tg) {
+        tg.ready();
+        tg.expand();
+      }
+
+      var dateEl = document.getElementById("pushDate");
+      var timeEl = document.getElementById("pushTime");
+      var msgEl = document.getElementById("pushMessage");
+      var autoEl = document.getElementById("autoDeleteToggle");
+      var submitBtn = document.getElementById("submitBtn");
+      var statusEl = document.getElementById("status");
+      var backBtn = document.getElementById("topBackBtn");
+
+      function pad(n) { return String(n).padStart(2, "0"); }
+      var now = new Date();
+      dateEl.value = now.getFullYear() + "-" + pad(now.getMonth() + 1) + "-" + pad(now.getDate());
+      timeEl.value = pad(now.getHours()) + ":" + pad(now.getMinutes());
+
+      backBtn.addEventListener("click", function () {
+        var payload = { type: "video_bot_back_to_main_menu" };
+        if (tg) {
+          tg.sendData(JSON.stringify(payload));
+          tg.close();
+          return;
+        }
+        statusEl.textContent = "Preview mode: buka dari Telegram.";
+      });
+
+      submitBtn.addEventListener("click", function () {
+        var message = (msgEl.value || "").trim();
+        if (!dateEl.value || !timeEl.value || !message) {
+          statusEl.textContent = "Sila isi tarikh, masa dan mesej.";
+          return;
+        }
+        var payload = {
+          type: "push_notification_schedule",
+          date: dateEl.value,
+          time: timeEl.value,
+          message: message,
+          auto_delete: !!autoEl.checked
+        };
+        if (tg) {
+          tg.sendData(JSON.stringify(payload));
+          statusEl.textContent = "Permintaan dihantar ke bot.";
+          return;
+        }
+        statusEl.textContent = "Preview mode: payload siap.";
+      });
+    })();
+  </script>
+</body>
+</html>
