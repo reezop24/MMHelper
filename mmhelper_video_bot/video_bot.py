@@ -32,7 +32,7 @@ MENU_EVIDEO = "🎬 NEXT eVideo26 Full Silibus"
 MENU_INTRADAY = "📈 Intraday Strategy (coming soon)"
 MENU_FIBO = "🧩 Fibo Extension Custom Strategy (coming soon)"
 MENU_MMHELPER = "🤖 MM Helper"
-MENU_ADMIN = "🛠️ Admin"
+MENU_ADMIN = "📝 Daftar NEXT"
 MENU_ADMIN_PANEL = "🔒 Admin Panel"
 MENU_ADMIN_PUSH = "📣 Push Notification"
 MENU_ADMIN_DELETE = "🗑️ Delete Video"
@@ -130,6 +130,31 @@ def get_video_status_webapp_url() -> str:
         prefix = base.rsplit("/", 1)[0]
         return f"{prefix}/video-status.html"
     return f"{base}/video-status.html"
+
+
+def get_daftar_next_webapp_url() -> str:
+    explicit = (os.getenv("VIDEO_DAFTAR_WEBAPP_URL") or "").strip()
+    if explicit.lower().startswith("https://") and "<" not in explicit and ">" not in explicit and " " not in explicit:
+        base = explicit
+    else:
+        root = get_evideo_webapp_url()
+        if not root:
+            return ""
+        if root.endswith("/"):
+            base = f"{root}daftar-next.html"
+        elif root.endswith(".html"):
+            prefix = root.rsplit("/", 1)[0]
+            base = f"{prefix}/daftar-next.html"
+        else:
+            base = f"{root}/daftar-next.html"
+
+    admin_bot_url = (os.getenv("VIDEO_ADMIN_BOT_URL") or "").strip()
+    if not admin_bot_url:
+        return base
+    if not admin_bot_url.startswith("https://t.me/"):
+        return base
+    sep = "&" if "?" in base else "?"
+    return f"{base}{sep}admin_bot_url={quote(admin_bot_url, safe='')}"
 
 
 def get_bot_timezone() -> ZoneInfo:
@@ -255,11 +280,16 @@ def main_menu_keyboard(show_admin_panel: bool = False) -> ReplyKeyboardMarkup:
         evideo_button = KeyboardButton(MENU_EVIDEO, web_app=WebAppInfo(url=evideo_url))
     else:
         evideo_button = KeyboardButton(MENU_EVIDEO)
+    daftar_url = get_daftar_next_webapp_url()
+    if daftar_url:
+        daftar_button = KeyboardButton(MENU_ADMIN, web_app=WebAppInfo(url=daftar_url))
+    else:
+        daftar_button = KeyboardButton(MENU_ADMIN)
     rows = [
         [evideo_button],
         [KeyboardButton(MENU_INTRADAY)],
         [KeyboardButton(MENU_FIBO)],
-        [KeyboardButton(MENU_MMHELPER), KeyboardButton(MENU_ADMIN)],
+        [KeyboardButton(MENU_MMHELPER), daftar_button],
     ]
     if show_admin_panel:
         rows.append([KeyboardButton(MENU_ADMIN_PANEL)])
@@ -816,10 +846,16 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         )
         return
     if text == MENU_ADMIN:
+        daftar_url = get_daftar_next_webapp_url()
+        if not daftar_url:
+            await message.reply_text(
+                "Daftar NEXT miniapp URL belum diset.",
+                reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update)),
+            )
+            return
         await message.reply_text(
-            "🛠️ Admin <i>(coming soon)</i>",
+            "Sila buka miniapp Daftar NEXT untuk teruskan pendaftaran.",
             reply_markup=main_menu_keyboard(show_admin_panel=is_admin_user(update)),
-            parse_mode="HTML",
         )
         return
     if text == MENU_ADMIN_PANEL:

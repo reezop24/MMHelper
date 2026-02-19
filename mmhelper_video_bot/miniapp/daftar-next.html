@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Daftar NEXT</title>
+  <link rel="stylesheet" href="global.css" />
+  <style>
+    .hero {
+      margin-bottom: 14px;
+      text-align: center;
+    }
+
+    .logo {
+      width: 120px;
+      height: 120px;
+      object-fit: contain;
+      display: block;
+      margin: 0 auto 10px;
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+
+    .hero p {
+      margin: 8px 0 0;
+      color: #d1b8bf;
+    }
+
+    .card p {
+      margin: 0 0 12px;
+      color: #f3f4f6;
+      line-height: 1.62;
+      font-size: 14px;
+    }
+
+    .intro {
+      text-align: left;
+      margin-bottom: 14px;
+    }
+
+    .section-title {
+      margin: 0 0 10px;
+      font-size: 15px;
+      font-weight: 800;
+      color: #ffe4e6;
+    }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .tab-btn {
+      border: 1px solid #3b2e1e;
+      border-radius: 10px;
+      padding: 9px 8px;
+      background: #121012;
+      color: #f3f4f6;
+      font-size: 12px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .tab-btn img {
+      width: 40px;
+      height: 40px;
+      object-fit: contain;
+    }
+
+    .tab-btn.with-logo {
+      padding: 7px 10px;
+      gap: 8px;
+    }
+
+    .tab-btn.active {
+      border-color: #f59e0b;
+      background: linear-gradient(90deg, #17120b 0%, #b45309 100%);
+      color: #fff7ed;
+    }
+
+    .tab-panel {
+      display: none;
+      border: 1px solid #5a2a33;
+      border-radius: 10px;
+      padding: 10px;
+      background: rgba(20, 13, 15, 0.75);
+      margin-bottom: 12px;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    .tab-panel p {
+      margin: 0;
+      font-size: 13px;
+      line-height: 1.55;
+      color: #f3f4f6;
+    }
+
+    .tab-panel h3 {
+      margin: 0 0 8px;
+      font-size: 14px;
+      color: #ffe4e6;
+    }
+
+    .tab-panel h4 {
+      margin: 10px 0 6px;
+      font-size: 13px;
+      color: #fde68a;
+    }
+
+    .terms-list {
+      margin: 0;
+      padding-left: 18px;
+      font-size: 13px;
+      line-height: 1.55;
+      color: #f3f4f6;
+    }
+
+    .terms-list li + li {
+      margin-top: 6px;
+    }
+
+    .go-btn {
+      width: 100%;
+      border: 1px solid #f59e0b;
+      border-radius: 10px;
+      padding: 11px 12px;
+      background: linear-gradient(90deg, #090909 0%, #d97706 100%);
+      color: #fff7ed;
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .status {
+      min-height: 20px;
+      margin-top: 10px;
+      color: #fda4af;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header class="hero">
+      <img class="logo" src="logo.png" alt="NEXTexclusive Logo" />
+      <h1>Daftar NEXT</h1>
+      <p>Sila lengkapkan pendaftaran anda di bot admin.</p>
+    </header>
+
+    <section class="card">
+      <div class="intro">
+        <p>Untuk menikmati akses penuh ke NEXT eVideo26, anda boleh memilih sama ada mendaftar sebagai NEXTexclusive Member bagi menikmati kelebihan komuniti premium, atau membuat pembelian secara individu (one-time purchase) tanpa keahlian.</p>
+        <p>Terma dan syarat bagi setiap kategori adalah seperti yang dinyatakan di bawah.</p>
+      </div>
+
+      <h2 class="section-title">Terma dan Syarat</h2>
+      <div class="tabs">
+        <button id="tabDaftar" class="tab-btn with-logo active" type="button" aria-label="Daftar">
+          <span>Daftar</span>
+          <img src="nextexc.png" alt="NEXTexclusive" />
+        </button>
+        <button id="tabOneTime" class="tab-btn" type="button">One Time Purchase</button>
+      </div>
+
+      <div id="panelDaftar" class="tab-panel active">
+        <h3>NEXTexclusive Membership</h3>
+        <h4>Kelebihan Keahlian</h4>
+        <p>Sebagai NEXTexclusive Member, anda akan menikmati akses premium merangkumi:</p>
+        <ul class="terms-list">
+          <li>✅ Akses penuh ke semua kandungan eksklusif yang memerlukan akses NEXTexclusive</li>
+          <li>✅ Akses penuh ke sistem MM Helper</li>
+          <li>✅ Akses penuh ke NEXT eVideo 26</li>
+          <li>✅ Penyertaan dalam Webinar, Seminar, TradeTalk serta semua aktiviti rasmi di bawah rangkaian NEXTexclusive</li>
+          <li>✅ Semua keistimewaan ini diberikan selama 45 hari dan akan diperbaharui secara automatik selagi anda kekal aktif sebagai klien AMarkets</li>
+        </ul>
+
+        <h4>Syarat Kelayakan</h4>
+        <p>Untuk melayakkan diri sebagai NEXTexclusive Member:</p>
+        <ul class="terms-list">
+          <li>✔ Daftar akaun AMarkets di bawah IB Reezo</li>
+          <li>✔ Pelanggan baharu AMarkets: Deposit minimum USD100 (pertama kali sahaja)</li>
+          <li>✔ Pelanggan AMarkets sedia ada (Change IB ke Reezo): Deposit minimum USD100 (pertama kali sahaja)</li>
+          <li>✔ Klien Reezo sedia ada di AMarkets: Deposit minimum USD50 (pertama kali sahaja)</li>
+          <li>✔ Kekal aktif sebagai klien AMarkets untuk memastikan pembaharuan keahlian secara automatik</li>
+        </ul>
+
+        <p style="margin-top:10px;">Jika anda memenuhi syarat dan bersetuju dengan terma di atas, sila tekan butang TERUSKAN untuk melengkapkan pendaftaran NEXTexclusive Membership.</p>
+      </div>
+      <div id="panelOneTime" class="tab-panel">
+        <h3>One Time Purchase</h3>
+        <p>Bagi anda yang tidak ingin mendaftar sebagai NEXTexclusive Member, anda juga boleh mendapatkan akses penuh kepada NEXT eVideo 26 melalui pembelian terus (one-time purchase).</p>
+
+        <p>Dengan pembelian ini, anda akan menerima:</p>
+        <ul class="terms-list">
+          <li>✅ Akses penuh ke keseluruhan modul NEXT eVideo 26</li>
+          <li>✅ Akses tanpa had masa (permanent access)</li>
+          <li>✅ Tiada keperluan deposit atau pendaftaran broker</li>
+          <li>✅ Tiada pembaharuan berkala - bayar sekali sahaja untuk akses selamanya</li>
+        </ul>
+
+        <h4>Syarat Pembelian</h4>
+        <ul class="terms-list">
+          <li>💳 Bayaran sebanyak RM350 (sekali bayaran sahaja)</li>
+          <li>🔐 Akses akan diberikan selepas pembayaran disahkan</li>
+          <li>📌 Akses adalah untuk kegunaan individu dan tidak boleh dipindah milik</li>
+        </ul>
+
+        <p style="margin-top:10px;">Sekiranya anda bersetuju dengan terma di atas dan ingin mendapatkan akses penuh secara kekal, sila tekan butang TERUSKAN untuk meneruskan proses pembelian.</p>
+      </div>
+
+      <button id="goAdminBtn" class="go-btn" type="button">Teruskan</button>
+      <p id="statusText" class="status" aria-live="polite"></p>
+    </section>
+  </main>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    (function () {
+      var tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+      if (tg) {
+        tg.ready();
+        tg.expand();
+      }
+
+      var statusEl = document.getElementById("statusText");
+      var goBtn = document.getElementById("goAdminBtn");
+      var tabDaftar = document.getElementById("tabDaftar");
+      var tabOneTime = document.getElementById("tabOneTime");
+      var panelDaftar = document.getElementById("panelDaftar");
+      var panelOneTime = document.getElementById("panelOneTime");
+      var adminUrl = new URLSearchParams(window.location.search).get("admin_bot_url") || "";
+
+      function activateTab(name) {
+        var isDaftar = name === "daftar";
+        tabDaftar.classList.toggle("active", isDaftar);
+        panelDaftar.classList.toggle("active", isDaftar);
+        tabOneTime.classList.toggle("active", !isDaftar);
+        panelOneTime.classList.toggle("active", !isDaftar);
+      }
+
+      tabDaftar.addEventListener("click", function () { activateTab("daftar"); });
+      tabOneTime.addEventListener("click", function () { activateTab("one"); });
+
+      goBtn.addEventListener("click", function () {
+        if (!adminUrl || adminUrl.indexOf("https://t.me/") !== 0) {
+          statusEl.textContent = "Link bot admin belum diset.";
+          return;
+        }
+        if (tg && typeof tg.openTelegramLink === "function") {
+          tg.openTelegramLink(adminUrl);
+          return;
+        }
+        window.location.href = adminUrl;
+      });
+    })();
+  </script>
+</body>
+</html>
