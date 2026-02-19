@@ -398,6 +398,19 @@ def topic_navigation_keyboard(user_id: int | None = None) -> ReplyKeyboardMarkup
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
 
+def vip_locked_keyboard() -> ReplyKeyboardMarkup:
+    daftar_url = get_daftar_next_webapp_url()
+    if daftar_url:
+        daftar_button = KeyboardButton(MENU_ADMIN, web_app=WebAppInfo(url=daftar_url))
+    else:
+        daftar_button = KeyboardButton(MENU_ADMIN)
+    rows = [
+        [daftar_button],
+        [KeyboardButton(MENU_TOPIC_MAIN)],
+    ]
+    return ReplyKeyboardMarkup(rows, resize_keyboard=True)
+
+
 def _message_link(group_id: int, message_id: int) -> str:
     # Telegram deep-link format for private supergroup messages.
     group_text = str(group_id)
@@ -743,9 +756,10 @@ async def _send_topic_video(
             chat_id=chat_id,
             text=(
                 "🔒 Topik ini khas untuk NEXT access.\n"
-                "Akses dibuka untuk VIP2 atau VIP3."
+                "Akses dibuka untuk VIP2 atau VIP3.\n\n"
+                "Sila daftar NEXT untuk unlock kandungan VIP."
             ),
-            reply_markup=topic_navigation_keyboard(user_id),
+            reply_markup=vip_locked_keyboard(),
         )
         return
 

@@ -531,7 +531,6 @@
         btn.appendChild(badge);
         if (!HAS_NEXT_ACCESS) {
           btn.classList.add("is-unavailable");
-          btn.disabled = true;
         }
       }
 
