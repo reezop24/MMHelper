@@ -2,7 +2,11 @@
 
 from telegram import KeyboardButton, ReplyKeyboardMarkup, WebAppInfo
 
-from settings import get_activity_hub_webapp_url, get_risk_calculator_webapp_url
+from settings import (
+    get_activity_hub_webapp_url,
+    get_next_exclusive_webapp_url,
+    get_risk_calculator_webapp_url,
+)
 
 ADMIN_USER_IDS = {627116869}
 
@@ -13,6 +17,8 @@ MAIN_MENU_BUTTON_STATISTIC = "📊 Records & Reports"
 MAIN_MENU_BUTTON_EXTRA = "🧰 Extra"
 MAIN_MENU_BUTTON_ADMIN_PANEL = "🛡️ Admin Panel"
 MAIN_MENU_BUTTON_ACTIVITY_HUB = "🧭 Activity Hub"
+MAIN_MENU_BUTTON_VIDEO_TUTORIAL = "🎬 Video Tutorial (coming soon)"
+MAIN_MENU_BUTTON_NEXT_EXCLUSIVE = "⭐ NEXTexclusive"
 
 SUBMENU_MM_BUTTON_INITIAL_CAPITAL_RESET = "♻️ Reset All Setting"
 SUBMENU_MM_BUTTON_CORRECTION = "⚖️ Balance Adjustment"
@@ -36,6 +42,11 @@ SUBMENU_STAT_BUTTON_TRANSACTION_HISTORY = "🧾 Transaction History"
 SUBMENU_STAT_BUTTON_ACCOUNT_SUMMARY = "🧾 Account Summary"
 SUBMENU_STAT_BUTTON_WEEKLY_REPORTS = "📆 Weekly Reports (beta)"
 SUBMENU_STAT_BUTTON_MONTHLY_REPORTS = "🗓️ Monthly Reports (beta)"
+SUBMENU_EXTRA_BUTTON_FIBO_DEWA = "🌀 Fibo Dewa (coming soon)"
+SUBMENU_EXTRA_BUTTON_FIBO_EXTENSION = "📐 Fibo Extension (coming soon)"
+SUBMENU_EXTRA_BUTTON_SCALPING_STRATEGY = "⚡ Scalping Strategy (coming soon)"
+SUBMENU_EXTRA_BUTTON_TRADING_ADVICE = "💡 Trading Advice (coming soon)"
+SUBMENU_EXTRA_BUTTON_EDUCATION_VIDEO = "🎓 Education Video (coming soon)"
 
 def is_admin_user(user_id: int | None) -> bool:
     return user_id in ADMIN_USER_IDS
@@ -98,6 +109,16 @@ def main_menu_keyboard(user_id: int | None = None) -> ReplyKeyboardMarkup:
     else:
         activity_hub_button = MAIN_MENU_BUTTON_ACTIVITY_HUB
 
+    next_exclusive_url = get_next_exclusive_webapp_url()
+    next_exclusive_button: KeyboardButton | str
+    if next_exclusive_url:
+        next_exclusive_button = KeyboardButton(
+            MAIN_MENU_BUTTON_NEXT_EXCLUSIVE,
+            web_app=WebAppInfo(url=next_exclusive_url),
+        )
+    else:
+        next_exclusive_button = MAIN_MENU_BUTTON_NEXT_EXCLUSIVE
+
     rows = [
         [
             activity_hub_button,
@@ -111,6 +132,8 @@ def main_menu_keyboard(user_id: int | None = None) -> ReplyKeyboardMarkup:
             ),
         ],
         [MAIN_MENU_BUTTON_EXTRA, MAIN_MENU_BUTTON_MM_SETTING],
+        [MAIN_MENU_BUTTON_VIDEO_TUTORIAL],
+        [next_exclusive_button],
     ]
     if is_admin_user(user_id):
         rows.append([MAIN_MENU_BUTTON_ADMIN_PANEL])
@@ -226,6 +249,18 @@ def records_reports_keyboard(account_summary_url: str, transaction_history_url: 
         ],
         [SUBMENU_STAT_BUTTON_WEEKLY_REPORTS],
         [SUBMENU_STAT_BUTTON_MONTHLY_REPORTS],
+        [SUBMENU_MM_BUTTON_BACK_MAIN],
+    ]
+    return ReplyKeyboardMarkup(rows, resize_keyboard=True)
+
+
+def extra_keyboard() -> ReplyKeyboardMarkup:
+    rows = [
+        [SUBMENU_EXTRA_BUTTON_FIBO_DEWA],
+        [SUBMENU_EXTRA_BUTTON_FIBO_EXTENSION],
+        [SUBMENU_EXTRA_BUTTON_SCALPING_STRATEGY],
+        [SUBMENU_EXTRA_BUTTON_TRADING_ADVICE],
+        [SUBMENU_EXTRA_BUTTON_EDUCATION_VIDEO],
         [SUBMENU_MM_BUTTON_BACK_MAIN],
     ]
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)

@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>NEXTexclusive</title>
+  <link rel="stylesheet" href="global.css" />
+  <style>
+    .next-logo-wrap {
+      margin: 0 0 12px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .next-logo {
+      width: 170px;
+      max-width: 78%;
+      height: auto;
+      object-fit: contain;
+      filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.35));
+    }
+
+    .single-tab {
+      margin-top: 12px;
+      border: 1px solid rgba(89, 129, 191, 0.7);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: rgba(10, 32, 68, 0.85);
+      color: #e9f2ff;
+      font-size: 13px;
+      font-weight: 700;
+      text-align: center;
+    }
+
+    .content-card p {
+      margin: 0;
+      line-height: 1.55;
+      color: #d9e8ff;
+      font-size: 14px;
+    }
+
+    .content-card p + p {
+      margin-top: 10px;
+    }
+
+    .feature-list {
+      margin: 8px 0 0;
+      padding-left: 18px;
+      color: #d9e8ff;
+      line-height: 1.55;
+      font-size: 14px;
+    }
+
+    .feature-list li + li {
+      margin-top: 6px;
+    }
+
+    .cta-btn {
+      margin-top: 16px;
+      width: 100%;
+      border: 1px solid #f8a24d;
+      border-radius: 12px;
+      padding: 11px 12px;
+      background: linear-gradient(90deg, #f59e0b 0%, #f97316 100%);
+      color: #2a1300;
+      font-size: 14px;
+      font-weight: 800;
+      line-height: 1.2;
+      text-align: center;
+    }
+
+    .detail-card {
+      margin-top: 12px;
+      border: 1px solid rgba(80, 122, 186, 0.5);
+      border-radius: 12px;
+      background: rgba(8, 24, 52, 0.82);
+      padding: 12px;
+    }
+
+    .detail-card p {
+      margin: 0;
+      line-height: 1.55;
+      color: #d9e8ff;
+      font-size: 14px;
+    }
+
+    .detail-list {
+      margin: 8px 0 0;
+      padding-left: 18px;
+      color: #d9e8ff;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    .detail-list li + li {
+      margin-top: 4px;
+    }
+
+    .cta-row {
+      margin-top: 14px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .cta-row .cta-btn {
+      margin-top: 0;
+      padding: 10px 10px;
+      font-size: 13px;
+      border-radius: 10px;
+    }
+
+    .bottom-actions {
+      margin-top: 12px;
+    }
+
+    .back-btn {
+      margin: 0;
+      width: auto;
+      min-width: 200px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid #4a70ac;
+      background: rgba(11, 34, 71, 0.9);
+      color: #e6f0ff;
+      font-size: 13px;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="top-nav">
+      <button id="topBackBtn" type="button" class="top-back-btn">← Back</button>
+    </div>
+
+    <header class="hero">
+      <img class="logo" src="logo.png" alt="MM HELPER Logo" />
+      <h1>NEXTexclusive</h1>
+      <p>Pendaftaran akses premium rangkaian NEXT.</p>
+    </header>
+
+    <section class="card content-card">
+      <div class="next-logo-wrap">
+        <img class="next-logo" src="nextexc.png" alt="NEXTexclusive" />
+      </div>
+      <p>Sebagai NEXTexclusive Member, anda akan menikmati akses premium merangkumi:</p>
+      <ul class="feature-list">
+        <li>✅ Akses penuh ke semua kandungan eksklusif yang memerlukan akses NEXTexclusive</li>
+        <li>✅ Akses penuh ke sistem MM Helper</li>
+        <li>✅ Akses penuh ke NEXT eVideo 26</li>
+        <li>✅ Penyertaan dalam Webinar, Seminar, TradeTalk serta semua aktiviti rasmi di bawah rangkaian NEXTexclusive</li>
+      </ul>
+      <div class="single-tab">NEXTexclusive eVideo Full Silibus</div>
+      <section class="detail-card">
+        <p>Koleksi Video pembelajaran penuh berperingkat yang merangkumi</p>
+        <ul class="detail-list">
+          <li>✔ 19 Topik Basic</li>
+          <li>✔ 21 Topik Intermediate</li>
+          <li>✔ 19 Topik Advanced</li>
+          <li>✔ Video strategi</li>
+          <li>✔ Video pembelajaran berperingkat</li>
+        </ul>
+      </section>
+      <div class="cta-row">
+        <button id="watchBtn" type="button" class="cta-btn">Tonton eVideo26</button>
+        <button id="registerBtn" type="button" class="cta-btn">Daftar NEXT</button>
+      </div>
+      <p id="status" class="status" aria-live="polite"></p>
+    </section>
+
+    <div class="bottom-actions">
+      <button id="bottomBackBtn" type="button" class="back-btn">⬅️ Back to Main Menu</button>
+    </div>
+  </main>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="next-exclusive.js"></script>
+</body>
+</html>

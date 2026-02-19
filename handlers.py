@@ -10,14 +10,21 @@ from telegram.ext import ContextTypes
 
 from menu import (
     MAIN_MENU_BUTTON_ADMIN_PANEL,
+    MAIN_MENU_BUTTON_NEXT_EXCLUSIVE,
     MAIN_MENU_BUTTON_EXTRA,
     MAIN_MENU_BUTTON_MM_SETTING,
     MAIN_MENU_BUTTON_PROJECT_GROW,
     MAIN_MENU_BUTTON_RISK,
     MAIN_MENU_BUTTON_STATISTIC,
+    MAIN_MENU_BUTTON_VIDEO_TUTORIAL,
     SUBMENU_ADMIN_BUTTON_BETA_RESET,
     SUBMENU_ADMIN_BUTTON_NOTIFICATION_SETTING,
     SUBMENU_ADMIN_BUTTON_STOP_ALL_NOTIFICATION,
+    SUBMENU_EXTRA_BUTTON_EDUCATION_VIDEO,
+    SUBMENU_EXTRA_BUTTON_FIBO_DEWA,
+    SUBMENU_EXTRA_BUTTON_FIBO_EXTENSION,
+    SUBMENU_EXTRA_BUTTON_SCALPING_STRATEGY,
+    SUBMENU_EXTRA_BUTTON_TRADING_ADVICE,
     SUBMENU_MM_BUTTON_BACK_MAIN,
     SUBMENU_MM_BUTTON_CORRECTION,
     SUBMENU_MM_BUTTON_SYSTEM_INFO,
@@ -31,6 +38,7 @@ from menu import (
     SUBMENU_STAT_BUTTON_TRANSACTION_HISTORY,
     SUBMENU_STAT_BUTTON_WEEKLY_REPORTS,
     admin_panel_keyboard,
+    extra_keyboard,
     is_admin_user,
     main_menu_keyboard,
     mm_helper_setting_keyboard,
@@ -1227,8 +1235,32 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
             context,
             message.chat_id,
             EXTRA_OPENED_TEXT,
-            reply_markup=main_menu_keyboard(user.id),
+            reply_markup=extra_keyboard(),
             parse_mode="Markdown",
+        )
+        return
+
+    if text in {
+        SUBMENU_EXTRA_BUTTON_FIBO_DEWA,
+        SUBMENU_EXTRA_BUTTON_FIBO_EXTENSION,
+        SUBMENU_EXTRA_BUTTON_SCALPING_STRATEGY,
+        SUBMENU_EXTRA_BUTTON_TRADING_ADVICE,
+        SUBMENU_EXTRA_BUTTON_EDUCATION_VIDEO,
+    }:
+        await send_screen(
+            context,
+            message.chat_id,
+            "Coming soon. Feature ni masih dalam pembangunan.",
+            reply_markup=extra_keyboard(),
+        )
+        return
+
+    if text == MAIN_MENU_BUTTON_VIDEO_TUTORIAL:
+        await send_screen(
+            context,
+            message.chat_id,
+            "Coming soon. Feature ni masih dalam pembangunan.",
+            reply_markup=main_menu_keyboard(user.id),
         )
         return
 

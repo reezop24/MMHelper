@@ -94,6 +94,22 @@ def get_system_info_webapp_url() -> str:
     return f"{_miniapp_base_url()}/system-info.html"
 
 
+def get_next_exclusive_webapp_url() -> str:
+    page = f"{_miniapp_base_url()}/next-exclusive.html"
+    bot_url = (os.getenv("MMHELPER_NEXTEXCLUSIVE_BOT_URL") or "").strip()
+    if not bot_url:
+        bot_url = "https://t.me/ReezoAdmin_Bot"
+    if not bot_url.startswith("https://t.me/"):
+        bot_url = "https://t.me/ReezoAdmin_Bot"
+
+    evideo_bot_url = (os.getenv("MMHELPER_EVIDEO_BOT_URL") or "").strip()
+    if not evideo_bot_url.startswith("https://t.me/"):
+        evideo_bot_url = "https://t.me/NEXTeVideo_bot"
+
+    query = urlencode({"admin_bot_url": bot_url, "evideo_bot_url": evideo_bot_url})
+    return f"{page}?{query}"
+
+
 def get_initial_capital_reset_webapp_url(
     name: str,
     initial_capital: float,
