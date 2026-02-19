@@ -121,7 +121,7 @@ BASIC_TOPICS: list[TopicItem] = [
     {
         "topic_no": 7,
         "topic_title": "Support & Resistant (Level 1)",
-        "message_id": 0,
+        "message_id": 11,
         "next_only": False,
         "subtopics": [
             "Pengenalan",
@@ -133,7 +133,7 @@ BASIC_TOPICS: list[TopicItem] = [
     {
         "topic_no": 8,
         "topic_title": "Trendline (Level 1)",
-        "message_id": 0,
+        "message_id": 12,
         "next_only": False,
         "subtopics": [
             "Apa itu trendline",
@@ -144,7 +144,7 @@ BASIC_TOPICS: list[TopicItem] = [
     {
         "topic_no": 9,
         "topic_title": "Volume",
-        "message_id": 0,
+        "message_id": 13,
         "next_only": True,
         "subtopics": [
             "Participant",
@@ -154,7 +154,7 @@ BASIC_TOPICS: list[TopicItem] = [
     {
         "topic_no": 10,
         "topic_title": "Risk Management (Level 1)",
-        "message_id": 0,
+        "message_id": 14,
         "next_only": True,
         "subtopics": [
             "Apa itu SL & TP",
@@ -166,7 +166,7 @@ BASIC_TOPICS: list[TopicItem] = [
     {
         "topic_no": 11,
         "topic_title": "Candlestick Pattern",
-        "message_id": 0,
+        "message_id": 15,
         "next_only": True,
         "subtopics": [
             "Engulfing",
@@ -177,7 +177,7 @@ BASIC_TOPICS: list[TopicItem] = [
     {
         "topic_no": 12,
         "topic_title": "Chart Pattern",
-        "message_id": 0,
+        "message_id": 16,
         "next_only": True,
         "subtopics": [
             "Double top / bottom",
@@ -188,7 +188,7 @@ BASIC_TOPICS: list[TopicItem] = [
     {
         "topic_no": 13,
         "topic_title": "Liquidity (Level 1)",
-        "message_id": 0,
+        "message_id": 17,
         "next_only": True,
         "subtopics": [
             "Pengenalan",
@@ -265,3 +265,274 @@ BASIC_TOPICS: list[TopicItem] = [
     },
 ]
 
+
+# Intermediate full structure Topik 1-21.
+# Rule requested:
+# - next_only: topik 3-21
+# - coming soon label handled in miniapp (topik 4-21)
+INTERMEDIATE_TOPICS: list[TopicItem] = [
+    {
+        "topic_no": 1,
+        "topic_title": "Market Structure (Level 2)",
+        "message_id": 18,
+        "next_only": False,
+        "subtopics": [
+            "Internal vs external structure",
+            "Complex pullback",
+            "Trend correction & trend change",
+            "Micro consolidation",
+            "Multi BOS",
+        ],
+    },
+    {
+        "topic_no": 2,
+        "topic_title": "Liquidity (Level 2)",
+        "message_id": 19,
+        "next_only": False,
+        "subtopics": [
+            "Jenis liquidity",
+            "Kumpulan liquidity",
+            "Bagaimana liquidity dicipta oleh pergerakan harga",
+            "Liquidity tujuan entry vs liquidity tujuan target",
+        ],
+    },
+    {
+        "topic_no": 3,
+        "topic_title": "Supply & Demand",
+        "message_id": 20,
+        "next_only": True,
+        "subtopics": [
+            "Perbezaan SNR dan SND",
+            "Fresh & test zone",
+            "Weak vs strong SND",
+            "Kesilapan biasa marking SND",
+            "Hubungan SND dengan liquidity",
+        ],
+    },
+    {
+        "topic_no": 4,
+        "topic_title": "Memahami Breakout Behavior",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "True breakout vs fake breakout",
+            "Retest type A vs retest type B",
+            "Breakout failure & perangkap",
+            "Accumulation sebelum breakout (micro buildup)",
+        ],
+    },
+    {
+        "topic_no": 5,
+        "topic_title": "Candlestick Advanced Behavior",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "Candle volume behavior",
+            "Impulsive candle vs corrective candle",
+            "Wick sebagai liquidity grab",
+            "Candle yang tidak mempunyai volume",
+        ],
+    },
+    {
+        "topic_no": 6,
+        "topic_title": "Momentum & Correction",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "Impulse > correction > impulse",
+            "Deep & shallow retracement",
+            "Trend melemah sebelum perubahan trend",
+        ],
+    },
+    {
+        "topic_no": 7,
+        "topic_title": "Fibonacci",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "Pengenalan",
+            "Fibonacci retracement",
+            "Fibonacci extension",
+            "Fibo Dewa (quarter zone: discount vs premium)",
+            "AB=CD (Level 1)",
+        ],
+    },
+    {
+        "topic_no": 8,
+        "topic_title": "Support & Resistant (Level 2)",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "Flip zone",
+            "Strong zone vs weak zone",
+            "Bagaimana zone dimakan",
+            "Multi-timeframe SNR alignment",
+        ],
+    },
+    {
+        "topic_no": 9,
+        "topic_title": "Trendline (Level 2)",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "Trendline channel",
+            "Break of trendline - momentum shift",
+            "Trendline liquidity",
+            "Bagaimana trendline digunakan sebagai perangkap",
+        ],
+    },
+    {
+        "topic_no": 10,
+        "topic_title": "Entry Refinement",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "Confirmation entry vs blind entry",
+            "Entry pada pullback vs breakout entry",
+            "Mencari POI kecil dalam zon besar",
+            "Scaling in / out",
+        ],
+    },
+    {
+        "topic_no": 11,
+        "topic_title": "Risk Management (Level 2)",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "Position sizing calculation",
+            "Fixed fractional vs fixed risk",
+            "Risk to reward ratio & mapping",
+            "SL placement based on structure",
+        ],
+    },
+    {
+        "topic_no": 12,
+        "topic_title": "Trade Management (Level 1)",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "Breakeven rules",
+            "Partial TP strategy",
+            "Trailing TP strategy",
+            "Trailing TP based on structure",
+            "Menguruskan drawdown",
+        ],
+    },
+    {
+        "topic_no": 13,
+        "topic_title": "Multi-Timeframe Analysis",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "Top-down mapping",
+            "HTF bias vs LTF entry",
+            "Cara elakkan perangkap LTF",
+            "Bagaimana melihat big picture untuk entry kecil",
+        ],
+    },
+    {
+        "topic_no": 14,
+        "topic_title": "Accumulation / Distribution (Level 1)",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "Sideway",
+            "Range high / low manipulation",
+            "Fake breakout dua hala",
+            "Re-entry dalam range",
+        ],
+    },
+    {
+        "topic_no": 15,
+        "topic_title": "FVG & Imbalance (Level 2)",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "Jenis FVG dan peranan FVG",
+            "Clean vs messy imbalance",
+            "Mengapa FVG diuji semula",
+            "FVG + structure alignment",
+            "FVG yang gagal",
+        ],
+    },
+    {
+        "topic_no": 16,
+        "topic_title": "Orderblock (Level 2)",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "Weak vs valid OB",
+            "OB dalam trend vs reversal",
+            "OB & BOS / CHoCH alignment",
+            "Entry refinement di OB",
+            "Orderblock to breakerblock",
+        ],
+    },
+    {
+        "topic_no": 17,
+        "topic_title": "BOS & CHoCH (Level 2)",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "Confirmation BOS valid & failed",
+            "Early CHoCH vs valid CHoCH",
+            "CHoCH dalam range vs trend",
+            "Multi-timeframe BOS & CHoCH",
+        ],
+    },
+    {
+        "topic_no": 18,
+        "topic_title": "Mitigation Candlestick",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "Pengenalan",
+            "Impulse vs mitigation",
+            "Candle mitigation vs candle manipulation",
+            "Peranan mitigation dalam OB dan FVG",
+            "Kesilapan baca candle mitigation",
+        ],
+    },
+    {
+        "topic_no": 19,
+        "topic_title": "Trading Plan (Level 2)",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "Setup-specific rules (SOP)",
+            "Entry model (A, B, C)",
+            "Exit model",
+            "Time-of-day filter",
+            "Risk filter",
+        ],
+    },
+    {
+        "topic_no": 20,
+        "topic_title": "Money Management (Level 1)",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "Pembahagian risk per setup mengikut capital",
+            "Dynamic equity based on trade risk",
+        ],
+    },
+    {
+        "topic_no": 21,
+        "topic_title": "Psychology (Level 2)",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "Menguruskan winning streak",
+            "Menguruskan losing streak",
+            "Mengenalpasti emotional trading pattern",
+            "Kaedah membina disiplin",
+        ],
+    },
+]
+
+
+LEVEL_TOPICS: dict[str, list[TopicItem]] = {
+    "basic": BASIC_TOPICS,
+    "intermediate": INTERMEDIATE_TOPICS,
+    "advanced": [],
+}

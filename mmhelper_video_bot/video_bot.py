@@ -16,7 +16,7 @@ from texts import (
     EVIDEO_MENU_TEXT,
     MAIN_MENU_TEXT,
 )
-from video_catalog import BASIC_TOPICS, LEVEL_LABELS, VIDEO_CATALOG
+from video_catalog import LEVEL_LABELS, LEVEL_TOPICS, VIDEO_CATALOG
 
 logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
@@ -130,9 +130,10 @@ def _message_link(group_id: int, message_id: int) -> str:
 
 def build_level_text(level_key: str, group_id: int | None) -> str:
     label = LEVEL_LABELS.get(level_key, level_key.title())
-    if level_key == "basic":
-        lines = [f"📂 {label} ({len(BASIC_TOPICS)} topik)\n"]
-        for row in BASIC_TOPICS:
+    level_topics = LEVEL_TOPICS.get(level_key, [])
+    if level_topics:
+        lines = [f"📂 {label} ({len(level_topics)} topik)\n"]
+        for row in level_topics:
             topic_no = int(row.get("topic_no") or 0)
             topic_title = str(row.get("topic_title") or f"Topik {topic_no}")
             mid = int(row.get("message_id") or 0)
@@ -160,8 +161,9 @@ def build_level_text(level_key: str, group_id: int | None) -> str:
     return "\n".join(lines)
 
 
-def _find_basic_topic(topic_no: int) -> dict | None:
-    for row in BASIC_TOPICS:
+def _find_level_topic(level: str, topic_no: int) -> dict | None:
+    topics = LEVEL_TOPICS.get(level, [])
+    for row in topics:
         if int(row.get("topic_no") or 0) == int(topic_no):
             return row
     return None
@@ -173,15 +175,7 @@ async def _send_topic_video(
     level: str,
     topic_no: int,
 ) -> None:
-    if level != "basic":
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text="Level ini belum disambung untuk penghantaran video.",
-            reply_markup=topic_navigation_keyboard(),
-        )
-        return
-
-    topic = _find_basic_topic(topic_no)
+    topic = _find_level_topic(level, topic_no)
     if not topic:
         await context.bot.send_message(
             chat_id=chat_id,
@@ -303,7 +297,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             )
             return
         next_topic = current_topic - 1 if text == MENU_TOPIC_PREV else current_topic + 1
-        if next_topic < 1 or next_topic > len(BASIC_TOPICS):
+        level_topics = LEVEL_TOPICS.get(level, [])
+        if next_topic < 1 or next_topic > len(level_topics):
             await message.reply_text(
                 "Tiada topik lagi untuk arah ini.",
                 reply_markup=topic_navigation_keyboard(),

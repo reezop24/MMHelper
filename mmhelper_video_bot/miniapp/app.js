@@ -203,6 +203,114 @@
     }
   ];
 
+  var INTERMEDIATE_TOPICS = [
+    {
+      topic: 1,
+      title: "Market Structure (Level 2)",
+      subtopics: ["Internal vs external structure", "Complex pullback", "Trend correction & trend change", "Micro consolidation", "Multi BOS"]
+    },
+    {
+      topic: 2,
+      title: "Liquidity (Level 2)",
+      subtopics: ["Jenis liquidity", "Kumpulan liquidity", "Bagaimana liquidity dicipta oleh pergerakan harga", "Liquidity tujuan entry vs liquidity tujuan target"]
+    },
+    {
+      topic: 3,
+      title: "Supply & Demand",
+      subtopics: ["Perbezaan SNR dan SND", "Fresh & test zone", "Weak vs strong SND", "Kesilapan biasa marking SND", "Hubungan SND dengan liquidity"]
+    },
+    {
+      topic: 4,
+      title: "Memahami Breakout Behavior",
+      subtopics: ["True breakout vs fake breakout", "Retest type A vs retest type B", "Breakout failure & perangkap", "Accumulation sebelum breakout (micro buildup)"]
+    },
+    {
+      topic: 5,
+      title: "Candlestick Advanced Behavior",
+      subtopics: ["Candle volume behavior", "Impulsive candle vs corrective candle", "Wick sebagai liquidity grab", "Candle yang tidak mempunyai volume"]
+    },
+    {
+      topic: 6,
+      title: "Momentum & Correction",
+      subtopics: ["Impulse > correction > impulse", "Deep & shallow retracement", "Trend melemah sebelum perubahan trend"]
+    },
+    {
+      topic: 7,
+      title: "Fibonacci",
+      subtopics: ["Pengenalan", "Fibonacci retracement", "Fibonacci extension", "Fibo Dewa (quarter zone: discount vs premium)", "AB=CD (Level 1)"]
+    },
+    {
+      topic: 8,
+      title: "Support & Resistant (Level 2)",
+      subtopics: ["Flip zone", "Strong zone vs weak zone", "Bagaimana zone dimakan", "Multi-timeframe SNR alignment"]
+    },
+    {
+      topic: 9,
+      title: "Trendline (Level 2)",
+      subtopics: ["Trendline channel", "Break of trendline - momentum shift", "Trendline liquidity", "Bagaimana trendline digunakan sebagai perangkap"]
+    },
+    {
+      topic: 10,
+      title: "Entry Refinement",
+      subtopics: ["Confirmation entry vs blind entry", "Entry pada pullback vs breakout entry", "Mencari POI kecil dalam zon besar", "Scaling in / out"]
+    },
+    {
+      topic: 11,
+      title: "Risk Management (Level 2)",
+      subtopics: ["Position sizing calculation", "Fixed fractional vs fixed risk", "Risk to reward ratio & mapping", "SL placement based on structure"]
+    },
+    {
+      topic: 12,
+      title: "Trade Management (Level 1)",
+      subtopics: ["Breakeven rules", "Partial TP strategy", "Trailing TP strategy", "Trailing TP based on structure", "Menguruskan drawdown"]
+    },
+    {
+      topic: 13,
+      title: "Multi-Timeframe Analysis",
+      subtopics: ["Top-down mapping", "HTF bias vs LTF entry", "Cara elakkan perangkap LTF", "Bagaimana melihat big picture untuk entry kecil"]
+    },
+    {
+      topic: 14,
+      title: "Accumulation / Distribution (Level 1)",
+      subtopics: ["Sideway", "Range high / low manipulation", "Fake breakout dua hala", "Re-entry dalam range"]
+    },
+    {
+      topic: 15,
+      title: "FVG & Imbalance (Level 2)",
+      subtopics: ["Jenis FVG dan peranan FVG", "Clean vs messy imbalance", "Mengapa FVG diuji semula", "FVG + structure alignment", "FVG yang gagal"]
+    },
+    {
+      topic: 16,
+      title: "Orderblock (Level 2)",
+      subtopics: ["Weak vs valid OB", "OB dalam trend vs reversal", "OB & BOS / CHoCH alignment", "Entry refinement di OB", "Orderblock to breakerblock"]
+    },
+    {
+      topic: 17,
+      title: "BOS & CHoCH (Level 2)",
+      subtopics: ["Confirmation BOS valid & failed", "Early CHoCH vs valid CHoCH", "CHoCH dalam range vs trend", "Multi-timeframe BOS & CHoCH"]
+    },
+    {
+      topic: 18,
+      title: "Mitigation Candlestick",
+      subtopics: ["Pengenalan", "Impulse vs mitigation", "Candle mitigation vs candle manipulation", "Peranan mitigation dalam OB dan FVG", "Kesilapan baca candle mitigation"]
+    },
+    {
+      topic: 19,
+      title: "Trading Plan (Level 2)",
+      subtopics: ["Setup-specific rules (SOP)", "Entry model (A, B, C)", "Exit model", "Time-of-day filter", "Risk filter"]
+    },
+    {
+      topic: 20,
+      title: "Money Management (Level 1)",
+      subtopics: ["Pembahagian risk per setup mengikut capital", "Dynamic equity based on trade risk"]
+    },
+    {
+      topic: 21,
+      title: "Psychology (Level 2)",
+      subtopics: ["Menguruskan winning streak", "Menguruskan losing streak", "Mengenalpasti emotional trading pattern", "Kaedah membina disiplin"]
+    }
+  ];
+
   var tabs = [
     { btn: document.getElementById("tabBasic"), panel: document.getElementById("panelBasic") },
     { btn: document.getElementById("tabIntermediate"), panel: document.getElementById("panelIntermediate") },
@@ -212,6 +320,7 @@
   var topBackBtn = document.getElementById("topBackBtn");
   var bottomBackBtn = document.getElementById("bottomBackBtn");
   var basicTopicList = document.getElementById("basicTopicList");
+  var intermediateTopicList = document.getElementById("intermediateTopicList");
   var evideoCard = document.getElementById("evideoCard");
 
   function activate(index) {
@@ -235,17 +344,22 @@
     });
   });
 
-  function renderBasicTopics() {
-    if (!basicTopicList) return;
-    basicTopicList.innerHTML = "";
+  function renderTopicList(container, topics, level, nextOnlyFrom, comingSoonFrom) {
+    if (!container) return;
+    container.innerHTML = "";
 
-    BASIC_TOPICS.forEach(function (row) {
+    topics.forEach(function (row) {
       var card = document.createElement("div");
       card.className = "topic-card";
 
       var title = document.createElement("p");
       title.className = "topic-title";
-      title.textContent = "Topik " + row.topic + ": " + row.title;
+      var topicLabel = "Topik " + row.topic + ": " + row.title;
+      if (row.topic >= comingSoonFrom) {
+        title.innerHTML = topicLabel + ' <em>(coming soon)</em>';
+      } else {
+        title.textContent = topicLabel;
+      }
       card.appendChild(title);
 
       var ul = document.createElement("ul");
@@ -263,11 +377,11 @@
       btn.type = "button";
       btn.className = "topic-select-btn";
       btn.textContent = "Pilih Topik Ini";
-      btn.setAttribute("data-level", "basic");
+      btn.setAttribute("data-level", level);
       btn.setAttribute("data-topic", String(row.topic));
       btn.setAttribute("data-title", row.title);
 
-      if (row.nextOnly) {
+      if (row.topic >= nextOnlyFrom) {
         var badge = document.createElement("img");
         badge.src = "nextexc.png";
         badge.alt = "NEXT only";
@@ -276,12 +390,12 @@
       }
 
       btn.addEventListener("click", function () {
-        sendTopicPickPayload("basic", String(row.topic), row.title);
+        sendTopicPickPayload(level, String(row.topic), row.title);
       });
 
       actions.appendChild(btn);
       card.appendChild(actions);
-      basicTopicList.appendChild(card);
+      container.appendChild(card);
     });
   }
 
@@ -323,6 +437,7 @@
     bottomBackBtn.addEventListener("click", backToMainMenu);
   }
 
-  renderBasicTopics();
+  renderTopicList(basicTopicList, BASIC_TOPICS, "basic", 9, 14);
+  renderTopicList(intermediateTopicList, INTERMEDIATE_TOPICS, "intermediate", 3, 4);
   activate(0);
 })();
