@@ -6,6 +6,26 @@
   <title>Daftar NEXT</title>
   <link rel="stylesheet" href="global.css" />
   <style>
+    .top-nav {
+      display: flex;
+      justify-content: flex-start;
+      margin-bottom: 8px;
+    }
+
+    .top-back-btn {
+      margin: 0;
+      width: auto;
+      min-width: 0;
+      border: 1px solid #6a2d36;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #fee2e2;
+      background: rgba(39, 16, 20, 0.92);
+      line-height: 1;
+    }
+
     .hero {
       margin-bottom: 14px;
       text-align: center;
@@ -147,10 +167,33 @@
       color: #fda4af;
       font-size: 13px;
     }
+
+    .bottom-actions {
+      margin-top: 10px;
+      display: flex;
+      justify-content: flex-start;
+    }
+
+    .back-btn {
+      margin: 0;
+      width: auto;
+      min-width: 170px;
+      border: 1px solid #6a2d36;
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: rgba(39, 16, 20, 0.92);
+      color: #fee2e2;
+      font-size: 13px;
+      font-weight: 700;
+    }
   </style>
 </head>
 <body>
   <main class="page">
+    <div class="top-nav">
+      <button id="topBackBtn" type="button" class="top-back-btn">← Back</button>
+    </div>
+
     <header class="hero">
       <img class="logo" src="logo.png" alt="NEXTexclusive Logo" />
       <h1>Daftar NEXT</h1>
@@ -220,6 +263,10 @@
 
       <button id="goAdminBtn" class="go-btn" type="button">Teruskan</button>
       <p id="statusText" class="status" aria-live="polite"></p>
+
+      <div class="bottom-actions">
+        <button id="bottomBackBtn" type="button" class="back-btn">⬅️ Back to Main Menu</button>
+      </div>
     </section>
   </main>
 
@@ -234,6 +281,8 @@
 
       var statusEl = document.getElementById("statusText");
       var goBtn = document.getElementById("goAdminBtn");
+      var topBackBtn = document.getElementById("topBackBtn");
+      var bottomBackBtn = document.getElementById("bottomBackBtn");
       var tabDaftar = document.getElementById("tabDaftar");
       var tabOneTime = document.getElementById("tabOneTime");
       var panelDaftar = document.getElementById("panelDaftar");
@@ -250,6 +299,19 @@
 
       tabDaftar.addEventListener("click", function () { activateTab("daftar"); });
       tabOneTime.addEventListener("click", function () { activateTab("one"); });
+
+      function backToMainMenu() {
+        var payload = { type: "video_bot_back_to_main_menu" };
+        if (tg) {
+          tg.sendData(JSON.stringify(payload));
+          tg.close();
+          return;
+        }
+        statusEl.textContent = "Preview mode: buka dari Telegram.";
+      }
+
+      topBackBtn.addEventListener("click", backToMainMenu);
+      bottomBackBtn.addEventListener("click", backToMainMenu);
 
       goBtn.addEventListener("click", function () {
         if (!adminUrl || adminUrl.indexOf("https://t.me/") !== 0) {
