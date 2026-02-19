@@ -422,9 +422,23 @@
     }
   }
 
+  function parseVideoStatusFromUrl() {
+    var fallback = { basic: {}, intermediate: {}, advanced: {} };
+    try {
+      var raw = new URLSearchParams(window.location.search).get("video_status");
+      if (!raw) return fallback;
+      var parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return fallback;
+      return parsed;
+    } catch (err) {
+      return fallback;
+    }
+  }
+
   // UI availability comes from bot-injected URL param topic_ids.
   // Bot-side validation remains authoritative (video_catalog.py).
   var TOPIC_MESSAGE_IDS = parseTopicMessageIdsFromUrl();
+  var VIDEO_STATUS = parseVideoStatusFromUrl();
 
   var tabs = [
     { btn: document.getElementById("tabBasic"), panel: document.getElementById("panelBasic") },
@@ -471,7 +485,25 @@
       var title = document.createElement("p");
       title.className = "topic-title";
       var topicLabel = "Topik " + row.topic + ": " + row.title;
-      if (row.topic >= comingSoonFrom) {
+      var statusMap = VIDEO_STATUS[level] || {};
+      var override = statusMap[String(row.topic)] || statusMap[row.topic] || null;
+      if (override && typeof override === "object") {
+        var st = String(override.status || "").toLowerCase();
+        if (st === "coming_soon") {
+          title.innerHTML = topicLabel + ' <em>(coming soon)</em>';
+        } else if (st === "available_on") {
+          var onDate = String(override.available_on || "").trim();
+          if (onDate) {
+            title.innerHTML = topicLabel + ' <em>(available on: ' + onDate + ')</em>';
+          } else {
+            title.innerHTML = topicLabel + ' <em>(available on)</em>';
+          }
+        } else if (st === "online") {
+          title.innerHTML = topicLabel + ' <span>🟢 online</span>';
+        } else {
+          title.textContent = topicLabel;
+        }
+      } else if (row.topic >= comingSoonFrom) {
         title.innerHTML = topicLabel + ' <em>(coming soon)</em>';
       } else {
         title.textContent = topicLabel;

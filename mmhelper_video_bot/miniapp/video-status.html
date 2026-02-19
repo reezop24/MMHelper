@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Video Status</title>
+  <link rel="stylesheet" href="global.css" />
+  <style>
+    .top-nav {
+      display: flex;
+      justify-content: flex-start;
+      margin-bottom: 8px;
+    }
+
+    .top-back-btn {
+      margin: 0;
+      width: auto;
+      min-width: 0;
+      border: 1px solid #6a2d36;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #fee2e2;
+      background: rgba(39, 16, 20, 0.92);
+      line-height: 1;
+    }
+
+    .hero {
+      margin-bottom: 14px;
+      text-align: center;
+    }
+
+    .logo {
+      width: 120px;
+      height: 120px;
+      object-fit: contain;
+      display: block;
+      margin: 0 auto 10px;
+    }
+
+    .hero h1 {
+      margin: 0;
+      font-size: 24px;
+    }
+
+    .hero p {
+      margin: 8px 0 0;
+      color: #d1b8bf;
+    }
+
+    .field {
+      margin-bottom: 12px;
+    }
+
+    .field label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #ffe4e6;
+    }
+
+    select,
+    input[type="date"] {
+      width: 100%;
+      border: 1px solid #6f3741;
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: #0f0b0d;
+      color: #f3f4f6;
+      font-size: 14px;
+    }
+
+    .submit-btn {
+      width: 100%;
+      border: 1px solid #ef4444;
+      border-radius: 10px;
+      padding: 11px 12px;
+      background: linear-gradient(90deg, #991b1b 0%, #dc2626 100%);
+      color: #fff;
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .status {
+      min-height: 20px;
+      margin-top: 10px;
+      color: #fda4af;
+      font-size: 13px;
+    }
+
+    .hint {
+      margin: 6px 0 0;
+      color: #d1b8bf;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="top-nav">
+      <button id="topBackBtn" type="button" class="top-back-btn">← Back</button>
+    </div>
+
+    <header class="hero">
+      <img class="logo" src="logo.png" alt="NEXTexclusive Logo" />
+      <h1>Video Status</h1>
+      <p>Kemas kini status mengikut level dan topik.</p>
+    </header>
+
+    <section class="card">
+      <div class="field">
+        <label for="levelSelect">Level</label>
+        <select id="levelSelect">
+          <option value="basic">Basic</option>
+          <option value="intermediate">Intermediate</option>
+          <option value="advanced">Advanced</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="topicSelect">Topik</label>
+        <select id="topicSelect"></select>
+      </div>
+
+      <div class="field">
+        <label for="statusSelect">Status</label>
+        <select id="statusSelect">
+          <option value="coming_soon">(coming soon)</option>
+          <option value="available_on">Available on:</option>
+          <option value="online">🟢 online</option>
+        </select>
+      </div>
+
+      <div id="availableOnField" class="field" style="display:none;">
+        <label for="availableDate">Available on date</label>
+        <input id="availableDate" type="date" />
+        <p class="hint">Hanya diperlukan untuk status "Available on".</p>
+      </div>
+
+      <button id="submitBtn" class="submit-btn" type="button">Submit Status</button>
+      <p id="statusText" class="status" aria-live="polite"></p>
+    </section>
+  </main>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    (function () {
+      var tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+      if (tg) {
+        tg.ready();
+        tg.expand();
+      }
+
+      var TOPIC_COUNTS = {
+        basic: 19,
+        intermediate: 21,
+        advanced: 19
+      };
+
+      var levelEl = document.getElementById("levelSelect");
+      var topicEl = document.getElementById("topicSelect");
+      var statusEl = document.getElementById("statusSelect");
+      var availWrap = document.getElementById("availableOnField");
+      var availDateEl = document.getElementById("availableDate");
+      var submitBtn = document.getElementById("submitBtn");
+      var statusTextEl = document.getElementById("statusText");
+      var backBtn = document.getElementById("topBackBtn");
+
+      function fillTopics(level) {
+        topicEl.innerHTML = "";
+        var max = TOPIC_COUNTS[level] || 0;
+        for (var i = 1; i <= max; i += 1) {
+          var opt = document.createElement("option");
+          opt.value = String(i);
+          opt.textContent = "Topik " + i;
+          topicEl.appendChild(opt);
+        }
+      }
+
+      function refreshAvailableDateVisibility() {
+        var visible = statusEl.value === "available_on";
+        availWrap.style.display = visible ? "block" : "none";
+      }
+
+      levelEl.addEventListener("change", function () {
+        fillTopics(levelEl.value);
+      });
+      statusEl.addEventListener("change", refreshAvailableDateVisibility);
+
+      backBtn.addEventListener("click", function () {
+        var payload = { type: "video_bot_back_to_main_menu" };
+        if (tg) {
+          tg.sendData(JSON.stringify(payload));
+          tg.close();
+          return;
+        }
+        statusTextEl.textContent = "Preview mode: buka dari Telegram.";
+      });
+
+      submitBtn.addEventListener("click", function () {
+        var level = levelEl.value;
+        var topicNo = topicEl.value;
+        var statusValue = statusEl.value;
+        var availableOn = "";
+        if (statusValue === "available_on") {
+          availableOn = (availDateEl.value || "").trim();
+          if (!availableOn) {
+            statusTextEl.textContent = "Sila isi tarikh available on.";
+            return;
+          }
+        }
+
+        var payload = {
+          type: "video_status_update",
+          level: level,
+          topic_no: topicNo,
+          status: statusValue,
+          available_on: availableOn
+        };
+
+        if (tg) {
+          tg.sendData(JSON.stringify(payload));
+          statusTextEl.textContent = "Permintaan status dihantar ke bot.";
+          return;
+        }
+        statusTextEl.textContent = "Preview mode: payload siap.";
+      });
+
+      fillTopics(levelEl.value);
+      refreshAvailableDateVisibility();
+    })();
+  </script>
+</body>
+</html>

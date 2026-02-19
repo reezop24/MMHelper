@@ -36,6 +36,7 @@ MENU_ADMIN = "🛠️ Admin"
 MENU_ADMIN_PANEL = "🔒 Admin Panel"
 MENU_ADMIN_PUSH = "📣 Push Notification"
 MENU_ADMIN_DELETE = "🗑️ Delete Video"
+MENU_ADMIN_VIDEO_STATUS = "🧷 Video Status"
 MENU_ADMIN_BACK = "⬅️ Back to Main Menu"
 MENU_ADMIN_DELETE_CONFIRM = "✅ Confirm Delete All"
 MENU_ADMIN_DELETE_CANCEL = "❌ Cancel"
@@ -53,6 +54,7 @@ SENT_VIDEO_LOG_PATH = Path(__file__).with_name("sent_video_log.json")
 KNOWN_USERS_PATH = Path(__file__).with_name("known_users.json")
 SCHEDULED_NOTIFICATIONS_PATH = Path(__file__).with_name("scheduled_notifications.json")
 AUTO_DELETE_NOTICES_PATH = Path(__file__).with_name("auto_delete_notices.json")
+VIDEO_STATUS_PATH = Path(__file__).with_name("video_status.json")
 
 
 def load_local_env() -> None:
@@ -114,6 +116,22 @@ def get_push_webapp_url() -> str:
     return f"{base}/push-notification.html"
 
 
+def get_video_status_webapp_url() -> str:
+    explicit = (os.getenv("VIDEO_STATUS_WEBAPP_URL") or "").strip()
+    if explicit.lower().startswith("https://") and "<" not in explicit and ">" not in explicit and " " not in explicit:
+        return explicit
+
+    base = get_evideo_webapp_url()
+    if not base:
+        return ""
+    if base.endswith("/"):
+        return f"{base}video-status.html"
+    if base.endswith(".html"):
+        prefix = base.rsplit("/", 1)[0]
+        return f"{prefix}/video-status.html"
+    return f"{base}/video-status.html"
+
+
 def get_bot_timezone() -> ZoneInfo:
     raw = (os.getenv("VIDEO_BOT_TIMEZONE") or "Asia/Kuala_Lumpur").strip()
     try:
@@ -162,13 +180,73 @@ def _topic_message_ids_payload() -> str:
     return json.dumps(payload, separators=(",", ":"))
 
 
+def _load_video_status_overrides() -> dict[str, dict[str, dict[str, str]]]:
+    if not VIDEO_STATUS_PATH.exists():
+        return {}
+    try:
+        raw = json.loads(VIDEO_STATUS_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(raw, dict):
+        return {}
+    result: dict[str, dict[str, dict[str, str]]] = {}
+    for level, topics in raw.items():
+        if not isinstance(topics, dict):
+            continue
+        level_key = str(level).strip().lower()
+        level_map: dict[str, dict[str, str]] = {}
+        for topic_no, data in topics.items():
+            if not isinstance(data, dict):
+                continue
+            status = str(data.get("status") or "").strip().lower()
+            if status not in {"coming_soon", "available_on", "online"}:
+                continue
+            row: dict[str, str] = {"status": status}
+            available_on = str(data.get("available_on") or "").strip()
+            if available_on:
+                row["available_on"] = available_on
+            level_map[str(topic_no)] = row
+        if level_map:
+            result[level_key] = level_map
+    return result
+
+
+def _save_video_status_overrides(data: dict[str, dict[str, dict[str, str]]]) -> None:
+    try:
+        VIDEO_STATUS_PATH.write_text(
+            json.dumps(data, ensure_ascii=True, separators=(",", ":")),
+            encoding="utf-8",
+        )
+    except OSError:
+        logger.exception("Failed to write video status overrides")
+
+
+def _upsert_video_status(level: str, topic_no: int, status: str, available_on: str) -> None:
+    all_data = _load_video_status_overrides()
+    level_key = str(level).strip().lower()
+    topic_key = str(int(topic_no))
+    if level_key not in all_data:
+        all_data[level_key] = {}
+    row: dict[str, str] = {"status": status}
+    if status == "available_on" and available_on:
+        row["available_on"] = available_on
+    all_data[level_key][topic_key] = row
+    _save_video_status_overrides(all_data)
+
+
+def _video_status_payload() -> str:
+    data = _load_video_status_overrides()
+    return json.dumps(data, separators=(",", ":"))
+
+
 def get_evideo_webapp_url_with_topic_ids() -> str:
     base = get_evideo_webapp_url()
     if not base:
         return ""
     encoded_payload = quote(_topic_message_ids_payload(), safe="")
+    encoded_status = quote(_video_status_payload(), safe="")
     sep = "&" if "?" in base else "?"
-    return f"{base}{sep}topic_ids={encoded_payload}"
+    return f"{base}{sep}topic_ids={encoded_payload}&video_status={encoded_status}"
 
 
 def main_menu_keyboard(show_admin_panel: bool = False) -> ReplyKeyboardMarkup:
@@ -190,12 +268,18 @@ def main_menu_keyboard(show_admin_panel: bool = False) -> ReplyKeyboardMarkup:
 
 def admin_panel_keyboard() -> ReplyKeyboardMarkup:
     push_url = get_push_webapp_url()
+    status_url = get_video_status_webapp_url()
     if push_url:
         push_button = KeyboardButton(MENU_ADMIN_PUSH, web_app=WebAppInfo(url=push_url))
     else:
         push_button = KeyboardButton(MENU_ADMIN_PUSH)
+    if status_url:
+        status_button = KeyboardButton(MENU_ADMIN_VIDEO_STATUS, web_app=WebAppInfo(url=status_url))
+    else:
+        status_button = KeyboardButton(MENU_ADMIN_VIDEO_STATUS)
     rows = [
         [push_button],
+        [status_button],
         [KeyboardButton(MENU_ADMIN_DELETE)],
         [KeyboardButton(MENU_ADMIN_BACK)],
     ]
@@ -767,6 +851,25 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             reply_markup=admin_panel_keyboard(),
         )
         return
+    if text == MENU_ADMIN_VIDEO_STATUS:
+        if not is_admin_user(update):
+            await message.reply_text(
+                "Akses ditolak.",
+                reply_markup=main_menu_keyboard(show_admin_panel=False),
+            )
+            return
+        status_url = get_video_status_webapp_url()
+        if not status_url:
+            await message.reply_text(
+                "Video Status miniapp URL belum diset. Isi VIDEO_STATUS_WEBAPP_URL atau pastikan VIDEO_EVIDEO_WEBAPP_URL sah.",
+                reply_markup=admin_panel_keyboard(),
+            )
+            return
+        await message.reply_text(
+            "🧷 Buka miniapp Video Status dan submit perubahan.",
+            reply_markup=admin_panel_keyboard(),
+        )
+        return
     if text == MENU_ADMIN_DELETE:
         if not is_admin_user(update):
             await message.reply_text(
@@ -955,6 +1058,57 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
         auto_text = "ON" if auto_delete else "OFF"
         await message.reply_text(
             f"✅ Push notification dijadualkan.\nID: {row['id']}\nMasa: {human_time}\nAuto delete: {auto_text}",
+            reply_markup=admin_panel_keyboard(),
+        )
+        return
+
+    if payload_type == "video_status_update":
+        if not is_admin_user(update):
+            await message.reply_text(
+                "Akses ditolak.",
+                reply_markup=main_menu_keyboard(show_admin_panel=False),
+            )
+            return
+
+        level = str(payload.get("level") or "").strip().lower()
+        status = str(payload.get("status") or "").strip().lower()
+        available_on = str(payload.get("available_on") or "").strip()
+        topic_raw = str(payload.get("topic_no") or "").strip()
+
+        try:
+            topic_no = int(topic_raw)
+        except ValueError:
+            topic_no = 0
+
+        if level not in LEVEL_TOPICS:
+            await message.reply_text("Level tak sah.", reply_markup=admin_panel_keyboard())
+            return
+        if topic_no < 1 or topic_no > len(LEVEL_TOPICS.get(level, [])):
+            await message.reply_text("Topik tak sah.", reply_markup=admin_panel_keyboard())
+            return
+        if status not in {"coming_soon", "available_on", "online"}:
+            await message.reply_text("Status tak sah.", reply_markup=admin_panel_keyboard())
+            return
+        if status == "available_on":
+            try:
+                datetime.strptime(available_on, "%Y-%m-%d")
+            except ValueError:
+                await message.reply_text(
+                    "Tarikh available_on tak sah (format: YYYY-MM-DD).",
+                    reply_markup=admin_panel_keyboard(),
+                )
+                return
+        else:
+            available_on = ""
+
+        _upsert_video_status(level=level, topic_no=topic_no, status=status, available_on=available_on)
+        status_text = status.replace("_", " ")
+        if status == "online":
+            status_text = "online 🟢"
+        if status == "available_on":
+            status_text = f"available on: {available_on}"
+        await message.reply_text(
+            f"✅ Status dikemaskini.\nLevel: {level.title()}\nTopik: {topic_no}\nStatus: {status_text}",
             reply_markup=admin_panel_keyboard(),
         )
         return
