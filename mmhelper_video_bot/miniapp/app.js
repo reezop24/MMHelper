@@ -485,29 +485,7 @@
       var title = document.createElement("p");
       title.className = "topic-title";
       var topicLabel = "Topik " + row.topic + ": " + row.title;
-      var statusMap = VIDEO_STATUS[level] || {};
-      var override = statusMap[String(row.topic)] || statusMap[row.topic] || null;
-      if (override && typeof override === "object") {
-        var st = String(override.status || "").toLowerCase();
-        if (st === "coming_soon") {
-          title.innerHTML = topicLabel + ' <em>(coming soon)</em>';
-        } else if (st === "available_on") {
-          var onDate = String(override.available_on || "").trim();
-          if (onDate) {
-            title.innerHTML = topicLabel + ' <em>(available on: ' + onDate + ')</em>';
-          } else {
-            title.innerHTML = topicLabel + ' <em>(available on)</em>';
-          }
-        } else if (st === "online") {
-          title.innerHTML = topicLabel + ' <span>🟢 online</span>';
-        } else {
-          title.textContent = topicLabel;
-        }
-      } else if (row.topic >= comingSoonFrom) {
-        title.innerHTML = topicLabel + ' <em>(coming soon)</em>';
-      } else {
-        title.textContent = topicLabel;
-      }
+      title.textContent = topicLabel;
       card.appendChild(title);
 
       var ul = document.createElement("ul");
@@ -548,6 +526,30 @@
       });
 
       actions.appendChild(btn);
+
+      var statusMap = VIDEO_STATUS[level] || {};
+      var override = statusMap[String(row.topic)] || statusMap[row.topic] || null;
+      var statusText = "";
+      if (override && typeof override === "object") {
+        var st = String(override.status || "").toLowerCase();
+        if (st === "coming_soon") {
+          statusText = "(coming soon)";
+        } else if (st === "available_on") {
+          var onDate = String(override.available_on || "").trim();
+          statusText = onDate ? "(available on: " + onDate + ")" : "(available on)";
+        } else if (st === "online") {
+          statusText = "🟢 online";
+        }
+      } else if (row.topic >= comingSoonFrom) {
+        statusText = "(coming soon)";
+      }
+      if (statusText) {
+        var statusMeta = document.createElement("p");
+        statusMeta.className = "topic-status-meta";
+        statusMeta.textContent = statusText;
+        actions.appendChild(statusMeta);
+      }
+
       card.appendChild(actions);
       container.appendChild(card);
     });
