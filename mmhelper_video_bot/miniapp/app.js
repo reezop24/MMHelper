@@ -311,6 +311,121 @@
     }
   ];
 
+  var ADVANCED_TOPICS = [
+    {
+      topic: 1,
+      title: "Market Narrative & Context Building",
+      subtopics: ["Siapa aktif sekarang", "Continuation day vs reversal day", "Expansion vs contraction day", "High probability vs chop day"]
+    },
+    {
+      topic: 2,
+      title: "Liquidity (Level 3)",
+      subtopics: ["Session liquidity map", "External vs internal liquidity target", "Partial liquidity grab vs full sweep", "Liquidity run & exhaustion"]
+    },
+    {
+      topic: 3,
+      title: "Algorithmic Price Behavior",
+      subtopics: ["Mengapa price menguji zon sama berulang kali", "Time based manipulation", "Engineered pullback vs real weakness"]
+    },
+    {
+      topic: 4,
+      title: "Entry Framework Overview",
+      subtopics: ["Mengapa SOP diperlukan", "Environment filter sebelum guna SOP", "Bila tak boleh guna SOP"]
+    },
+    {
+      topic: 5,
+      title: "SOP1 - DBO (Double Breakout)",
+      subtopics: ["Pengenalan konsep dan struktur wajib DBO", "Entry origin & invalidation", "DBO dalam DBO", "Risk profile"]
+    },
+    {
+      topic: 6,
+      title: "SOP2 - BtB (Break to Back)",
+      subtopics: ["BtB logic sebagai perubahan karektor (CHoCH)", "BtB dalam range vs trend", "High possibility fake BtB yang menyebabkan trend bersambung"]
+    },
+    {
+      topic: 7,
+      title: "SOP3 - Pattern Failure Models",
+      subtopics: ["Mengapa pattern gagal lebih padu dari pattern jadi", "DBO failed = fake DBO (fDBO)"]
+    },
+    {
+      topic: 8,
+      title: "SOP Alignment",
+      subtopics: ["Confirmation berkembar", "DBO + BtB", "DBO > fDBO + BtB", "Trendline & Fibonacci alignment", "Multi-timeframe & structure alignment"]
+    },
+    {
+      topic: 9,
+      title: "Execution Timing & Precision",
+      subtopics: ["Entry candle selection", "Micro POI dalam POI besar", "Spread & slippage awareness", "Killzone-based execution"]
+    },
+    {
+      topic: 10,
+      title: "Risk Management (Level 3) - Dynamic",
+      subtopics: ["Risk scaling mengikut conviction", "Partial risk off", "Reduce exposure during chop", "News aware risk adjustment"]
+    },
+    {
+      topic: 11,
+      title: "Trade Management (Level 2) - Advanced",
+      subtopics: ["Stack TP logic", "Structure trail vs time-based trail", "Reentry logic selepas TP1", "Position add-on rules"]
+    },
+    {
+      topic: 12,
+      title: "System Validation & Expectancy",
+      subtopics: ["Winrate vs RR trade-off", "Setup expectancy", "Sample size logic", "Abaikan sementara SOP yang tak perform"]
+    },
+    {
+      topic: 13,
+      title: "Trading Plan (Level 2) - Journaling",
+      subtopics: ["Tagging SOP & context", "Screenshot classification", "Error pattern detection", "Forward testing framework"]
+    },
+    {
+      topic: 14,
+      title: "Psychology (Level 3)",
+      subtopics: ["Ego spike selepas win besar", "Trauma selepas loss streak", "Detachment from result", "Trading as execution, bukan emosi"]
+    },
+    {
+      topic: 15,
+      title: "Live Market Breakdown",
+      subtopics: ["HTF > LTF breakdown lengkap", "Kenapa entry diambil", "Kenapa entry dielakkan", "Post-trade autopsy"]
+    },
+    {
+      topic: 16,
+      title: "Money Management (Level 2) - Business Model",
+      subtopics: ["Pengurusan kewangan cekap", "Ledger in out capital", "Performance ledger based on profit loss"]
+    },
+    {
+      topic: 17,
+      title: "Bonus 1",
+      subtopics: ["Multi-SOP - liquidity based"]
+    },
+    {
+      topic: 18,
+      title: "Bonus 2",
+      subtopics: ["Market analysis - FiboExtension based"]
+    },
+    {
+      topic: 19,
+      title: "Bonus 3",
+      subtopics: ["Scalping within range"]
+    }
+  ];
+
+  function parseTopicMessageIdsFromUrl() {
+    var fallback = { basic: {}, intermediate: {}, advanced: {} };
+    try {
+      var raw = new URLSearchParams(window.location.search).get("topic_ids");
+      if (!raw) return fallback;
+      var parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return fallback;
+      return parsed;
+    } catch (err) {
+      return fallback;
+    }
+  }
+
+  // UI availability comes from bot-injected URL param topic_ids.
+  // Bot-side validation remains authoritative (video_catalog.py).
+  var TOPIC_MESSAGE_IDS = parseTopicMessageIdsFromUrl();
+
   var tabs = [
     { btn: document.getElementById("tabBasic"), panel: document.getElementById("panelBasic") },
     { btn: document.getElementById("tabIntermediate"), panel: document.getElementById("panelIntermediate") },
@@ -321,6 +436,7 @@
   var bottomBackBtn = document.getElementById("bottomBackBtn");
   var basicTopicList = document.getElementById("basicTopicList");
   var intermediateTopicList = document.getElementById("intermediateTopicList");
+  var advancedTopicList = document.getElementById("advancedTopicList");
   var evideoCard = document.getElementById("evideoCard");
 
   function activate(index) {
@@ -381,6 +497,12 @@
       btn.setAttribute("data-topic", String(row.topic));
       btn.setAttribute("data-title", row.title);
 
+      var levelMap = TOPIC_MESSAGE_IDS[level] || {};
+      var topicMessageId = Number(levelMap[String(row.topic)] || levelMap[row.topic] || 0);
+      if (topicMessageId <= 0) {
+        btn.classList.add("is-unavailable");
+      }
+
       if (row.topic >= nextOnlyFrom) {
         var badge = document.createElement("img");
         badge.src = "nextexc.png";
@@ -439,5 +561,6 @@
 
   renderTopicList(basicTopicList, BASIC_TOPICS, "basic", 9, 14);
   renderTopicList(intermediateTopicList, INTERMEDIATE_TOPICS, "intermediate", 3, 4);
+  renderTopicList(advancedTopicList, ADVANCED_TOPICS, "advanced", 2, 3);
   activate(0);
 })();

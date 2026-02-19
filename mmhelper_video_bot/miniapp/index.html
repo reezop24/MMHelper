@@ -131,6 +131,12 @@
       overflow: visible;
     }
 
+    .topic-select-btn.is-unavailable {
+      border-color: #374151;
+      background: linear-gradient(90deg, #111827 0%, #1f2937 100%);
+      color: #9ca3af;
+    }
+
     .next-badge {
       width: 72px;
       height: 72px;
@@ -215,12 +221,7 @@
 
       <div id="panelAdvanced" class="panel">
         <h2>Advanced</h2>
-        <div class="topic-card">
-          <p class="topic-title">Akan ditambah</p>
-          <ul>
-            <li>Struktur topik Advanced belum dimasukkan.</li>
-          </ul>
-        </div>
+        <div id="advancedTopicList"></div>
       </div>
 
       <p id="status" class="status" aria-live="polite"></p>

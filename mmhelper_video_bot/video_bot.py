@@ -6,6 +6,7 @@ import json
 import logging
 import os
 from pathlib import Path
+from urllib.parse import quote
 
 from telegram import KeyboardButton, ReplyKeyboardMarkup, Update, WebAppInfo
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
@@ -81,8 +82,30 @@ def get_evideo_webapp_url() -> str:
     return url
 
 
+def _topic_message_ids_payload() -> str:
+    payload: dict[str, dict[str, int]] = {}
+    for level, topics in LEVEL_TOPICS.items():
+        level_map: dict[str, int] = {}
+        for row in topics:
+            topic_no = int(row.get("topic_no") or 0)
+            if topic_no <= 0:
+                continue
+            level_map[str(topic_no)] = int(row.get("message_id") or 0)
+        payload[level] = level_map
+    return json.dumps(payload, separators=(",", ":"))
+
+
+def get_evideo_webapp_url_with_topic_ids() -> str:
+    base = get_evideo_webapp_url()
+    if not base:
+        return ""
+    encoded_payload = quote(_topic_message_ids_payload(), safe="")
+    sep = "&" if "?" in base else "?"
+    return f"{base}{sep}topic_ids={encoded_payload}"
+
+
 def main_menu_keyboard() -> ReplyKeyboardMarkup:
-    evideo_url = get_evideo_webapp_url()
+    evideo_url = get_evideo_webapp_url_with_topic_ids()
     if evideo_url:
         evideo_button = KeyboardButton(MENU_EVIDEO, web_app=WebAppInfo(url=evideo_url))
     else:
@@ -105,7 +128,7 @@ def level_menu_keyboard() -> ReplyKeyboardMarkup:
 
 
 def topic_navigation_keyboard() -> ReplyKeyboardMarkup:
-    evideo_url = get_evideo_webapp_url()
+    evideo_url = get_evideo_webapp_url_with_topic_ids()
     if evideo_url:
         pick_button = KeyboardButton(MENU_TOPIC_PICK, web_app=WebAppInfo(url=evideo_url))
     else:
@@ -196,9 +219,11 @@ async def _send_topic_video(
     message_id = int(topic.get("message_id") or 0)
     topic_title = str(topic.get("topic_title") or f"Topik {topic_no}")
     if message_id <= 0:
+        context.user_data["last_topic_level"] = level
+        context.user_data["last_topic_no"] = topic_no
         await context.bot.send_message(
             chat_id=chat_id,
-            text=f"Message ID untuk Topik {topic_no} belum diisi.",
+            text="❌ Video ini belum tersedia, akan dikemaskini kemudian.",
             reply_markup=topic_navigation_keyboard(),
         )
         return

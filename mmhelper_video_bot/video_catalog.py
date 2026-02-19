@@ -531,8 +531,230 @@ INTERMEDIATE_TOPICS: list[TopicItem] = [
 ]
 
 
+# Advanced full structure Topik 1-19.
+# Rule requested:
+# - next_only: topik 2-19
+# - coming soon label handled in miniapp (topik 3-19)
+ADVANCED_TOPICS: list[TopicItem] = [
+    {
+        "topic_no": 1,
+        "topic_title": "Market Narrative & Context Building",
+        "message_id": 22,
+        "next_only": False,
+        "subtopics": [
+            "Siapa aktif sekarang",
+            "Continuation day vs reversal day",
+            "Expansion vs contraction day",
+            "High probability vs chop day",
+        ],
+    },
+    {
+        "topic_no": 2,
+        "topic_title": "Liquidity (Level 3)",
+        "message_id": 21,
+        "next_only": True,
+        "subtopics": [
+            "Session liquidity map",
+            "External vs internal liquidity target",
+            "Partial liquidity grab vs full sweep",
+            "Liquidity run & exhaustion",
+        ],
+    },
+    {
+        "topic_no": 3,
+        "topic_title": "Algorithmic Price Behavior",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "Mengapa price menguji zon sama berulang kali",
+            "Time based manipulation",
+            "Engineered pullback vs real weakness",
+        ],
+    },
+    {
+        "topic_no": 4,
+        "topic_title": "Entry Framework Overview",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "Mengapa SOP diperlukan",
+            "Environment filter sebelum guna SOP",
+            "Bila tak boleh guna SOP",
+        ],
+    },
+    {
+        "topic_no": 5,
+        "topic_title": "SOP1 - DBO (Double Breakout)",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "Pengenalan konsep dan struktur wajib DBO",
+            "Entry origin & invalidation",
+            "DBO dalam DBO",
+            "Risk profile",
+        ],
+    },
+    {
+        "topic_no": 6,
+        "topic_title": "SOP2 - BtB (Break to Back)",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "BtB logic sebagai perubahan karektor (CHoCH)",
+            "BtB dalam range vs trend",
+            "High possibility fake BtB yang menyebabkan trend bersambung",
+        ],
+    },
+    {
+        "topic_no": 7,
+        "topic_title": "SOP3 - Pattern Failure Models",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "Mengapa pattern gagal lebih padu dari pattern jadi",
+            "DBO failed = fake DBO (fDBO)",
+        ],
+    },
+    {
+        "topic_no": 8,
+        "topic_title": "SOP Alignment",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "Confirmation berkembar",
+            "DBO + BtB",
+            "DBO > fDBO + BtB",
+            "Trendline & Fibonacci alignment",
+            "Multi-timeframe & structure alignment",
+        ],
+    },
+    {
+        "topic_no": 9,
+        "topic_title": "Execution Timing & Precision",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "Entry candle selection",
+            "Micro POI dalam POI besar",
+            "Spread & slippage awareness",
+            "Killzone-based execution",
+        ],
+    },
+    {
+        "topic_no": 10,
+        "topic_title": "Risk Management (Level 3) - Dynamic",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "Risk scaling mengikut conviction",
+            "Partial risk off",
+            "Reduce exposure during chop",
+            "News aware risk adjustment",
+        ],
+    },
+    {
+        "topic_no": 11,
+        "topic_title": "Trade Management (Level 2) - Advanced",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "Stack TP logic",
+            "Structure trail vs time-based trail",
+            "Reentry logic selepas TP1",
+            "Position add-on rules",
+        ],
+    },
+    {
+        "topic_no": 12,
+        "topic_title": "System Validation & Expectancy",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "Winrate vs RR trade-off",
+            "Setup expectancy",
+            "Sample size logic",
+            "Abaikan sementara SOP yang tak perform",
+        ],
+    },
+    {
+        "topic_no": 13,
+        "topic_title": "Trading Plan (Level 2) - Journaling",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "Tagging SOP & context",
+            "Screenshot classification",
+            "Error pattern detection",
+            "Forward testing framework",
+        ],
+    },
+    {
+        "topic_no": 14,
+        "topic_title": "Psychology (Level 3)",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "Ego spike selepas win besar",
+            "Trauma selepas loss streak",
+            "Detachment from result",
+            "Trading as execution, bukan emosi",
+        ],
+    },
+    {
+        "topic_no": 15,
+        "topic_title": "Live Market Breakdown",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "HTF > LTF breakdown lengkap",
+            "Kenapa entry diambil",
+            "Kenapa entry dielakkan",
+            "Post-trade autopsy",
+        ],
+    },
+    {
+        "topic_no": 16,
+        "topic_title": "Money Management (Level 2) - Business Model",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "Pengurusan kewangan cekap",
+            "Ledger in out capital",
+            "Performance ledger based on profit loss",
+        ],
+    },
+    {
+        "topic_no": 17,
+        "topic_title": "Bonus 1",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "Multi-SOP - liquidity based",
+        ],
+    },
+    {
+        "topic_no": 18,
+        "topic_title": "Bonus 2",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "Market analysis - FiboExtension based",
+        ],
+    },
+    {
+        "topic_no": 19,
+        "topic_title": "Bonus 3",
+        "message_id": 0,
+        "next_only": True,
+        "subtopics": [
+            "Scalping within range",
+        ],
+    },
+]
+
+
 LEVEL_TOPICS: dict[str, list[TopicItem]] = {
     "basic": BASIC_TOPICS,
     "intermediate": INTERMEDIATE_TOPICS,
-    "advanced": [],
+    "advanced": ADVANCED_TOPICS,
 }
