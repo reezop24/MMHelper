@@ -36,3 +36,40 @@ LEVEL_LABELS: dict[str, str] = {
     "advanced": "Advanced",
 }
 
+
+# Draft structure for Basic (Topik 1-5). Replace placeholders with real titles.
+BASIC_TOPIC_DRAFT: dict[str, list[str]] = {
+    "Topik 1": [
+        "1. APA ITU TRADING",
+        "Bezakan trading, investing, speculation",
+        "Apa yang sebenarnya trader buat",
+        "Mitos & salah faham",
+    ],
+    "Topik 2": [
+        "2. BAGAIMANA HARGA BERGERAK",
+        "Siapa pemain pasaran",
+        "Siapa yang menggerakkan harga",
+        "Konsep pergerakan harga",
+        "Apa itu liquidity",
+    ],
+    "Topik 3": [
+        "3. BROKER",
+        "Pengenalan",
+        "Market maker vs ECN",
+        "Spread, swap, leverage",
+        "Risiko leverage tinggi",
+    ],
+    "Topik 4": [
+        "4. PLATFORM",
+        "MT4/MT5",
+        "TradingView",
+        "Order type",
+        "Cara membaca chart (platform overview)",
+    ],
+    "Topik 5": [
+        "5. PSYCHOLOGY (Level 1)",
+        "Kenapa beginner selalu loss",
+        "Emotional cycle dalam trading",
+        "Apa maksud disiplin dan sabar",
+    ],
+}

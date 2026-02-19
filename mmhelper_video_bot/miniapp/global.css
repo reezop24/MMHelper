@@ -30,6 +30,26 @@ body {
   padding: 24px 16px 44px;
 }
 
+.top-nav {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 8px;
+}
+
+.top-back-btn {
+  margin: 0;
+  width: auto;
+  min-width: 0;
+  border: 1px solid #6a2d36;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fee2e2;
+  background: rgba(39, 16, 20, 0.92);
+  line-height: 1;
+}
+
 .hero {
   margin-bottom: 14px;
   text-align: center;
@@ -69,6 +89,25 @@ body {
   color: #fda4af;
 }
 
+.bottom-actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.back-btn {
+  margin: 0;
+  width: auto;
+  min-width: 170px;
+  border: 1px solid #6a2d36;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: rgba(39, 16, 20, 0.92);
+  color: #fee2e2;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 @media (max-width: 640px) {
   .logo {
     width: 120px;
@@ -78,5 +117,9 @@ body {
   .hero h1 {
     font-size: 24px;
   }
-}
 
+  .top-back-btn {
+    font-size: 12px;
+    padding: 7px 11px;
+  }
+}

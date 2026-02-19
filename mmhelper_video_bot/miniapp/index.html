@@ -70,10 +70,57 @@
     .panel li + li {
       margin-top: 6px;
     }
+
+    .topic-card {
+      border: 1px solid #6b1f2c;
+      border-radius: 12px;
+      background: rgba(33, 15, 19, 0.88);
+      padding: 12px;
+    }
+
+    .topic-card + .topic-card {
+      margin-top: 10px;
+    }
+
+    .topic-title {
+      margin: 0 0 10px;
+      padding: 9px 10px;
+      font-size: 15px;
+      font-weight: 800;
+      color: #ffe4e6;
+      background: rgba(73, 24, 34, 0.92);
+      border: 1px solid #7a3140;
+      border-left: 4px solid #be4559;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(34, 12, 16, 0.35);
+    }
+
+    .topic-actions {
+      margin-top: 10px;
+      display: flex;
+      justify-content: flex-start;
+    }
+
+    .topic-select-btn {
+      margin: 0;
+      width: auto;
+      min-width: 150px;
+      border: 1px solid #ef4444;
+      border-radius: 10px;
+      padding: 8px 12px;
+      background: linear-gradient(90deg, #991b1b 0%, #dc2626 100%);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+    }
   </style>
 </head>
 <body>
   <main class="page">
+    <div class="top-nav">
+      <button id="topBackBtn" type="button" class="top-back-btn">← Back</button>
+    </div>
+
     <header class="hero">
       <img class="logo" src="logo.png" alt="NEXTexclusive Logo" />
       <h1>NEXT eVideo26</h1>
@@ -93,32 +140,91 @@
 
       <div id="panelBasic" class="panel active">
         <h2>Basic</h2>
-        <ul>
-          <li>Video 01 - Placeholder</li>
-          <li>Video 02 - Placeholder</li>
-          <li>Video 03 - Placeholder</li>
-        </ul>
+        <div class="topic-card">
+          <p class="topic-title">Topik 1: Apa Itu Trading</p>
+          <ul>
+            <li>Bezakan trading, investing, speculation</li>
+            <li>Apa yang sebenarnya trader buat</li>
+            <li>Mitos & salah faham</li>
+          </ul>
+          <div class="topic-actions">
+            <button type="button" class="topic-select-btn js-topic-pick" data-level="basic" data-topic="1" data-title="Apa Itu Trading">Pilih Topik Ini</button>
+          </div>
+        </div>
+        <div class="topic-card">
+          <p class="topic-title">Topik 2: Bagaimana Harga Bergerak</p>
+          <ul>
+            <li>Siapa pemain pasaran</li>
+            <li>Siapa yang menggerakkan harga</li>
+            <li>Konsep pergerakan harga</li>
+            <li>Apa itu liquidity</li>
+          </ul>
+          <div class="topic-actions">
+            <button type="button" class="topic-select-btn js-topic-pick" data-level="basic" data-topic="2" data-title="Bagaimana Harga Bergerak">Pilih Topik Ini</button>
+          </div>
+        </div>
+        <div class="topic-card">
+          <p class="topic-title">Topik 3: Broker</p>
+          <ul>
+            <li>Pengenalan</li>
+            <li>Market maker vs ECN</li>
+            <li>Spread, swap, leverage</li>
+            <li>Risiko leverage tinggi</li>
+          </ul>
+          <div class="topic-actions">
+            <button type="button" class="topic-select-btn js-topic-pick" data-level="basic" data-topic="3" data-title="Broker">Pilih Topik Ini</button>
+          </div>
+        </div>
+        <div class="topic-card">
+          <p class="topic-title">Topik 4: Platform</p>
+          <ul>
+            <li>MT4/MT5</li>
+            <li>TradingView</li>
+            <li>Order type</li>
+            <li>Cara membaca chart (platform overview)</li>
+          </ul>
+          <div class="topic-actions">
+            <button type="button" class="topic-select-btn js-topic-pick" data-level="basic" data-topic="4" data-title="Platform">Pilih Topik Ini</button>
+          </div>
+        </div>
+        <div class="topic-card">
+          <p class="topic-title">Topik 5: Psychology (Level 1)</p>
+          <ul>
+            <li>Kenapa beginner selalu loss</li>
+            <li>Emotional cycle dalam trading</li>
+            <li>Apa maksud disiplin dan sabar</li>
+          </ul>
+          <div class="topic-actions">
+            <button type="button" class="topic-select-btn js-topic-pick" data-level="basic" data-topic="5" data-title="Psychology Level 1">Pilih Topik Ini</button>
+          </div>
+        </div>
       </div>
 
       <div id="panelIntermediate" class="panel">
         <h2>Intermediate</h2>
-        <ul>
-          <li>Video 01 - Placeholder</li>
-          <li>Video 02 - Placeholder</li>
-          <li>Video 03 - Placeholder</li>
-        </ul>
+        <div class="topic-card">
+          <p class="topic-title">Akan ditambah</p>
+          <ul>
+            <li>Struktur topik Intermediate belum dimasukkan.</li>
+          </ul>
+        </div>
       </div>
 
       <div id="panelAdvanced" class="panel">
         <h2>Advanced</h2>
-        <ul>
-          <li>Video 01 - Placeholder</li>
-          <li>Video 02 - Placeholder</li>
-          <li>Video 03 - Placeholder</li>
-        </ul>
+        <div class="topic-card">
+          <p class="topic-title">Akan ditambah</p>
+          <ul>
+            <li>Struktur topik Advanced belum dimasukkan.</li>
+          </ul>
+        </div>
       </div>
 
       <p id="status" class="status" aria-live="polite"></p>
+
+      <div class="bottom-actions">
+        <button id="bottomBackBtn" type="button" class="back-btn">⬅️ Back to Main Menu</button>
+      </div>
     </section>
   </main>
 
@@ -126,4 +232,3 @@
   <script src="app.js"></script>
 </body>
 </html>
-

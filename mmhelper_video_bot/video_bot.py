@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 from pathlib import Path
@@ -69,6 +70,9 @@ def get_video_db_group_id() -> int | None:
 def get_evideo_webapp_url() -> str:
     url = (os.getenv("VIDEO_EVIDEO_WEBAPP_URL") or "").strip()
     if not url.lower().startswith("https://"):
+        return ""
+    # Ignore template/placeholder values so bot menu still works.
+    if "<" in url or ">" in url or " " in url:
         return ""
     return url
 
@@ -187,11 +191,54 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await message.reply_text(MAIN_MENU_TEXT, reply_markup=main_menu_keyboard())
 
 
+async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    if not message or not message.web_app_data:
+        return
+    raw = str(message.web_app_data.data or "").strip()
+    if not raw:
+        return
+
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        await message.reply_text("Data miniapp tak sah.", reply_markup=main_menu_keyboard())
+        return
+
+    if not isinstance(payload, dict):
+        await message.reply_text("Data miniapp tak sah.", reply_markup=main_menu_keyboard())
+        return
+
+    payload_type = str(payload.get("type") or "").strip().lower()
+    if payload_type == "video_bot_back_to_main_menu":
+        await message.reply_text(MAIN_MENU_TEXT, reply_markup=main_menu_keyboard())
+        return
+
+    if payload_type == "video_topic_pick":
+        level = str(payload.get("level") or "").strip().lower()
+        topic = str(payload.get("topic") or "").strip()
+        title = str(payload.get("title") or "").strip()
+        await message.reply_text(
+            (
+                f"✅ Topik dipilih\n"
+                f"Level: {level or '-'}\n"
+                f"Topik: {topic or '-'}\n"
+                f"Tajuk: {title or '-'}\n\n"
+                "Flow hantar video dari group akan disambungkan selepas mapping message_id siap."
+            ),
+            reply_markup=main_menu_keyboard(),
+        )
+        return
+
+    await message.reply_text("Action miniapp diterima.", reply_markup=main_menu_keyboard())
+
+
 def main() -> None:
     token = get_token()
     app = ApplicationBuilder().token(token).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("groupid", groupid))
+    app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp_data))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     logger.info("Video bot started")
     app.run_polling(drop_pending_updates=True)
