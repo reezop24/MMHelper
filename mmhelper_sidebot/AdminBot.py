@@ -7,7 +7,8 @@ import logging
 import os
 from pathlib import Path
 from datetime import datetime, timezone
-from urllib.parse import quote
+from uuid import uuid4
+from urllib.parse import quote, urlencode, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
 
@@ -52,10 +53,10 @@ ADMIN_USER_IDS = {627116869}
 STATE_PATH = Path(__file__).with_name("sidebot_state.json")
 VIP_WHITELIST_PATH = Path(__file__).with_name("sidebot_vip_whitelist.json")
 
-MENU_DAFTAR_NEXT_MEMBER = "Daftar NEXT member"
-MENU_BELI_EVIDEO26 = "Beli NEXT eVideo26"
-MENU_ALL_PRODUCT_PREVIEW = "All Product Preview"
-MENU_ADMIN_PANEL = "Admin Panel"
+MENU_DAFTAR_NEXT_MEMBER = "🚀 Daftar NEXTexclusive"
+MENU_BELI_EVIDEO26 = "🎬 One Time Purchase NEXT eVideo26"
+MENU_ALL_PRODUCT_PREVIEW = "🛍️ All Product Preview (coming soon)"
+MENU_ADMIN_PANEL = "🛡️ Admin Panel"
 MENU_BETA_RESET = "🧪 BETA RESET"
 MENU_CHECK_UNDER_IB = "🔎 Check Under IB"
 MENU_BACK_MAIN = "⬅️ Back to Main Menu"
@@ -92,6 +93,33 @@ def get_register_next_webapp_url() -> str:
     return url
 
 
+def get_onetime_evideo_webapp_url() -> str:
+    explicit = (os.getenv("SIDEBOT_ONETIME_EVIDEO_WEBAPP_URL") or "").strip()
+    if explicit.lower().startswith("https://"):
+        return explicit
+
+    base = get_register_next_webapp_url()
+    if not base:
+        return ""
+    try:
+        parts = urlsplit(base)
+        path = parts.path or "/"
+        if path.endswith("/"):
+            new_path = f"{path}one-time-purchase.html"
+        elif path.endswith(".html"):
+            parent = path.rsplit("/", 1)[0] if "/" in path else ""
+            new_path = f"{parent}/one-time-purchase.html" if parent else "/one-time-purchase.html"
+        else:
+            new_path = f"{path}/one-time-purchase.html"
+        return urlunsplit((parts.scheme, parts.netloc, new_path, parts.query, parts.fragment))
+    except Exception:
+        if base.endswith("/"):
+            return f"{base}one-time-purchase.html"
+        if base.endswith(".html"):
+            return f"{base.rsplit('/', 1)[0]}/one-time-purchase.html"
+        return f"{base}/one-time-purchase.html"
+
+
 def get_admin_group_id() -> int | None:
     raw = (os.getenv("SIDEBOT_ADMIN_GROUP_ID") or "").strip()
     if not raw:
@@ -110,9 +138,138 @@ def get_amarkets_api_token() -> str:
     return (os.getenv("AMARKETS_API_TOKEN") or "").strip()
 
 
-def amarkets_check_is_client(wallet_id: str) -> tuple[bool | None, str]:
+def get_amarkets_api_refresh_token() -> str:
+    return (os.getenv("AMARKETS_API_REFRESH_TOKEN") or "").strip()
+
+
+def get_amarkets_api_username() -> str:
+    return (os.getenv("AMARKETS_API_USERNAME") or "").strip()
+
+
+def get_amarkets_api_password() -> str:
+    return (os.getenv("AMARKETS_API_PASSWORD") or "").strip()
+
+
+def get_amarkets_auth_url() -> str:
+    return (os.getenv("AMARKETS_AUTH_URL") or "https://auth.prod.amarkets.dev/api/v1/token").strip()
+
+
+def _persist_amarkets_tokens(access_token: str, refresh_token: str) -> None:
+    env_path = Path(__file__).with_name(".env")
+    if not env_path.exists():
+        return
+    try:
+        lines = env_path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return
+
+    def _set_or_append(key: str, value: str) -> None:
+        nonlocal lines
+        prefix = f"{key}="
+        for i, line in enumerate(lines):
+            if line.strip().startswith(prefix):
+                lines[i] = f"{key}={value}"
+                return
+        lines.append(f"{key}={value}")
+
+    _set_or_append("AMARKETS_API_TOKEN", access_token)
+    if refresh_token:
+        _set_or_append("AMARKETS_API_REFRESH_TOKEN", refresh_token)
+
+    try:
+        env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    except OSError:
+        return
+
+
+def _amarkets_token_request(payload: dict[str, str]) -> tuple[bool, str, str]:
+    auth_url = get_amarkets_auth_url()
+    if not auth_url:
+        return False, "", ""
+    body = urlencode(payload).encode("utf-8")
+    req = Request(
+        auth_url,
+        method="POST",
+        data=body,
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "application/json,text/plain,*/*",
+        },
+    )
+    try:
+        with urlopen(req, timeout=15) as resp:
+            raw = resp.read().decode("utf-8", errors="ignore").strip()
+    except HTTPError as exc:
+        preview = ""
+        try:
+            preview = exc.read().decode("utf-8", errors="ignore")[:180]
+        except Exception:
+            preview = ""
+        logger.warning("AMarkets token request HTTP error code=%s body_preview=%s", exc.code, preview)
+        return False, "", ""
+    except Exception:
+        logger.exception("AMarkets token request failed")
+        return False, "", ""
+
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        logger.warning("AMarkets token response not JSON preview=%s", raw[:180])
+        return False, "", ""
+
+    if not isinstance(parsed, dict):
+        return False, "", ""
+    access_token = str(parsed.get("access_token") or "").strip()
+    refresh_token = str(parsed.get("refresh_token") or "").strip()
+    if not access_token:
+        return False, "", ""
+    return True, access_token, refresh_token
+
+
+def _amarkets_refresh_access_token() -> tuple[bool, str]:
+    refresh_token = get_amarkets_api_refresh_token()
+    if not refresh_token:
+        return False, "refresh_token_not_set"
+    ok, access_token, new_refresh = _amarkets_token_request(
+        {
+            "grant_type": "refresh_token",
+            "refresh_token": refresh_token,
+        }
+    )
+    if not ok:
+        return False, "refresh_failed"
+    os.environ["AMARKETS_API_TOKEN"] = access_token
+    if new_refresh:
+        os.environ["AMARKETS_API_REFRESH_TOKEN"] = new_refresh
+    _persist_amarkets_tokens(access_token, new_refresh or refresh_token)
+    logger.info("AMarkets token refreshed successfully access_len=%s", len(access_token))
+    return True, "ok"
+
+
+def _amarkets_login_access_token() -> tuple[bool, str]:
+    username = get_amarkets_api_username()
+    password = get_amarkets_api_password()
+    if not username or not password:
+        return False, "username_password_not_set"
+    ok, access_token, refresh_token = _amarkets_token_request(
+        {
+            "grant_type": "password",
+            "username": username,
+            "password": password,
+        }
+    )
+    if not ok:
+        return False, "password_grant_failed"
+    os.environ["AMARKETS_API_TOKEN"] = access_token
+    if refresh_token:
+        os.environ["AMARKETS_API_REFRESH_TOKEN"] = refresh_token
+    _persist_amarkets_tokens(access_token, refresh_token)
+    logger.info("AMarkets token acquired via password grant access_len=%s", len(access_token))
+    return True, "ok"
+
+
+def _amarkets_check_is_client_once(wallet_id: str, token: str) -> tuple[bool | None, str]:
     base_url = get_amarkets_api_base_url()
-    token = get_amarkets_api_token()
     if not base_url or not token:
         logger.warning(
             "AMarkets API config missing (base_url_set=%s token_set=%s)",
@@ -143,6 +300,8 @@ def amarkets_check_is_client(wallet_id: str) -> tuple[bool | None, str]:
         except Exception:
             err_body = ""
         logger.warning("AMarkets check HTTP error wallet_id=%s code=%s body_preview=%s", wallet_id, exc.code, err_body)
+        if exc.code == 401:
+            return None, "HTTP 401"
         return None, f"HTTP {exc.code}"
     except URLError as exc:
         logger.warning("AMarkets check connection error wallet_id=%s reason=%s", wallet_id, exc.reason)
@@ -172,6 +331,25 @@ def amarkets_check_is_client(wallet_id: str) -> tuple[bool | None, str]:
             if isinstance(value, str) and value.lower() in {"true", "false"}:
                 return value.lower() == "true", "ok"
     return None, "Unexpected response"
+
+
+def amarkets_check_is_client(wallet_id: str) -> tuple[bool | None, str]:
+    token = get_amarkets_api_token()
+    result, message = _amarkets_check_is_client_once(wallet_id, token)
+    if message != "HTTP 401":
+        return result, message
+
+    # Auto refresh flow on unauthorized.
+    refreshed, reason = _amarkets_refresh_access_token()
+    if not refreshed:
+        logger.warning("AMarkets auto-refresh unavailable reason=%s; trying password grant fallback", reason)
+        refreshed, reason = _amarkets_login_access_token()
+        if not refreshed:
+            logger.warning("AMarkets token recovery failed reason=%s", reason)
+            return None, "HTTP 401"
+
+    token = get_amarkets_api_token()
+    return _amarkets_check_is_client_once(wallet_id, token)
 
 
 def load_state() -> dict:
@@ -284,7 +462,8 @@ def store_verification_submission(
         submissions = {}
         state["verification_submissions"] = submissions
 
-    submission_id = f"{user_id}-{int(datetime.now(timezone.utc).timestamp())}"
+    # Use UUID to avoid collisions when multiple submissions happen in the same second.
+    submission_id = f"{user_id}-{uuid4().hex}"
 
     deposit_required_usd = get_required_deposit_amount(registration_flow)
 
@@ -473,7 +652,7 @@ def render_admin_submission_text(item: dict) -> str:
     elif api_message:
         api_check_text = f"API Check (Under IB): ⚠️ {api_message}\n"
     return (
-        "🆕 NEXT Member Verification Submit\n\n"
+        "🆕 NEXTexclusive Verification Submit\n\n"
         f"Flow: {flow_text}\n"
         f"Submission ID: {item.get('submission_id')}\n"
         f"User ID: {user_id}\n"
@@ -622,9 +801,15 @@ def main_menu_keyboard(user_id: int | None) -> ReplyKeyboardMarkup:
     else:
         register_button = KeyboardButton(MENU_DAFTAR_NEXT_MEMBER)
 
+    onetime_url = get_onetime_evideo_webapp_url()
+    if onetime_url:
+        onetime_button = KeyboardButton(MENU_BELI_EVIDEO26, web_app=WebAppInfo(url=onetime_url))
+    else:
+        onetime_button = KeyboardButton(MENU_BELI_EVIDEO26)
+
     rows = [
         [register_button],
-        [KeyboardButton(MENU_BELI_EVIDEO26)],
+        [onetime_button],
         [KeyboardButton(MENU_ALL_PRODUCT_PREVIEW)],
     ]
     if is_admin_user(user_id):
@@ -792,7 +977,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 await context.bot.send_message(
                     chat_id=user_id,
                     text=(
-                        "Akses NEXT Member anda telah ditarik semula oleh admin.\n"
+                        "Akses NEXTexclusive anda telah ditarik semula oleh admin.\n"
                         "Sila hubungi admin untuk maklumat lanjut."
                     ),
                 )
@@ -821,7 +1006,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                     await context.bot.send_message(
                         chat_id=target_user_id,
                         text=(
-                            "Permohonan akses NEXT Member anda tidak diluluskan.\n"
+                            "Permohonan akses NEXTexclusive anda tidak diluluskan.\n"
                             "Sila buat pendaftaran baru."
                         ),
                     )
@@ -838,7 +1023,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                     await context.bot.send_message(
                         chat_id=target_user_id,
                         text=(
-                            "Tahniah! Anda kini boleh menikmati semua keistimewaan/privilege NEXT Member."
+                            "Tahniah! Anda kini boleh menikmati semua keistimewaan/privilege NEXTexclusive."
                         ),
                     )
             except Exception:
@@ -1065,6 +1250,17 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             await message.reply_text("Buka miniapp melalui butang web app pada menu.")
             return
         await message.reply_text("Miniapp URL belum diset. Isi SIDEBOT_REGISTER_WEBAPP_URL dalam .env dulu.")
+        return
+
+    if text == MENU_BELI_EVIDEO26:
+        if get_onetime_evideo_webapp_url():
+            await message.reply_text("Buka miniapp One Time Purchase melalui butang web app pada menu.")
+            return
+        await message.reply_text("Miniapp URL belum diset. Isi SIDEBOT_ONETIME_EVIDEO_WEBAPP_URL dalam .env dulu.")
+        return
+
+    if text == MENU_ALL_PRODUCT_PREVIEW:
+        await message.reply_text("🛍️ All Product Preview (coming soon).", reply_markup=main_menu_keyboard(user.id))
         return
 
     if text == MENU_BETA_RESET:
