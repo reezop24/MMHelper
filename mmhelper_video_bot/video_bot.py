@@ -16,7 +16,7 @@ from texts import (
     EVIDEO_MENU_TEXT,
     MAIN_MENU_TEXT,
 )
-from video_catalog import LEVEL_LABELS, VIDEO_CATALOG
+from video_catalog import BASIC_TOPICS, LEVEL_LABELS, VIDEO_CATALOG
 
 logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
@@ -32,6 +32,10 @@ MENU_LEVEL_BASIC = "🟢 Basic"
 MENU_LEVEL_INTERMEDIATE = "🟠 Intermediate"
 MENU_LEVEL_ADVANCED = "🔴 Advanced"
 MENU_BACK_MAIN = "⬅️ Back to Main Menu"
+MENU_TOPIC_PREV = "⏮️ << Prev Topic"
+MENU_TOPIC_NEXT = "⏭️ Next Topic >>"
+MENU_TOPIC_PICK = "📚 Pilih Topik"
+MENU_TOPIC_MAIN = "🏠 Main Menu"
 
 
 def load_local_env() -> None:
@@ -100,6 +104,15 @@ def level_menu_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
 
+def topic_navigation_keyboard() -> ReplyKeyboardMarkup:
+    rows = [
+        [KeyboardButton(MENU_TOPIC_PREV), KeyboardButton(MENU_TOPIC_NEXT)],
+        [KeyboardButton(MENU_TOPIC_PICK)],
+        [KeyboardButton(MENU_TOPIC_MAIN)],
+    ]
+    return ReplyKeyboardMarkup(rows, resize_keyboard=True)
+
+
 def _message_link(group_id: int, message_id: int) -> str:
     # Telegram deep-link format for private supergroup messages.
     group_text = str(group_id)
@@ -112,6 +125,17 @@ def _message_link(group_id: int, message_id: int) -> str:
 
 def build_level_text(level_key: str, group_id: int | None) -> str:
     label = LEVEL_LABELS.get(level_key, level_key.title())
+    if level_key == "basic":
+        lines = [f"📂 {label} ({len(BASIC_TOPICS)} topik)\n"]
+        for row in BASIC_TOPICS:
+            topic_no = int(row.get("topic_no") or 0)
+            topic_title = str(row.get("topic_title") or f"Topik {topic_no}")
+            mid = int(row.get("message_id") or 0)
+            status = "✅" if mid > 0 else "⚠️"
+            lines.append(f"{status} Topik {topic_no}: {topic_title}")
+        lines.append("\nPilih topik melalui miniapp untuk hantar video.")
+        return "\n".join(lines)
+
     videos = VIDEO_CATALOG.get(level_key, [])
     if not videos:
         return f"📂 {label}\n\nBelum ada video lagi."
@@ -129,6 +153,92 @@ def build_level_text(level_key: str, group_id: int | None) -> str:
             continue
         lines.append(f"{idx}. {title}\n   {_message_link(group_id, message_id)}")
     return "\n".join(lines)
+
+
+def _find_basic_topic(topic_no: int) -> dict | None:
+    for row in BASIC_TOPICS:
+        if int(row.get("topic_no") or 0) == int(topic_no):
+            return row
+    return None
+
+
+async def _send_topic_video(
+    context: ContextTypes.DEFAULT_TYPE,
+    chat_id: int,
+    level: str,
+    topic_no: int,
+) -> None:
+    if level != "basic":
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="Level ini belum disambung untuk penghantaran video.",
+            reply_markup=topic_navigation_keyboard(),
+        )
+        return
+
+    topic = _find_basic_topic(topic_no)
+    if not topic:
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="Topik tak dijumpai.",
+            reply_markup=topic_navigation_keyboard(),
+        )
+        return
+
+    group_id = get_video_db_group_id()
+    if group_id is None:
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="VIDEO_DB_GROUP_ID belum diset dalam .env.",
+            reply_markup=topic_navigation_keyboard(),
+        )
+        return
+
+    message_id = int(topic.get("message_id") or 0)
+    topic_title = str(topic.get("topic_title") or f"Topik {topic_no}")
+    if message_id <= 0:
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=f"Message ID untuk Topik {topic_no} belum diisi.",
+            reply_markup=topic_navigation_keyboard(),
+        )
+        return
+
+    try:
+        sent_video = await context.bot.copy_message(
+            chat_id=chat_id,
+            from_chat_id=group_id,
+            message_id=message_id,
+            protect_content=True,
+        )
+    except Exception:
+        logger.exception("Failed to copy topic video level=%s topic=%s", level, topic_no)
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=f"Gagal tarik video Topik {topic_no}. Semak message_id/group id.",
+            reply_markup=topic_navigation_keyboard(),
+        )
+        return
+
+    # Keep video until user chooses another topic.
+    # Old video is removed only after a new one is sent successfully.
+    old_video_message_id = int(context.user_data.get("last_video_message_id") or 0)
+    old_video_chat_id = int(context.user_data.get("last_video_chat_id") or 0)
+    if old_video_message_id > 0 and old_video_chat_id == chat_id and old_video_message_id != int(sent_video.message_id):
+        try:
+            await context.bot.delete_message(chat_id=chat_id, message_id=old_video_message_id)
+        except Exception:
+            logger.exception("Failed to delete previous topic video message_id=%s", old_video_message_id)
+
+    context.user_data["last_video_message_id"] = int(sent_video.message_id)
+    context.user_data["last_video_chat_id"] = int(chat_id)
+    context.user_data["last_topic_level"] = level
+    context.user_data["last_topic_no"] = topic_no
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=f"✅ Topik {topic_no}: {topic_title}",
+        reply_markup=topic_navigation_keyboard(),
+    )
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -158,6 +268,31 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
 
     if lowered in {"groupid", "/groupid"}:
         await groupid(update, context)
+        return
+
+    if text == MENU_TOPIC_MAIN:
+        await message.reply_text(MAIN_MENU_TEXT, reply_markup=main_menu_keyboard())
+        return
+    if text == MENU_TOPIC_PICK:
+        await message.reply_text(EVIDEO_MENU_TEXT, reply_markup=level_menu_keyboard())
+        return
+    if text in {MENU_TOPIC_PREV, MENU_TOPIC_NEXT}:
+        level = str(context.user_data.get("last_topic_level") or "basic")
+        current_topic = int(context.user_data.get("last_topic_no") or 0)
+        if current_topic <= 0:
+            await message.reply_text(
+                "Belum ada topik dipilih. Pilih topik dulu dari miniapp.",
+                reply_markup=topic_navigation_keyboard(),
+            )
+            return
+        next_topic = current_topic - 1 if text == MENU_TOPIC_PREV else current_topic + 1
+        if next_topic < 1 or next_topic > len(BASIC_TOPICS):
+            await message.reply_text(
+                "Tiada topik lagi untuk arah ini.",
+                reply_markup=topic_navigation_keyboard(),
+            )
+            return
+        await _send_topic_video(context, message.chat_id, level, next_topic)
         return
 
     if text == MENU_EVIDEO:
@@ -218,16 +353,14 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
         level = str(payload.get("level") or "").strip().lower()
         topic = str(payload.get("topic") or "").strip()
         title = str(payload.get("title") or "").strip()
-        await message.reply_text(
-            (
-                f"✅ Topik dipilih\n"
-                f"Level: {level or '-'}\n"
-                f"Topik: {topic or '-'}\n"
-                f"Tajuk: {title or '-'}\n\n"
-                "Flow hantar video dari group akan disambungkan selepas mapping message_id siap."
-            ),
-            reply_markup=main_menu_keyboard(),
-        )
+        try:
+            topic_no = int(topic)
+        except ValueError:
+            topic_no = 0
+        if not level or topic_no <= 0:
+            await message.reply_text("Pilihan topik tak sah.", reply_markup=main_menu_keyboard())
+            return
+        await _send_topic_video(context, message.chat_id, level, topic_no)
         return
 
     await message.reply_text("Action miniapp diterima.", reply_markup=main_menu_keyboard())
