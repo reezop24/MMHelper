@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>One Time Purchase NEXT eVideo26</title>
+  <link rel="stylesheet" href="global.css" />
+  <style>
+    .content-card p {
+      margin: 0;
+      line-height: 1.58;
+      color: #f0dde1;
+      font-size: 14px;
+    }
+
+    .content-card p + p {
+      margin-top: 10px;
+    }
+
+    .section-title {
+      margin: 0 0 10px;
+      color: #ffeef1;
+      font-size: 19px;
+    }
+
+    .feature-list {
+      margin: 8px 0 0;
+      padding-left: 18px;
+      color: #f0dde1;
+      line-height: 1.55;
+      font-size: 14px;
+    }
+
+    .feature-list li + li {
+      margin-top: 6px;
+    }
+
+    .inline-actions {
+      margin-top: 12px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .back-btn {
+      margin: 0;
+      width: auto;
+      min-width: 210px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid #5a3035;
+      background: rgba(27, 18, 20, 0.92);
+      color: #ffeef1;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .buy-btn {
+      margin-top: 14px;
+      width: 100%;
+      border: 1px solid #f59e0b;
+      border-radius: 12px;
+      padding: 11px 12px;
+      background: linear-gradient(90deg, #f59e0b 0%, #f97316 100%);
+      color: #2e1400;
+      font-size: 14px;
+      font-weight: 800;
+      text-align: center;
+      line-height: 1.2;
+    }
+
+    .secondary-btn {
+      margin-top: 10px;
+      width: 100%;
+      border: 1px solid #8d4d54;
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: rgba(56, 24, 29, 0.86);
+      color: #f4e2e6;
+      font-size: 13px;
+      font-weight: 700;
+      text-align: center;
+      line-height: 1.2;
+    }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .tab-btn {
+      margin: 0;
+      width: 100%;
+      border: 1px solid #8d4d54;
+      border-radius: 12px;
+      padding: 10px 10px;
+      background: rgba(56, 24, 29, 0.86);
+      color: #f4e2e6;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.2;
+      text-align: center;
+    }
+
+    .tab-btn.active {
+      background: linear-gradient(90deg, #f59e0b 0%, #f97316 100%);
+      color: #2e1400;
+      border-color: #f59e0b;
+    }
+
+    .tab-panels {
+      margin-top: 12px;
+    }
+
+    .tab-panel {
+      display: none;
+      border: 1px solid #5a3035;
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(27, 18, 20, 0.92);
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    .form-grid {
+      margin-top: 8px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .field-label {
+      font-size: 13px;
+      color: #f0dde1;
+      margin: 0 0 4px;
+      display: block;
+      font-weight: 700;
+    }
+
+    .field-input {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid #8d4d54;
+      border-radius: 10px;
+      background: rgba(43, 18, 22, 0.92);
+      color: #fff2f5;
+      padding: 10px 11px;
+      font-size: 14px;
+      outline: none;
+    }
+
+    .payment-images {
+      margin-top: 12px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .payment-item {
+      border: 1px solid #5a3035;
+      border-radius: 12px;
+      background: rgba(20, 14, 16, 0.9);
+      padding: 10px;
+      text-align: center;
+    }
+
+    .payment-item img {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid #744147;
+      display: block;
+      background: rgba(37, 21, 24, 0.92);
+    }
+
+    .payment-label {
+      margin: 8px 0 0;
+      font-size: 13px;
+      color: #f0dde1;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="top-nav">
+      <button id="topBackBtn" type="button" class="top-back-btn">← Back</button>
+    </div>
+
+    <header class="hero">
+      <img class="logo" src="logo.png" alt="NEXTexclusive Logo" />
+      <h1>One Time Purchase</h1>
+      <p>NEXT eVideo26</p>
+    </header>
+
+    <section class="card content-card">
+      <h2 class="section-title">Akses Sekali Bayar</h2>
+      <p>Bagi anda yang tidak ingin mendaftar sebagai NEXTexclusive Member, anda juga boleh mendapatkan akses kepada NEXT eVideo 26 melalui pembelian terus (one-time purchase).</p>
+      <p>Dengan pembelian ini, anda akan menerima:</p>
+      <ul class="feature-list">
+        <li>✅ Akses penuh ke keseluruhan modul NEXT eVideo 26</li>
+        <li>✅ Akses tanpa had masa (permanent access)</li>
+        <li>✅ Tiada keperluan deposit atau pendaftaran broker</li>
+        <li>✅ Tiada pembaharuan berkala — bayar sekali sahaja untuk akses selamanya</li>
+      </ul>
+      <p>Sila ikut Langkah Pembayaran dibawah untuk meneruskan</p>
+
+      <div class="tabs">
+        <button id="tabLangkah" type="button" class="tab-btn">Langkah Pembayaran</button>
+        <button id="tabPengesahan" type="button" class="tab-btn">Pengesahan Pembayaran</button>
+      </div>
+
+      <div id="tabPanels" class="tab-panels">
+        <div id="panelLangkah" class="tab-panel">
+          <p>Untuk mendapatkan akses penuh dan kekal ke NEXT eVideo 26, sila lakukan pembayaran sebanyak RM350 melalui kaedah QR Code yang disediakan di bawah.</p>
+          <p>Sila pastikan:</p>
+          <ul class="feature-list">
+            <li>📌 Jumlah pembayaran adalah tepat: RM350</li>
+            <li>📌 Rujukan pembayaran (jika ada) diisi dengan nama atau ID yang didaftarkan</li>
+            <li>📌 Simpan bukti pembayaran sehingga akses disahkan</li>
+          </ul>
+          <p>Akses akan diaktifkan selepas pembayaran disemak dan disahkan oleh pihak kami. Proses pengesahan biasanya mengambil masa yang singkat bergantung kepada waktu operasi.</p>
+          <p>Selepas membuat pembayaran, sila tekan butang Pengesahan Pembayaran untuk memaklumkan bahawa transaksi telah dilakukan dan membolehkan kami meneruskan semakan.</p>
+
+          <div class="payment-images">
+            <div class="payment-item">
+              <img src="maybank.jpg" alt="Maybank QR" />
+              <p class="payment-label">Maybank</p>
+            </div>
+            <div class="payment-item">
+              <img src="tng.jpg" alt="TouchNGo Ewallet QR" />
+              <p class="payment-label">TouchNGo Ewallet</p>
+            </div>
+          </div>
+
+          <button id="buyBtn" class="buy-btn" type="button">Teruskan</button>
+          <button id="goPengesahanBtn" class="secondary-btn" type="button">Pergi ke Pengesahan Pembayaran</button>
+        </div>
+        <div id="panelPengesahan" class="tab-panel">
+          <p>Sila isi maklumat pengesahan pembayaran anda:</p>
+          <div class="form-grid">
+            <div>
+              <label for="fullName" class="field-label">Nama :</label>
+              <input id="fullName" type="text" class="field-input" placeholder="Nama penuh" />
+            </div>
+            <div>
+              <label for="phoneNo" class="field-label">No Telefon :</label>
+              <input id="phoneNo" type="tel" class="field-input" placeholder="Contoh: 0123456789" />
+            </div>
+            <div>
+              <label for="transferTo" class="field-label">Saluran Pembayaran :</label>
+              <select id="transferTo" class="field-input">
+                <option value="">Pilih saluran</option>
+                <option value="maybank">Maybank</option>
+                <option value="tng">TNG</option>
+              </select>
+            </div>
+            <div>
+              <label for="amountPaid" class="field-label">Jumlah Bayaran :</label>
+              <input id="amountPaid" type="number" min="0" step="1" inputmode="numeric" class="field-input" placeholder="Contoh: 350" />
+            </div>
+          </div>
+          <button id="submitBtn" class="buy-btn" type="button">Submit</button>
+        </div>
+      </div>
+      <p id="status" class="status" aria-live="polite"></p>
+
+      <div class="inline-actions">
+        <button id="bottomBackBtn" type="button" class="back-btn">⬅️ Back to Main Menu</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    (function () {
+      var tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+      if (tg) {
+        tg.ready();
+        tg.expand();
+      }
+
+      var statusEl = document.getElementById("status");
+      var topBackBtn = document.getElementById("topBackBtn");
+      var bottomBackBtn = document.getElementById("bottomBackBtn");
+      var buyBtn = document.getElementById("buyBtn");
+      var goPengesahanBtn = document.getElementById("goPengesahanBtn");
+      var submitBtn = document.getElementById("submitBtn");
+      var fullNameEl = document.getElementById("fullName");
+      var phoneNoEl = document.getElementById("phoneNo");
+      var transferToEl = document.getElementById("transferTo");
+      var amountPaidEl = document.getElementById("amountPaid");
+      var tabLangkah = document.getElementById("tabLangkah");
+      var tabPengesahan = document.getElementById("tabPengesahan");
+      var panelLangkah = document.getElementById("panelLangkah");
+      var panelPengesahan = document.getElementById("panelPengesahan");
+      var tabPanels = document.getElementById("tabPanels");
+
+      function backToMainMenu() {
+        var payload = { type: "sidebot_back_to_main_menu" };
+        if (tg) {
+          tg.sendData(JSON.stringify(payload));
+          tg.close();
+          return;
+        }
+        statusEl.textContent = "Preview mode: buka dari Telegram.";
+      }
+
+      topBackBtn.addEventListener("click", backToMainMenu);
+      bottomBackBtn.addEventListener("click", backToMainMenu);
+
+      function activateTab(name) {
+        var isLangkah = name === "langkah";
+        tabLangkah.classList.toggle("active", isLangkah);
+        panelLangkah.classList.toggle("active", isLangkah);
+        tabPengesahan.classList.toggle("active", !isLangkah);
+        panelPengesahan.classList.toggle("active", !isLangkah);
+        tabPanels.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+
+      tabLangkah.addEventListener("click", function () { activateTab("langkah"); });
+      tabPengesahan.addEventListener("click", function () { activateTab("pengesahan"); });
+      goPengesahanBtn.addEventListener("click", function () { activateTab("pengesahan"); });
+
+      buyBtn.addEventListener("click", function () {
+        statusEl.textContent = "Sila buat pembayaran dahulu, kemudian teruskan ke tab Pengesahan Pembayaran.";
+      });
+
+      submitBtn.addEventListener("click", function () {
+        var fullName = (fullNameEl.value || "").trim();
+        var phoneNo = (phoneNoEl.value || "").trim();
+        var transferTo = (transferToEl.value || "").trim();
+        var amountPaid = (amountPaidEl.value || "").trim();
+        if (!fullName || !phoneNo || !transferTo || !amountPaid) {
+          statusEl.textContent = "Sila lengkapkan semua maklumat pengesahan pembayaran.";
+          return;
+        }
+        if (!/^\d+$/.test(amountPaid)) {
+          statusEl.textContent = "Jumlah Bayaran mesti nombor sahaja.";
+          return;
+        }
+
+        var payload = {
+          type: "sidebot_onetime_payment_submit",
+          full_name: fullName,
+          phone_number: phoneNo,
+          transfer_to: transferTo,
+          amount_paid: amountPaid
+        };
+
+        if (tg) {
+          tg.sendData(JSON.stringify(payload));
+          statusEl.textContent = "Maklumat pengesahan pembayaran dihantar.";
+          return;
+        }
+        statusEl.textContent = "Preview mode: borang pengesahan lengkap.";
+      });
+    })();
+  </script>
+</body>
+</html>
