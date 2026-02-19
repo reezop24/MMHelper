@@ -212,8 +212,16 @@
   var topBackBtn = document.getElementById("topBackBtn");
   var bottomBackBtn = document.getElementById("bottomBackBtn");
   var basicTopicList = document.getElementById("basicTopicList");
+  var evideoCard = document.getElementById("evideoCard");
 
   function activate(index) {
+    var levelClass = "level-basic";
+    if (index === 1) levelClass = "level-intermediate";
+    if (index === 2) levelClass = "level-advanced";
+    if (evideoCard) {
+      evideoCard.classList.remove("level-basic", "level-intermediate", "level-advanced");
+      evideoCard.classList.add(levelClass);
+    }
     tabs.forEach(function (t, i) {
       var active = i === index;
       t.btn.classList.toggle("active", active);
@@ -316,5 +324,5 @@
   }
 
   renderBasicTopics();
+  activate(0);
 })();
-

@@ -45,6 +45,18 @@
       color: #fff;
     }
 
+    .level-intermediate .tab-btn.active {
+      border-color: #facc15;
+      background: linear-gradient(90deg, #ca8a04 0%, #facc15 100%);
+      color: #261700;
+    }
+
+    .level-advanced .tab-btn.active {
+      border-color: #34d399;
+      background: linear-gradient(90deg, #15803d 0%, #34d399 100%);
+      color: #03210f;
+    }
+
     .panel {
       display: none;
     }
@@ -130,6 +142,42 @@
       filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.35));
       pointer-events: none;
     }
+
+    #panelIntermediate .topic-card {
+      border-color: #916d14;
+      background: rgba(43, 33, 12, 0.55);
+    }
+
+    #panelIntermediate .topic-title {
+      border-color: #9f7d22;
+      border-left-color: #facc15;
+      background: rgba(83, 65, 18, 0.86);
+      color: #fff7d6;
+    }
+
+    #panelIntermediate .topic-select-btn {
+      border-color: #facc15;
+      background: linear-gradient(90deg, #a16207 0%, #facc15 100%);
+      color: #2a1600;
+    }
+
+    #panelAdvanced .topic-card {
+      border-color: #1f6c43;
+      background: rgba(14, 34, 23, 0.6);
+    }
+
+    #panelAdvanced .topic-title {
+      border-color: #2f7b53;
+      border-left-color: #34d399;
+      background: rgba(17, 63, 40, 0.86);
+      color: #ddffe9;
+    }
+
+    #panelAdvanced .topic-select-btn {
+      border-color: #34d399;
+      background: linear-gradient(90deg, #166534 0%, #34d399 100%);
+      color: #03210f;
+    }
   </style>
 </head>
 <body>
@@ -144,7 +192,7 @@
       <p>Full silibus ikut level pembelajaran.</p>
     </header>
 
-    <section class="card">
+    <section id="evideoCard" class="card level-basic">
       <div class="brand-strip">
         <img src="nextexc.png" alt="NEXTexclusive" />
       </div>

@@ -1,7 +1,7 @@
 :root {
-  --bg: #090607;
-  --panel: #161012;
-  --panel-soft: #261418;
+  --bg: #040304;
+  --panel: #120d0f;
+  --panel-soft: #1b1114;
   --text: #f3f4f6;
   --muted: #d1b8bf;
   --accent-main: #c62828;
@@ -18,9 +18,9 @@ body {
   margin: 0;
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   background:
-    radial-gradient(circle at 82% 12%, rgba(153, 27, 27, 0.25) 0%, rgba(153, 27, 27, 0) 42%),
-    radial-gradient(circle at 18% 26%, rgba(127, 29, 29, 0.2) 0%, rgba(127, 29, 29, 0) 38%),
-    linear-gradient(180deg, #070405 0%, #0a0607 52%, var(--bg) 100%);
+    radial-gradient(circle at 82% 12%, rgba(120, 20, 20, 0.22) 0%, rgba(120, 20, 20, 0) 40%),
+    radial-gradient(circle at 18% 26%, rgba(90, 16, 16, 0.16) 0%, rgba(90, 16, 16, 0) 36%),
+    linear-gradient(180deg, #020202 0%, #040304 52%, var(--bg) 100%);
   color: var(--text);
 }
 

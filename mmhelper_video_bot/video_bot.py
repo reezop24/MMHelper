@@ -105,9 +105,14 @@ def level_menu_keyboard() -> ReplyKeyboardMarkup:
 
 
 def topic_navigation_keyboard() -> ReplyKeyboardMarkup:
+    evideo_url = get_evideo_webapp_url()
+    if evideo_url:
+        pick_button = KeyboardButton(MENU_TOPIC_PICK, web_app=WebAppInfo(url=evideo_url))
+    else:
+        pick_button = KeyboardButton(MENU_TOPIC_PICK)
     rows = [
         [KeyboardButton(MENU_TOPIC_PREV), KeyboardButton(MENU_TOPIC_NEXT)],
-        [KeyboardButton(MENU_TOPIC_PICK)],
+        [pick_button],
         [KeyboardButton(MENU_TOPIC_MAIN)],
     ]
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
@@ -274,9 +279,21 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         await message.reply_text(MAIN_MENU_TEXT, reply_markup=main_menu_keyboard())
         return
     if text == MENU_TOPIC_PICK:
+        if not bool(context.user_data.get("topic_session_active")):
+            await message.reply_text(
+                "Sila buka miniapp eVideo dulu dan pilih topik.",
+                reply_markup=main_menu_keyboard(),
+            )
+            return
         await message.reply_text(EVIDEO_MENU_TEXT, reply_markup=level_menu_keyboard())
         return
     if text in {MENU_TOPIC_PREV, MENU_TOPIC_NEXT}:
+        if not bool(context.user_data.get("topic_session_active")):
+            await message.reply_text(
+                "Sila pilih topik melalui miniapp terlebih dahulu.",
+                reply_markup=main_menu_keyboard(),
+            )
+            return
         level = str(context.user_data.get("last_topic_level") or "basic")
         current_topic = int(context.user_data.get("last_topic_no") or 0)
         if current_topic <= 0:
@@ -360,6 +377,7 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if not level or topic_no <= 0:
             await message.reply_text("Pilihan topik tak sah.", reply_markup=main_menu_keyboard())
             return
+        context.user_data["topic_session_active"] = True
         await _send_topic_video(context, message.chat_id, level, topic_no)
         return
 
