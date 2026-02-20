@@ -20,6 +20,12 @@
   var resultInputCard = document.getElementById("resultInputCard");
   var resultBalanceCard = document.getElementById("resultBalanceCard");
   var resultBalanceRecommendationCard = document.getElementById("resultBalanceRecommendationCard");
+  var entryPriceInput = document.getElementById("entryPrice");
+  var liveFeedStatusEl = document.getElementById("liveFeedStatus");
+  var liveFeedPriceEl = document.getElementById("liveFeedPrice");
+  var liveFeedSymbolEl = document.getElementById("liveFeedSymbol");
+  var liveFeedTsEl = document.getElementById("liveFeedTs");
+  var liveTickEndpoint = params.get("live_tick_url") || "live-tick.json";
 
   function n(id) {
     return Number((document.getElementById(id).value || "").trim());
@@ -27,6 +33,46 @@
 
   function f2(v) {
     return Number(v || 0).toFixed(2);
+  }
+
+  function updateLiveFeedUi(payload) {
+    var symbol = String(payload.symbol || "XAU/USD");
+    var price = Number(payload.price);
+    var ts = String(payload.ts || "");
+    var dt = ts ? new Date(ts) : null;
+    var hasValidTime = dt && !Number.isNaN(dt.getTime());
+    var agoSec = hasValidTime ? Math.max(0, Math.round((Date.now() - dt.getTime()) / 1000)) : null;
+    var isFresh = agoSec !== null && agoSec <= 90;
+
+    liveFeedSymbolEl.textContent = symbol;
+    liveFeedPriceEl.textContent = Number.isFinite(price) ? f2(price) : "--";
+    if (Number.isFinite(price)) {
+      entryPriceInput.value = f2(price);
+    }
+    liveFeedTsEl.textContent = hasValidTime ? dt.toLocaleString() : "--";
+    liveFeedStatusEl.textContent = isFresh ? "🔴 LIVE" : "🟠 STALE";
+    liveFeedStatusEl.style.color = isFresh ? "#ff6b6b" : "#ffd37a";
+  }
+
+  function setLiveFeedError(statusText) {
+    liveFeedStatusEl.textContent = "⚫ " + statusText;
+    liveFeedStatusEl.style.color = "#ff8f8f";
+  }
+
+  async function pollLiveFeed() {
+    try {
+      var response = await fetch(liveTickEndpoint + "?t=" + Date.now(), { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error("http_" + response.status);
+      }
+      var payload = await response.json();
+      if (!payload || typeof payload !== "object") {
+        throw new Error("invalid_payload");
+      }
+      updateLiveFeedUi(payload);
+    } catch (err) {
+      setLiveFeedError("OFFLINE");
+    }
   }
 
   function floorToStep(value, step) {
@@ -256,4 +302,7 @@
     updateLiveRecommendation(0, riskPct);
     statusEl.textContent = "Kiraan tab input siap. Tab current balance perlukan data balance user aktif.";
   });
+
+  pollLiveFeed();
+  window.setInterval(pollLiveFeed, 3000);
 })();

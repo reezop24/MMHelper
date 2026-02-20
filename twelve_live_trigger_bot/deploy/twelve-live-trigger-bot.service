@@ -1,0 +1,16 @@
+[Unit]
+Description=Twelve Live Trigger Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/mmhelper/twelve_live_trigger_bot
+ExecStart=/root/mmhelper/twelve_live_trigger_bot/.venv/bin/python /root/mmhelper/twelve_live_trigger_bot/server.py
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

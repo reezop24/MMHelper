@@ -92,6 +92,42 @@
       margin-top: 14px;
     }
 
+    .live-feed-card {
+      margin-top: 12px;
+      border: 1px solid rgba(95, 145, 215, 0.45);
+      border-radius: 12px;
+      background: rgba(8, 26, 55, 0.78);
+      padding: 12px;
+    }
+
+    .live-feed-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .live-feed-status {
+      font-size: 12px;
+      font-weight: 700;
+      color: #b9d2ff;
+    }
+
+    .live-feed-price {
+      margin: 0;
+      color: #7ee0ff;
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: 0.2px;
+    }
+
+    .live-feed-meta {
+      margin: 4px 0 0;
+      color: #d8e6ff;
+      font-size: 12px;
+    }
+
     .ghost-btn {
       margin: 0;
       width: auto;
@@ -137,6 +173,16 @@
       <h1>Risk Calculator</h1>
       <p>Kiraan awal untuk XAUUSD sahaja.</p>
     </header>
+
+    <section class="live-feed-card">
+      <div class="live-feed-head">
+        <p class="result-title"><strong>Live Feed XAUUSD</strong></p>
+        <span id="liveFeedStatus" class="live-feed-status">Loading...</span>
+      </div>
+      <p class="live-feed-price">USD <span id="liveFeedPrice">--</span></p>
+      <p class="live-feed-meta">Symbol: <strong id="liveFeedSymbol">XAU/USD</strong></p>
+      <p class="live-feed-meta">Last update (local): <strong id="liveFeedTs">--</strong></p>
+    </section>
 
     <form id="riskForm" class="card">
       <div class="field">

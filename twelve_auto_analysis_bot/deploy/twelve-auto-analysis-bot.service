@@ -1,0 +1,16 @@
+[Unit]
+Description=Twelve Auto Analysis Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/mmhelper/twelve_auto_analysis_bot
+ExecStart=/usr/bin/python3 /root/mmhelper/twelve_auto_analysis_bot/server.py
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
