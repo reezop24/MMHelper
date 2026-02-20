@@ -27,7 +27,13 @@ def get_risk_calculator_webapp_url(
     grow_target_usd: float | None = None,
 ) -> str:
     page = f"{_miniapp_base_url()}/risk-calculator.html"
-    if current_balance_usd is None and target_days is None and grow_target_usd is None:
+    live_tick_url = (os.getenv("MMHELPER_LIVE_TICK_URL") or "").strip()
+    if (
+        current_balance_usd is None
+        and target_days is None
+        and grow_target_usd is None
+        and not live_tick_url
+    ):
         return page
     query_data: dict[str, str] = {}
     if current_balance_usd is not None:
@@ -36,6 +42,8 @@ def get_risk_calculator_webapp_url(
         query_data["target_days"] = str(max(0, int(target_days)))
     if grow_target_usd is not None:
         query_data["grow_target_usd"] = f"{float(grow_target_usd):.2f}"
+    if live_tick_url:
+        query_data["live_tick_url"] = live_tick_url
     query = urlencode(query_data)
     return f"{page}?{query}"
 
