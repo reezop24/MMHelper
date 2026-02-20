@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DBO Viewer</title>
+  <link rel="stylesheet" href="global.css" />
+  <style>
+    .card { margin-bottom: 12px; }
+    .row { display: flex; gap: 8px; align-items: center; }
+    select, button.ctrl {
+      border: 1px solid var(--border-input);
+      background: #06142f;
+      color: var(--text);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+    button.ctrl { width: auto; margin-top: 0; }
+    #chartWrap { border: 1px solid rgba(95,145,215,.45); border-radius: 12px; padding: 8px; background: rgba(8,26,55,.78); }
+    #chart { width: 100%; height: 420px; display: block; }
+    #summary { margin: 10px 2px 0; color: #d8e6ff; font-size: 13px; white-space: pre-line; }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="top-nav">
+      <button id="topBackBtn" type="button" class="top-back-btn">← Back</button>
+    </div>
+    <header class="hero">
+      <img class="logo" src="logo.png" alt="MM HELPER Logo" />
+      <h1>DBO Viewer</h1>
+      <p>Pilih timeframe dan semak marker HNS/QM.</p>
+    </header>
+
+    <section class="card">
+      <div class="row">
+        <select id="tf">
+          <option value="m5">M5</option>
+          <option value="m15">M15</option>
+          <option value="m30">M30</option>
+          <option value="h1">H1</option>
+          <option value="h4">H4</option>
+        </select>
+        <button id="reloadBtn" class="ctrl" type="button">Refresh</button>
+      </div>
+    </section>
+
+    <section id="chartWrap">
+      <canvas id="chart"></canvas>
+      <p id="summary">Loading...</p>
+    </section>
+  </main>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="dbo-viewer.js"></script>
+</body>
+</html>

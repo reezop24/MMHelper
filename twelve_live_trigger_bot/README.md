@@ -48,3 +48,12 @@ Contoh:
 ## Output
 - DB tick: `/root/mmhelper/db/twelve_live_trigger_bot/live_ticks.db`
 - Trigger events: `/root/mmhelper/db/twelve_live_trigger_bot/trigger_events.jsonl`
+
+## HTTP API
+Bot juga expose endpoint HTTP (default localhost):
+- `GET /healthz`
+- `GET /live-tick.json`
+
+Env:
+- `LIVE_API_HOST` (default `127.0.0.1`)
+- `LIVE_API_PORT` (default `8091`)

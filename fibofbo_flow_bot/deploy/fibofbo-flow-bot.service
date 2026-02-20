@@ -1,0 +1,16 @@
+[Unit]
+Description=FiboFBO Flow Telegram Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/mmhelper/fibofbo_flow_bot
+ExecStart=/root/mmhelper/fibofbo_flow_bot/run_fibofbo_flow_bot.sh
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

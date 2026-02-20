@@ -10,11 +10,15 @@ import json
 import logging
 import os
 import sqlite3
+import threading
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from http import HTTPStatus
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 from websocket import WebSocketApp  # type: ignore[import-untyped]
 
@@ -34,6 +38,9 @@ class Config:
     zones_file: Path
     events_file: Path
     public_tick_file: Path
+    live_candles_db: Path
+    api_host: str
+    api_port: int
     cooldown_sec: int
 
 
@@ -76,6 +83,7 @@ def load_config() -> Config:
     zones_file = Path(get_env("LIVE_ZONES_FILE", str(state_dir / "zones.json"))).resolve()
     events_file = Path(get_env("LIVE_EVENTS_FILE", str(state_dir / "trigger_events.jsonl"))).resolve()
     public_tick_file = Path(get_env("LIVE_PUBLIC_TICK_FILE", "/root/mmhelper/miniapp/live-tick.json")).resolve()
+    live_candles_db = Path(get_env("LIVE_CANDLES_DB", "/root/mmhelper/db/twelve_data_bot/candles.db")).resolve()
 
     return Config(
         api_key=api_key,
@@ -88,6 +96,9 @@ def load_config() -> Config:
         zones_file=zones_file,
         events_file=events_file,
         public_tick_file=public_tick_file,
+        live_candles_db=live_candles_db,
+        api_host=get_env("LIVE_API_HOST", "127.0.0.1"),
+        api_port=int(get_env("LIVE_API_PORT", "8091")),
         cooldown_sec=int(get_env("LIVE_TRIGGER_COOLDOWN_SEC", "60")),
     )
 
@@ -286,12 +297,129 @@ def extract_price_symbol(payload: dict[str, Any]) -> tuple[str | None, float | N
     return symbol, price
 
 
+def load_tf_candles(db_path: Path, timeframe: str, limit: int) -> list[dict[str, Any]]:
+    con = sqlite3.connect(db_path)
+    try:
+        rows = con.execute(
+            """
+            SELECT ts, open, high, low, close
+            FROM candles
+            WHERE timeframe = ?
+            ORDER BY ts DESC
+            LIMIT ?
+            """,
+            (timeframe, limit),
+        ).fetchall()
+    finally:
+        con.close()
+
+    rows.reverse()
+    out: list[dict[str, Any]] = []
+    for idx, (ts, o, h, l, c) in enumerate(rows):
+        out.append(
+            {
+                "idx": idx,
+                "ts": str(ts),
+                "open": float(o),
+                "high": float(h),
+                "low": float(l),
+                "close": float(c),
+            }
+        )
+    return out
+
+
+def find_pivots(candles: list[dict[str, Any]], swing_window: int = 2) -> list[dict[str, Any]]:
+    if len(candles) < (swing_window * 2 + 1):
+        return []
+
+    pivots: list[dict[str, Any]] = []
+    for i in range(swing_window, len(candles) - swing_window):
+        center = candles[i]
+        chunk = candles[i - swing_window : i + swing_window + 1]
+        highs = [x["high"] for x in chunk]
+        lows = [x["low"] for x in chunk]
+
+        if center["high"] == max(highs):
+            pivots.append({"idx": i, "ts": center["ts"], "kind": "H", "price": center["high"]})
+        if center["low"] == min(lows):
+            pivots.append({"idx": i, "ts": center["ts"], "kind": "L", "price": center["low"]})
+
+    if not pivots:
+        return []
+
+    pivots.sort(key=lambda x: int(x["idx"]))
+    compressed = [pivots[0]]
+    for p in pivots[1:]:
+        last = compressed[-1]
+        if p["kind"] != last["kind"]:
+            compressed.append(p)
+            continue
+        if p["kind"] == "H" and float(p["price"]) > float(last["price"]):
+            compressed[-1] = p
+        if p["kind"] == "L" and float(p["price"]) < float(last["price"]):
+            compressed[-1] = p
+    return compressed
+
+
+def detect_dbo(candles: list[dict[str, Any]], pivots: list[dict[str, Any]], tol_pct: float = 0.003) -> dict[str, Any]:
+    if not candles or len(pivots) < 5:
+        return {"status": "NO_SETUP"}
+
+    latest_close = float(candles[-1]["close"])
+    best: dict[str, Any] | None = None
+    for i in range(4, len(pivots)):
+        seq = pivots[i - 4 : i + 1]
+        kinds = "".join(str(x["kind"]) for x in seq)
+
+        if kinds == "LHLHL":
+            ls, _, head, right_high, rs = seq
+            if not (float(head["price"]) < float(ls["price"]) and float(head["price"]) < float(rs["price"])):
+                continue
+            near_equal = abs(float(rs["price"]) - float(ls["price"])) / max(float(ls["price"]), 1e-9) <= tol_pct
+            qm_shape = float(rs["price"]) > float(ls["price"]) * (1 + tol_pct)
+            if not (near_equal or qm_shape):
+                continue
+            trigger_level = float(right_high["price"])
+            triggered = latest_close > trigger_level
+            best = {
+                "status": "TRIGGERED" if triggered else "ARMED",
+                "side": "BUY",
+                "pattern": "INV_HNS" if near_equal else "QM_BULL",
+                "trigger_level": trigger_level,
+                "latest_close": latest_close,
+                "points": {"left_shoulder": ls, "head": head, "right_shoulder": rs},
+            }
+
+        if kinds == "HLHLH":
+            ls, _, head, right_low, rs = seq
+            if not (float(head["price"]) > float(ls["price"]) and float(head["price"]) > float(rs["price"])):
+                continue
+            near_equal = abs(float(rs["price"]) - float(ls["price"])) / max(float(ls["price"]), 1e-9) <= tol_pct
+            qm_shape = float(rs["price"]) < float(ls["price"]) * (1 - tol_pct)
+            if not (near_equal or qm_shape):
+                continue
+            trigger_level = float(right_low["price"])
+            triggered = latest_close < trigger_level
+            best = {
+                "status": "TRIGGERED" if triggered else "ARMED",
+                "side": "SELL",
+                "pattern": "HNS" if near_equal else "QM_BEAR",
+                "trigger_level": trigger_level,
+                "latest_close": latest_close,
+                "points": {"left_shoulder": ls, "head": head, "right_shoulder": rs},
+            }
+
+    return best or {"status": "NO_SETUP"}
+
+
 class LiveBot:
     def __init__(self, cfg: Config):
         self.cfg = cfg
         self.store = Storage(cfg)
         self.zone_engine = ZoneEngine(cfg, self.store)
         self.ws: WebSocketApp | None = None
+        self._api_server: ThreadingHTTPServer | None = None
 
     def _ws_url(self) -> str:
         return f"wss://ws.twelvedata.com/v1/quotes/price?apikey={self.cfg.api_key}"
@@ -344,7 +472,95 @@ class LiveBot:
     def on_close(self, ws: WebSocketApp, status_code: int, msg: str) -> None:  # noqa: ARG002
         LOGGER.warning("WebSocket closed code=%s msg=%s", status_code, msg)
 
+    def _start_api_server(self) -> None:
+        cfg = self.cfg
+        store = self.store
+
+        class Handler(BaseHTTPRequestHandler):
+            def _send_json(self, status: HTTPStatus, payload: dict[str, Any]) -> None:
+                body = json.dumps(payload, ensure_ascii=True).encode("utf-8")
+                self.send_response(int(status))
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+                self.send_header("Access-Control-Allow-Headers", "Content-Type")
+                self.end_headers()
+                self.wfile.write(body)
+
+            def do_OPTIONS(self) -> None:  # noqa: N802
+                self.send_response(204)
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+                self.send_header("Access-Control-Allow-Headers", "Content-Type")
+                self.end_headers()
+
+            def do_GET(self) -> None:  # noqa: N802
+                parsed = urlparse(self.path)
+                path = parsed.path
+
+                if path == "/healthz":
+                    self._send_json(HTTPStatus.OK, {"ok": True})
+                    return
+
+                if path == "/live-tick.json":
+                    try:
+                        payload = json.loads(store.cfg.public_tick_file.read_text(encoding="utf-8"))
+                        if not isinstance(payload, dict):
+                            raise ValueError("invalid tick payload")
+                        self._send_json(HTTPStatus.OK, payload)
+                        return
+                    except Exception as exc:  # noqa: BLE001
+                        self._send_json(
+                            HTTPStatus.SERVICE_UNAVAILABLE,
+                            {"ok": False, "error": "tick_unavailable", "detail": str(exc)},
+                        )
+                        return
+
+                if path == "/dbo-preview":
+                    if not cfg.live_candles_db.exists():
+                        self._send_json(
+                            HTTPStatus.SERVICE_UNAVAILABLE,
+                            {"ok": False, "error": "candles_db_missing"},
+                        )
+                        return
+                    query = parse_qs(parsed.query)
+                    tf = str((query.get("tf") or ["m5"])[0]).strip().lower()
+                    if tf not in {"m5", "m15", "m30", "h1", "h4"}:
+                        self._send_json(HTTPStatus.BAD_REQUEST, {"ok": False, "error": "invalid_tf"})
+                        return
+                    try:
+                        limit = int((query.get("limit") or ["400"])[0])
+                    except ValueError:
+                        limit = 400
+                    limit = max(80, min(limit, 1200))
+                    candles = load_tf_candles(cfg.live_candles_db, tf, limit)
+                    pivots = find_pivots(candles, swing_window=2)
+                    setup = detect_dbo(candles, pivots)
+                    self._send_json(
+                        HTTPStatus.OK,
+                        {
+                            "ok": True,
+                            "timeframe": tf,
+                            "candles": candles,
+                            "setup": setup,
+                        },
+                    )
+                    return
+
+                self._send_json(HTTPStatus.NOT_FOUND, {"ok": False, "error": "not_found"})
+
+            def log_message(self, format: str, *args: Any) -> None:  # noqa: A003
+                LOGGER.debug("api %s - %s", self.address_string(), format % args)
+
+        server = ThreadingHTTPServer((cfg.api_host, cfg.api_port), Handler)
+        self._api_server = server
+        thread = threading.Thread(target=server.serve_forever, name="live_api_server", daemon=True)
+        thread.start()
+        LOGGER.info("HTTP API started at http://%s:%s", cfg.api_host, cfg.api_port)
+
     def run_forever(self) -> None:
+        self._start_api_server()
         while True:
             try:
                 self.ws = WebSocketApp(
