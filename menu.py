@@ -15,7 +15,7 @@ MAIN_MENU_BUTTON_MM_SETTING = "⚙️ MM Helper Setting"
 MAIN_MENU_BUTTON_RISK = "🧮 Risk Calculator"
 MAIN_MENU_BUTTON_PROJECT_GROW = "📈 Project Grow"
 MAIN_MENU_BUTTON_STATISTIC = "📊 Records & Reports"
-MAIN_MENU_BUTTON_EXTRA = "🧰 Extra"
+MAIN_MENU_BUTTON_EXTRA = "🧰 Trading Tools"
 MAIN_MENU_BUTTON_ADMIN_PANEL = "🛡️ Admin Panel"
 MAIN_MENU_BUTTON_ACTIVITY_HUB = "🧭 Activity Hub"
 MAIN_MENU_BUTTON_VIDEO_TUTORIAL = "🎬 Video Tutorial (coming soon)"
@@ -48,6 +48,10 @@ SUBMENU_EXTRA_BUTTON_FIBO_EXTENSION = "📐 Fibo Extension"
 SUBMENU_EXTRA_BUTTON_SCALPING_STRATEGY = "⚡ Scalping Strategy (coming soon)"
 SUBMENU_EXTRA_BUTTON_TRADING_ADVICE = "💡 Trading Advice (coming soon)"
 SUBMENU_EXTRA_BUTTON_EDUCATION_VIDEO = "🎓 Education Video (coming soon)"
+SUBMENU_FIBO_PROFILE = "🧩 Profile"
+SUBMENU_FIBO_MARKET_INSIGHT = "📈 Market Insight (Fibo Extension)"
+SUBMENU_FIBO_RESET_ALL = "🗑️ Reset All Profile"
+SUBMENU_FIBO_BACK_TOOLS = "⬅️ Back to Trading Tools"
 
 def is_admin_user(user_id: int | None) -> bool:
     return user_id in ADMIN_USER_IDS
@@ -256,25 +260,35 @@ def records_reports_keyboard(account_summary_url: str, transaction_history_url: 
 
 
 def extra_keyboard(user_id: int | None = None) -> ReplyKeyboardMarkup:
-    fibo_extension_url = get_fibo_extension_webapp_url(
-        user_id=user_id,
-        is_superuser=is_admin_user(user_id),
-    )
-    fibo_extension_button: KeyboardButton | str
-    if fibo_extension_url:
-        fibo_extension_button = KeyboardButton(
-            SUBMENU_EXTRA_BUTTON_FIBO_EXTENSION,
-            web_app=WebAppInfo(url=fibo_extension_url),
-        )
-    else:
-        fibo_extension_button = SUBMENU_EXTRA_BUTTON_FIBO_EXTENSION
-
     rows = [
         [SUBMENU_EXTRA_BUTTON_FIBO_DEWA],
-        [fibo_extension_button],
+        [SUBMENU_EXTRA_BUTTON_FIBO_EXTENSION],
         [SUBMENU_EXTRA_BUTTON_SCALPING_STRATEGY],
         [SUBMENU_EXTRA_BUTTON_TRADING_ADVICE],
         [SUBMENU_EXTRA_BUTTON_EDUCATION_VIDEO],
         [SUBMENU_MM_BUTTON_BACK_MAIN],
+    ]
+    return ReplyKeyboardMarkup(rows, resize_keyboard=True)
+
+
+def fibo_extension_keyboard(user_id: int | None = None) -> ReplyKeyboardMarkup:
+    fibo_extension_url = get_fibo_extension_webapp_url(
+        user_id=user_id,
+        is_superuser=is_admin_user(user_id),
+    )
+    profile_button: KeyboardButton | str
+    if fibo_extension_url:
+        profile_button = KeyboardButton(
+            SUBMENU_FIBO_PROFILE,
+            web_app=WebAppInfo(url=fibo_extension_url),
+        )
+    else:
+        profile_button = SUBMENU_FIBO_PROFILE
+
+    rows = [
+        [profile_button],
+        [SUBMENU_FIBO_MARKET_INSIGHT],
+        [SUBMENU_FIBO_RESET_ALL],
+        [SUBMENU_FIBO_BACK_TOOLS],
     ]
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)

@@ -76,7 +76,7 @@ STATISTIC_OPENED_TEXT = "Records & Reports _dibuka_."
 TRANSACTION_HISTORY_OPENED_TEXT = "Transaction History _dibuka_."
 WEEKLY_REPORTS_OPENED_TEXT = "Weekly Reports sedang disiapkan."
 MONTHLY_REPORTS_OPENED_TEXT = "Monthly Reports sedang disiapkan."
-EXTRA_OPENED_TEXT = "Extra _dibuka_."
+EXTRA_OPENED_TEXT = "Trading Tools _dibuka_."
 
 DEPOSIT_ACTIVITY_SAVED_TEXT = "Update Deposit Activitiy _dikemas kini_."
 WITHDRAWAL_ACTIVITY_SAVED_TEXT = "Update Withdrawal Activity _dikemas kini_."

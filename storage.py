@@ -3037,6 +3037,19 @@ def save_fibo_extension_profiles(user_id: int, payload: Any) -> bool:
         return False
 
 
+def reset_fibo_extension_profiles(user_id: int) -> bool:
+    try:
+        with _connect_shared_db() as conn:
+            _ensure_fibo_profiles_table(conn)
+            conn.execute(
+                f"DELETE FROM {MMHELPER_FIBO_PROFILES_TABLE} WHERE user_id = ?",
+                (str(int(user_id)),),
+            )
+        return True
+    except sqlite3.Error:
+        return False
+
+
 def has_fibo_next_profile_access(user_id: int) -> bool:
     try:
         with _connect_shared_db() as conn:

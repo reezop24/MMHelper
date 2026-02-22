@@ -107,6 +107,20 @@
       content: " •";
       color: #8cf0bc;
     }
+    .profile-tab-btn.empty::after {
+      content: " •";
+      color: #ff7f7f;
+    }
+    .profile-back-btn {
+      border: 1px solid #4f6f98;
+      background: #10294f;
+      color: #e6f0ff;
+      border-radius: 9px;
+      padding: 7px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
     .profile-status {
       font-size: 12px;
       color: #9ab8e6;
@@ -288,6 +302,7 @@
             <span>member only</span>
           </span>
         </button>
+        <button id="bottomBackBtn" type="button" class="profile-back-btn">Back</button>
       </div>
     </section>
 

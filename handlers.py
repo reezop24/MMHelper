@@ -25,6 +25,10 @@ from menu import (
     SUBMENU_EXTRA_BUTTON_FIBO_EXTENSION,
     SUBMENU_EXTRA_BUTTON_SCALPING_STRATEGY,
     SUBMENU_EXTRA_BUTTON_TRADING_ADVICE,
+    SUBMENU_FIBO_BACK_TOOLS,
+    SUBMENU_FIBO_MARKET_INSIGHT,
+    SUBMENU_FIBO_RESET_ALL,
+    SUBMENU_FIBO_PROFILE,
     SUBMENU_MM_BUTTON_BACK_MAIN,
     SUBMENU_MM_BUTTON_CORRECTION,
     SUBMENU_MM_BUTTON_SYSTEM_INFO,
@@ -39,6 +43,7 @@ from menu import (
     SUBMENU_STAT_BUTTON_WEEKLY_REPORTS,
     admin_panel_keyboard,
     extra_keyboard,
+    fibo_extension_keyboard,
     is_admin_user,
     main_menu_keyboard,
     mm_helper_setting_keyboard,
@@ -90,6 +95,7 @@ from storage import (
     is_project_grow_goal_reached,
     current_user_date,
     get_beta_date_override,
+    reset_fibo_extension_profiles,
     load_core_db,
     reset_all_data,
     stop_all_notification_settings,
@@ -119,6 +125,7 @@ BETA_RESET_PASSWORD = "202210"
 BETA_RESET_CB_BEGIN = "BETA_RESET_BEGIN"
 BETA_RESET_CB_CANCEL = "BETA_RESET_CANCEL"
 BETA_RESET_CB_CONFIRM = "BETA_RESET_CONFIRM"
+FIBO_RESET_ALL_CONFIRM_KEY = "fibo_reset_all_confirm_pending"
 
 
 def _pdf_escape(text: str) -> str:
@@ -1276,6 +1283,76 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
             EXTRA_OPENED_TEXT,
             reply_markup=extra_keyboard(user.id),
             parse_mode="Markdown",
+        )
+        return
+
+    if text == SUBMENU_EXTRA_BUTTON_FIBO_EXTENSION:
+        context.user_data.pop(FIBO_RESET_ALL_CONFIRM_KEY, None)
+        await send_screen(
+            context,
+            message.chat_id,
+            "Fibo Extension tools _dibuka_.",
+            reply_markup=fibo_extension_keyboard(user.id),
+            parse_mode="Markdown",
+        )
+        return
+
+    if text == SUBMENU_FIBO_BACK_TOOLS:
+        context.user_data.pop(FIBO_RESET_ALL_CONFIRM_KEY, None)
+        await send_screen(
+            context,
+            message.chat_id,
+            EXTRA_OPENED_TEXT,
+            reply_markup=extra_keyboard(user.id),
+            parse_mode="Markdown",
+        )
+        return
+
+    if text == SUBMENU_FIBO_MARKET_INSIGHT:
+        await send_screen(
+            context,
+            message.chat_id,
+            "Market Insight (Fibo Extension) akan ditambah seterusnya.",
+            reply_markup=fibo_extension_keyboard(user.id),
+        )
+        return
+
+    if text == SUBMENU_FIBO_PROFILE:
+        await send_screen(
+            context,
+            message.chat_id,
+            "Miniapp profile belum tersedia sekarang. Cuba lagi sekejap lagi.",
+            reply_markup=fibo_extension_keyboard(user.id),
+        )
+        return
+
+    if text == SUBMENU_FIBO_RESET_ALL:
+        pending = bool(context.user_data.get(FIBO_RESET_ALL_CONFIRM_KEY))
+        if not pending:
+            context.user_data[FIBO_RESET_ALL_CONFIRM_KEY] = True
+            await send_screen(
+                context,
+                message.chat_id,
+                "⚠️ Confirm reset semua profile Fibo.\nTekan `Reset All Profile` sekali lagi untuk sahkan.",
+                reply_markup=fibo_extension_keyboard(user.id),
+                parse_mode="Markdown",
+            )
+            return
+        context.user_data.pop(FIBO_RESET_ALL_CONFIRM_KEY, None)
+        ok = reset_fibo_extension_profiles(user.id)
+        if not ok:
+            await send_screen(
+                context,
+                message.chat_id,
+                "❌ Reset profile Fibo gagal. Cuba lagi.",
+                reply_markup=fibo_extension_keyboard(user.id),
+            )
+            return
+        await send_screen(
+            context,
+            message.chat_id,
+            "✅ Semua profile Fibo dah direset.",
+            reply_markup=fibo_extension_keyboard(user.id),
         )
         return
 

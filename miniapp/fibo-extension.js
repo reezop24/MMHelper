@@ -20,6 +20,7 @@
   var profileTabsEl = document.getElementById("profileTabs");
   var profileResetBtn = document.getElementById("profileResetBtn");
   var profileSaveBtn = document.getElementById("profileSaveBtn");
+  var bottomBackBtn = document.getElementById("bottomBackBtn");
   var profileSaveDefaultEl = document.getElementById("profileSaveDefault");
   var profileSaveLockEl = document.getElementById("profileSaveLock");
   var profileStatusEl = document.getElementById("profileStatus");
@@ -161,7 +162,9 @@
       var idx = Number(btn.getAttribute("data-profile") || "0");
       btn.classList.toggle("active", idx === activeProfile);
       var p = state.profiles[String(idx)];
-      btn.classList.toggle("filled", hasProfileData(p));
+      var filled = hasProfileData(p);
+      btn.classList.toggle("filled", filled);
+      btn.classList.toggle("empty", !filled);
     });
     if (activeProfileLabelEl) activeProfileLabelEl.textContent = "#" + String(activeProfile);
     if (profileBadgeEl) {
@@ -826,6 +829,9 @@
   }
 
   backBtn.addEventListener("click", backToMenu);
+  if (bottomBackBtn) {
+    bottomBackBtn.addEventListener("click", backToMenu);
+  }
 
   loadFormState();
   updateTimeInputs();
