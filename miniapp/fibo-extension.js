@@ -19,12 +19,20 @@
   var cTimeEl = document.getElementById("cTime");
   var previewTextEl = document.getElementById("previewText");
   var backBtn = document.getElementById("topBackBtn");
+  var chartInfoEl = document.getElementById("chartInfo");
+  var liveInfoEl = document.getElementById("liveInfo");
+  var crosshairInfoEl = document.getElementById("crosshairInfo");
+  var chartWrapEl = document.getElementById("chartWrap");
+  var chartBoxEl = document.getElementById("chartBox");
 
   var candles = [];
   var latestPrice = null;
   var latestTs = "";
 
   var h4Times = [];
+  var chart = null;
+  var candleSeries = null;
+  var livePriceLine = null;
 
   function f2(v) {
     return Number(v || 0).toFixed(2);
@@ -38,6 +46,170 @@
     if (s.length === 16) return s + ":00";
     if (s.length === 10) return s + " 00:00:00";
     return s;
+  }
+
+  function toChartTime(rawTs) {
+    var d = parseUtcDate(rawTs);
+    if (Number.isNaN(d.getTime())) return 0;
+    return Math.floor(d.getTime() / 1000);
+  }
+
+  function mytTextFromSec(ts) {
+    if (!ts) return "-";
+    var d = new Date(Number(ts) * 1000);
+    var date = d.toLocaleDateString("en-GB", { timeZone: "Asia/Kuala_Lumpur" });
+    var time = d.toLocaleTimeString("en-GB", {
+      timeZone: "Asia/Kuala_Lumpur",
+      hour12: false,
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    return date + " " + time + " MYT";
+  }
+
+  function buildChartData() {
+    return candles
+      .map(function (c) {
+        return {
+          time: toChartTime(c.time || c.ts || ""),
+          open: Number(c.open),
+          high: Number(c.high),
+          low: Number(c.low),
+          close: Number(c.close),
+        };
+      })
+      .filter(function (c) {
+        return c.time > 0 && Number.isFinite(c.open) && Number.isFinite(c.high) && Number.isFinite(c.low) && Number.isFinite(c.close);
+      });
+  }
+
+  function initChart() {
+    if (!window.LightweightCharts || chart) return;
+    chart = window.LightweightCharts.createChart(chartBoxEl, {
+      width: chartWrapEl.clientWidth,
+      height: chartWrapEl.clientHeight,
+      layout: {
+        background: { color: "#0b1220" },
+        textColor: "#9ca3af",
+      },
+      grid: {
+        vertLines: { color: "#1f2937" },
+        horzLines: { color: "#1f2937" },
+      },
+      rightPriceScale: {
+        borderColor: "#1f2937",
+        scaleMargins: { top: 0.05, bottom: 0.05 },
+      },
+      localization: {
+        locale: "en-GB",
+        timeFormatter: function (time) {
+          return mytTextFromSec(typeof time === "number" ? time : 0);
+        },
+      },
+      timeScale: {
+        borderColor: "#1f2937",
+        timeVisible: true,
+        secondsVisible: false,
+        tickMarkFormatter: function (time) {
+          var ts = typeof time === "number" ? time : 0;
+          var d = new Date(ts * 1000);
+          var date = d.toLocaleDateString("en-GB", { timeZone: "Asia/Kuala_Lumpur" });
+          var hhmm = d.toLocaleTimeString("en-GB", {
+            timeZone: "Asia/Kuala_Lumpur",
+            hour12: false,
+            hour: "2-digit",
+            minute: "2-digit",
+          });
+          return date + " " + hhmm;
+        },
+      },
+      crosshair: {
+        mode: window.LightweightCharts.CrosshairMode.Normal,
+      },
+    });
+    candleSeries = chart.addCandlestickSeries({
+      upColor: "#16a34a",
+      downColor: "#dc2626",
+      borderVisible: false,
+      wickUpColor: "#16a34a",
+      wickDownColor: "#dc2626",
+      priceLineVisible: true,
+      lastValueVisible: true,
+    });
+
+    chart.subscribeCrosshairMove(function (param) {
+      if (!param || !param.time || !candleSeries) {
+        crosshairInfoEl.textContent = "Crosshair: -";
+        return;
+      }
+      var c = param.seriesData.get(candleSeries);
+      if (!c) {
+        crosshairInfoEl.textContent = "Crosshair: -";
+        return;
+      }
+      crosshairInfoEl.textContent =
+        "Crosshair: " +
+        mytTextFromSec(param.time) +
+        " | O:" + f2(c.open) +
+        " H:" + f2(c.high) +
+        " L:" + f2(c.low) +
+        " C:" + f2(c.close);
+    });
+
+    window.addEventListener("resize", function () {
+      if (!chart) return;
+      chart.applyOptions({
+        width: chartWrapEl.clientWidth,
+        height: chartWrapEl.clientHeight,
+      });
+    });
+  }
+
+  function updateChart(resetView) {
+    initChart();
+    if (!chart || !candleSeries) return;
+    var data = buildChartData();
+    candleSeries.setData(data);
+    if (resetView) {
+      chart.timeScale().fitContent();
+    }
+    if (data.length) {
+      chartInfoEl.textContent = "Chart " + String(tfEl.value || "").toUpperCase() + " | Candles: " + data.length;
+    } else {
+      chartInfoEl.textContent = "Chart " + String(tfEl.value || "").toUpperCase() + " | Candles: 0";
+    }
+    updateLiveLine();
+  }
+
+  function updateLiveLine() {
+    if (!candleSeries) return;
+    var sourcePrice = Number.isFinite(latestPrice) ? latestPrice : null;
+    var sourceTs = latestTs;
+    if (!Number.isFinite(sourcePrice) && candles.length) {
+      var last = candles[candles.length - 1];
+      sourcePrice = Number(last.close);
+      sourceTs = normalizeTs(last.time || last.ts || "");
+    }
+    if (!Number.isFinite(sourcePrice)) {
+      liveInfoEl.textContent = "LIVE: -";
+      return;
+    }
+    liveInfoEl.textContent = "LIVE: " + f2(sourcePrice) + " @ " + (sourceTs || "latest");
+    if (!livePriceLine) {
+      livePriceLine = candleSeries.createPriceLine({
+        price: sourcePrice,
+        color: "#ffffff",
+        lineWidth: 1,
+        lineStyle: window.LightweightCharts.LineStyle.Dotted,
+        axisLabelVisible: true,
+        title: "LIVE " + f2(sourcePrice),
+      });
+    } else {
+      livePriceLine.applyOptions({
+        price: sourcePrice,
+        title: "LIVE " + f2(sourcePrice),
+      });
+    }
   }
 
   function parseUtcDate(raw) {
@@ -233,6 +405,7 @@
     }
     candles = Array.isArray(payload.candles) ? payload.candles : [];
     refreshH4TimeOptionsFromCandles();
+    updateChart(true);
   }
 
   async function fetchLiveTick() {
@@ -244,6 +417,7 @@
       if (Number.isFinite(p)) {
         latestPrice = p;
         latestTs = normalizeTs(payload.ts || payload.time || "");
+        updateLiveLine();
       }
     } catch (_) {
       // ignore: fallback to latest candle close
@@ -263,6 +437,7 @@
     try {
       await fetchCandles();
       await fetchLiveTick();
+      updateChart(false);
       renderPreview();
     } catch (err) {
       previewTextEl.textContent = "Gagal load data: " + String(err.message || err);
@@ -297,5 +472,5 @@
     initDefaultDates();
     renderPreview();
   });
-  setInterval(fetchLiveTick, 15000);
+  setInterval(fetchLiveTick, 5000);
 })();
