@@ -638,11 +638,16 @@
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
     }
-    function levelLine(zoneName, levelKey, statusText, isInvalid) {
+    function wrapByClass(text, cls) {
+      if (!cls) return esc(text);
+      return '<span class="' + esc(cls) + '">' + esc(text) + "</span>";
+    }
+    function levelLine(zoneName, levelKey, statusText, isInvalid, priceClass, statusClass) {
       var status = isInvalid
         ? '<span class="status-invalid">' + esc(statusText) + "</span>"
-        : esc(statusText);
-      return "- " + esc(zoneName) + " : " + esc(f2(levels[levelKey])) + " [" + status + "]";
+        : wrapByClass(statusText, statusClass);
+      var priceText = wrapByClass(f2(levels[levelKey]), priceClass);
+      return "- " + esc(zoneName) + " : " + priceText + " [" + status + "]";
     }
 
     var side = String(trendEl.value || "").toUpperCase();
@@ -778,8 +783,6 @@
     lines.push("");
     if (!broken1) {
       lines.push("Belum pecah level 1.");
-    } else {
-      lines.push("Level 1 sudah pecah.");
     }
 
     var statusMap = {
@@ -819,6 +822,28 @@
       });
     }
 
+    var extToneMap = {};
+    var extKeys = ["1.382", "1.618", "2.618", "3.618", "4.236"];
+    for (var t = 0; t < extKeys.length; t++) {
+      var keyTone = extKeys[t];
+      if (Boolean(invalidMap[keyTone])) {
+        extToneMap[keyTone] = "invalid";
+        continue;
+      }
+      var lv = Number(levels[keyTone]);
+      var brokeNow = Number.isFinite(currentPrice) && (side === "BUY" ? currentPrice >= lv : currentPrice <= lv);
+      var reachedBefore = Number.isFinite(postHigh) && Number.isFinite(postLow) && (
+        side === "BUY" ? postHigh >= lv : postLow <= lv
+      );
+      if (brokeNow) {
+        extToneMap[keyTone] = "green";
+      } else if (reachedBefore) {
+        extToneMap[keyTone] = "yellow";
+      } else {
+        extToneMap[keyTone] = "";
+      }
+    }
+
     var html = [];
     for (var i = 0; i < lines.length; i++) {
       var line = String(lines[i] || "");
@@ -830,19 +855,22 @@
     }
 
     var entryKeys = ["1", "0.786", "0.618", "0.5", "0"];
-    var extKeys = ["1.382", "1.618", "2.618", "3.618", "4.236"];
     html.push("");
     html.push('<span class="zone-title">Entry Zone</span>');
     for (var e = 0; e < entryKeys.length; e++) {
       var ek = entryKeys[e];
-      html.push(levelLine("Entry Zone " + String(e + 1), ek, statusMap[ek] || "-", Boolean(invalidMap[ek])));
+      var entryPriceClass = ek === "0.5" && !Boolean(invalidMap[ek]) ? "price-green" : "";
+      html.push(levelLine("Entry Zone " + String(e + 1), ek, statusMap[ek] || "-", Boolean(invalidMap[ek]), entryPriceClass, ""));
     }
 
     html.push("");
     html.push('<span class="zone-title">Extension Zone</span>');
     for (var x = 0; x < extKeys.length; x++) {
       var xk = extKeys[x];
-      html.push(levelLine("Extension Zone " + String(x + 1), xk, statusMap[xk] || "-", Boolean(invalidMap[xk])));
+      var tone = extToneMap[xk] || "";
+      var priceCls = tone === "green" ? "zone-green" : (tone === "yellow" ? "zone-yellow" : "");
+      var statusCls = priceCls;
+      html.push(levelLine("Extension Zone " + String(x + 1), xk, statusMap[xk] || "-", Boolean(invalidMap[xk]), priceCls, statusCls));
     }
     if (broke4236State) {
       html.push("");
