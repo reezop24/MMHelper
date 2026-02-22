@@ -47,7 +47,7 @@
   var activeProfile = 1;
   var profileCount = 7;
 
-  var h4Times = [];
+  var tfTimes = [];
   var chart = null;
   var candleSeries = null;
   var livePriceLine = null;
@@ -75,6 +75,8 @@
       { time: "2026-02-19 23:00:00", open: 4995.6, high: 5018.4, low: 4984.2, close: 5008.9 },
     ],
   };
+  var INTRADAY_TF = { m15: true, m30: true, h1: true, h4: true };
+  var TF_LIMITS = { m15: 500, m30: 400, h1: 350, h4: 260, d1: 220, w1: 180 };
 
   function f2(v) {
     return Number(v || 0).toFixed(2);
@@ -315,6 +317,7 @@
     chart = window.LightweightCharts.createChart(chartBoxEl, {
       width: chartWrapEl.clientWidth,
       height: chartWrapEl.clientHeight,
+      attributionLogo: false,
       layout: {
         background: { color: "#0b1220" },
         textColor: "#9ca3af",
@@ -504,9 +507,18 @@
     };
   }
 
-  function setH4Times(selectEl) {
+  function defaultTimesForTf(tf) {
+    if (tf === "m15") return ["00:00", "00:15", "00:30", "00:45"];
+    if (tf === "m30") return ["00:00", "00:30"];
+    if (tf === "h1") return ["00:00"];
+    if (tf === "h4") return ["03:00", "07:00", "11:00", "15:00", "19:00", "23:00"];
+    return ["00:00"];
+  }
+
+  function setIntradayTimes(selectEl) {
     selectEl.innerHTML = "";
-    var rows = h4Times.length ? h4Times : ["03:00", "07:00", "11:00", "15:00", "19:00", "23:00"];
+    var tf = String(tfEl.value || "h4").toLowerCase();
+    var rows = tfTimes.length ? tfTimes : defaultTimesForTf(tf);
     rows.forEach(function (t) {
       var opt = document.createElement("option");
       opt.value = t;
@@ -515,8 +527,9 @@
     });
   }
 
-  function refreshH4TimeOptionsFromCandles() {
-    if (tfEl.value !== "h4") return;
+  function refreshTimeOptionsFromCandles() {
+    var tf = String(tfEl.value || "h4").toLowerCase();
+    if (!INTRADAY_TF[tf]) return;
     var uniq = {};
     candles.forEach(function (c) {
       var p = toMYTParts(c.time || c.ts || "");
@@ -524,8 +537,8 @@
         uniq[p.time] = true;
       }
     });
-    h4Times = Object.keys(uniq).sort();
-    [aTimeEl, bTimeEl, cTimeEl].forEach(setH4Times);
+    tfTimes = Object.keys(uniq).sort();
+    [aTimeEl, bTimeEl, cTimeEl].forEach(setIntradayTimes);
     var state = readState();
     var p = state.profiles[String(activeProfile)] || {};
     if (p.aTime) aTimeEl.value = p.aTime;
@@ -534,18 +547,19 @@
   }
 
   function updateTimeInputs() {
-    var isH4 = tfEl.value === "h4";
+    var tf = String(tfEl.value || "").toLowerCase();
+    var isIntraday = Boolean(INTRADAY_TF[tf]);
     [aTimeEl, bTimeEl, cTimeEl].forEach(function (el) {
-      el.disabled = !isH4;
-      el.style.display = isH4 ? "block" : "none";
+      el.disabled = !isIntraday;
+      el.style.display = isIntraday ? "block" : "none";
     });
   }
 
   function fetchPointCandle(dateValue, timeValue) {
     if (!dateValue) return null;
     var tf = tfEl.value;
-    var key = tf === "h4" ? (dateValue + " " + (timeValue || "00:00") + ":00") : dateValue;
-    if (tf === "d1") {
+    var key = INTRADAY_TF[tf] ? (dateValue + " " + (timeValue || "00:00") + ":00") : dateValue;
+    if (tf === "d1" || tf === "w1") {
       for (var i = candles.length - 1; i >= 0; i--) {
         var p = toMYTParts(candles[i].time || candles[i].ts || "");
         if (p && p.date === dateValue) return candles[i];
@@ -716,7 +730,8 @@
       }
     } else {
       dataSource = "api";
-      var url = previewUrl + "?tf=" + encodeURIComponent(tf) + "&limit=1200&t=" + Date.now();
+      var limit = Number(TF_LIMITS[tf] || 300);
+      var url = previewUrl + "?tf=" + encodeURIComponent(tf) + "&limit=" + String(limit) + "&t=" + Date.now();
       var res = await fetch(url, { cache: "no-store" });
       payload = await res.json();
       if (!res.ok || (payload && payload.ok === false)) {
@@ -724,7 +739,7 @@
       }
     }
     candles = Array.isArray(payload && payload.candles) ? payload.candles : [];
-    refreshH4TimeOptionsFromCandles();
+    refreshTimeOptionsFromCandles();
     updateChart(true);
   }
 
@@ -788,7 +803,7 @@
     if (!cDateEl.value) cDateEl.value = d;
   }
 
-  [aTimeEl, bTimeEl, cTimeEl].forEach(setH4Times);
+  [aTimeEl, bTimeEl, cTimeEl].forEach(setIntradayTimes);
   updateTimeInputs();
 
   tfEl.addEventListener("change", function () {

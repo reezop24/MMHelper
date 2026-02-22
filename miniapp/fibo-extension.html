@@ -189,6 +189,7 @@
       margin-bottom: 8px;
     }
     #chartWrap {
+      position: relative;
       height: 360px;
       border: 1px solid rgba(95, 145, 215, 0.35);
       border-radius: 10px;
@@ -198,6 +199,23 @@
     #chartBox {
       width: 100%;
       height: 100%;
+    }
+    .chart-brand {
+      position: absolute;
+      left: 8px;
+      top: 8px;
+      z-index: 20;
+      pointer-events: none;
+      opacity: 0.9;
+      border-radius: 8px;
+      background: rgba(8, 20, 42, 0.65);
+      padding: 3px 6px;
+    }
+    .chart-brand img {
+      width: 60px;
+      height: auto;
+      object-fit: contain;
+      display: block;
     }
     .pill {
       display: inline-block;
@@ -257,11 +275,15 @@
       <div class="field">
         <label for="tf"><strong>Timeframe</strong></label>
         <select id="tf">
+          <option value="m15">M15</option>
+          <option value="m30">M30</option>
+          <option value="h1">H1</option>
           <option value="h4">H4</option>
           <option value="d1">Daily</option>
+          <option value="w1">Weekly</option>
         </select>
       </div>
-      <p class="hint">H4 guna tarikh + masa candle 4 jam. Daily guna tarikh sahaja.</p>
+      <p class="hint">M15/M30/H1/H4 guna tarikh + masa candle. Daily/Weekly guna tarikh sahaja.</p>
       <p class="hint">Rule point: Uptrend => A/C guna Low, B guna High. Downtrend => A/C guna High, B guna Low.</p>
       <p class="hint">Dev lokal: buka `fibo-extension.html?dev=1` untuk guna data mock tanpa backend bot.</p>
     </section>
@@ -314,6 +336,9 @@
       </div>
       <div id="chartWrap">
         <div id="chartBox"></div>
+        <div class="chart-brand">
+          <img src="reezo.png" alt="Reezo" />
+        </div>
       </div>
     </section>
   </main>
