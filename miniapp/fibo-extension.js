@@ -15,6 +15,10 @@
 
   var trendEl = document.getElementById("trend");
   var tfEl = document.getElementById("tf");
+  var profileTabsEl = document.getElementById("profileTabs");
+  var profileSaveBtn = document.getElementById("profileSaveBtn");
+  var profileStatusEl = document.getElementById("profileStatus");
+  var activeProfileLabelEl = document.getElementById("activeProfileLabel");
   var aDateEl = document.getElementById("aDate");
   var bDateEl = document.getElementById("bDate");
   var cDateEl = document.getElementById("cDate");
@@ -32,7 +36,9 @@
   var candles = [];
   var latestPrice = null;
   var latestTs = "";
-  var stateKey = "fibofbo_fibo_extension_form_v1";
+  var stateKey = "fibofbo_fibo_extension_form_v2";
+  var activeProfile = 1;
+  var profileCount = 7;
 
   var h4Times = [];
   var chart = null;
@@ -67,53 +73,114 @@
     return Number(v || 0).toFixed(2);
   }
 
-  function saveFormState() {
+  function getEmptyState() {
+    return { activeProfile: 1, profiles: {} };
+  }
+
+  function readState() {
     try {
-      var payload = {
-        trend: String(trendEl.value || ""),
-        tf: String(tfEl.value || ""),
-        aDate: String(aDateEl.value || ""),
-        bDate: String(bDateEl.value || ""),
-        cDate: String(cDateEl.value || ""),
-        aTime: String(aTimeEl.value || ""),
-        bTime: String(bTimeEl.value || ""),
-        cTime: String(cTimeEl.value || ""),
-      };
-      localStorage.setItem(stateKey, JSON.stringify(payload));
+      var raw = localStorage.getItem(stateKey);
+      if (!raw) return getEmptyState();
+      var parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return getEmptyState();
+      if (!parsed.profiles || typeof parsed.profiles !== "object") parsed.profiles = {};
+      if (!Number.isFinite(Number(parsed.activeProfile))) parsed.activeProfile = 1;
+      return parsed;
+    } catch (_) {
+      return getEmptyState();
+    }
+  }
+
+  function writeState(state) {
+    try {
+      localStorage.setItem(stateKey, JSON.stringify(state));
     } catch (_) {
       // ignore storage failure
     }
   }
 
-  function loadFormState() {
+  function collectFormData() {
+    return {
+      trend: String(trendEl.value || ""),
+      tf: String(tfEl.value || ""),
+      aDate: String(aDateEl.value || ""),
+      bDate: String(bDateEl.value || ""),
+      cDate: String(cDateEl.value || ""),
+      aTime: String(aTimeEl.value || ""),
+      bTime: String(bTimeEl.value || ""),
+      cTime: String(cTimeEl.value || ""),
+    };
+  }
+
+  function hasProfileData(p) {
+    if (!p || typeof p !== "object") return false;
+    return Boolean(p.trend || p.tf || p.aDate || p.bDate || p.cDate || p.aTime || p.bTime || p.cTime);
+  }
+
+  function updateProfileTabsUI(state) {
+    var tabButtons = profileTabsEl ? profileTabsEl.querySelectorAll(".profile-tab-btn") : [];
+    tabButtons.forEach(function (btn) {
+      var idx = Number(btn.getAttribute("data-profile") || "0");
+      btn.classList.toggle("active", idx === activeProfile);
+      var p = state.profiles[String(idx)];
+      btn.classList.toggle("filled", hasProfileData(p));
+    });
+    if (activeProfileLabelEl) activeProfileLabelEl.textContent = "#" + String(activeProfile);
+  }
+
+  function saveFormState(showMessage) {
     try {
-      var raw = localStorage.getItem(stateKey);
-      if (!raw) return;
-      var s = JSON.parse(raw);
-      if (s && typeof s === "object") {
-        if (s.trend) trendEl.value = s.trend;
-        if (s.tf) tfEl.value = s.tf;
-        if (s.aDate) aDateEl.value = s.aDate;
-        if (s.bDate) bDateEl.value = s.bDate;
-        if (s.cDate) cDateEl.value = s.cDate;
+      var state = readState();
+      state.activeProfile = activeProfile;
+      state.profiles[String(activeProfile)] = collectFormData();
+      writeState(state);
+      updateProfileTabsUI(state);
+      if (showMessage && profileStatusEl) {
+        profileStatusEl.textContent = "Profile #" + String(activeProfile) + " disimpan.";
       }
     } catch (_) {
       // ignore storage failure
     }
   }
 
-  function loadTimeState() {
+  function applyProfileData(data) {
+    var p = data || {};
+    trendEl.value = p.trend || "";
+    tfEl.value = p.tf || "h4";
+    aDateEl.value = p.aDate || "";
+    bDateEl.value = p.bDate || "";
+    cDateEl.value = p.cDate || "";
+    updateTimeInputs();
+    [aTimeEl, bTimeEl, cTimeEl].forEach(setH4Times);
+    if (p.aTime) aTimeEl.value = p.aTime;
+    if (p.bTime) bTimeEl.value = p.bTime;
+    if (p.cTime) cTimeEl.value = p.cTime;
+  }
+
+  function loadFormState() {
     try {
-      var raw = localStorage.getItem(stateKey);
-      if (!raw) return;
-      var s = JSON.parse(raw);
-      if (!s || typeof s !== "object") return;
-      if (s.aTime) aTimeEl.value = s.aTime;
-      if (s.bTime) bTimeEl.value = s.bTime;
-      if (s.cTime) cTimeEl.value = s.cTime;
+      var state = readState();
+      activeProfile = Math.max(1, Math.min(profileCount, Number(state.activeProfile || 1)));
+      applyProfileData(state.profiles[String(activeProfile)] || {});
+      updateProfileTabsUI(state);
     } catch (_) {
       // ignore storage failure
     }
+  }
+
+  function switchProfile(profileIdx) {
+    saveFormState(false);
+    var state = readState();
+    activeProfile = Math.max(1, Math.min(profileCount, Number(profileIdx || 1)));
+    state.activeProfile = activeProfile;
+    writeState(state);
+    applyProfileData(state.profiles[String(activeProfile)] || {});
+    updateProfileTabsUI(state);
+    if (profileStatusEl) profileStatusEl.textContent = "Profile #" + String(activeProfile) + " aktif.";
+    reloadAll().then(initDefaultDates).then(function () {
+      renderPreview();
+      saveFormState(false);
+    });
   }
 
   function normalizeTs(raw) {
@@ -290,6 +357,39 @@
     }
   }
 
+  function clearABCMarkers() {
+    if (!candleSeries || typeof candleSeries.setMarkers !== "function") return;
+    candleSeries.setMarkers([]);
+  }
+
+  function updateABCMarkersAndFocus(side, aC, bC, cC) {
+    if (!chart || !candleSeries || typeof candleSeries.setMarkers !== "function") return;
+    var aTime = toChartTime(aC.time || aC.ts || "");
+    var bTime = toChartTime(bC.time || bC.ts || "");
+    var cTime = toChartTime(cC.time || cC.ts || "");
+    if (!(aTime > 0 && bTime > 0 && cTime > 0)) {
+      clearABCMarkers();
+      return;
+    }
+
+    var isBuy = side === "BUY";
+    var markers = [
+      { time: aTime, position: isBuy ? "belowBar" : "aboveBar", color: "#60a5fa", shape: "circle", text: "A" },
+      { time: bTime, position: isBuy ? "aboveBar" : "belowBar", color: "#f59e0b", shape: "circle", text: "B" },
+      { time: cTime, position: isBuy ? "belowBar" : "aboveBar", color: "#c084fc", shape: "circle", text: "C" },
+    ];
+    candleSeries.setMarkers(markers);
+
+    var minT = Math.min(aTime, bTime, cTime);
+    var maxT = Math.max(aTime, bTime, cTime);
+    var span = Math.max(maxT - minT, 1);
+    var pad = Math.max(Math.floor(span * 0.4), 3600 * 4);
+    chart.timeScale().setVisibleRange({
+      from: minT - pad,
+      to: maxT + pad,
+    });
+  }
+
   function parseUtcDate(raw) {
     var s = normalizeTs(raw).replace(" ", "T");
     if (!s) return new Date(NaN);
@@ -344,7 +444,11 @@
     });
     h4Times = Object.keys(uniq).sort();
     [aTimeEl, bTimeEl, cTimeEl].forEach(setH4Times);
-    loadTimeState();
+    var state = readState();
+    var p = state.profiles[String(activeProfile)] || {};
+    if (p.aTime) aTimeEl.value = p.aTime;
+    if (p.bTime) bTimeEl.value = p.bTime;
+    if (p.cTime) cTimeEl.value = p.cTime;
   }
 
   function updateTimeInputs() {
@@ -405,6 +509,7 @@
     var cC = fetchPointCandle(cDateEl.value, cTimeEl.value);
 
     if (!aC || !bC || !cC) {
+      clearABCMarkers();
       previewTextEl.textContent = "Sila isi Point A/B/C dulu.\nPastikan tarikh/masa wujud dalam candle timeframe dipilih.";
       return;
     }
@@ -413,9 +518,11 @@
     var bPrice = side === "BUY" ? Number(bC.high) : Number(bC.low);
     var cPrice = side === "BUY" ? Number(cC.low) : Number(cC.high);
     if (!Number.isFinite(aPrice) || !Number.isFinite(bPrice) || !Number.isFinite(cPrice)) {
+      clearABCMarkers();
       previewTextEl.textContent = "Data candle point tak lengkap untuk kira FE.";
       return;
     }
+    updateABCMarkersAndFocus(side, aC, bC, cC);
 
     var levels = computeLevels(side, aPrice, bPrice, cPrice);
     var currentPrice = getCurrentPriceFallback();
@@ -602,17 +709,35 @@
   updateTimeInputs();
 
   tfEl.addEventListener("change", function () {
-    saveFormState();
+    if (profileStatusEl) profileStatusEl.textContent = "";
+    saveFormState(false);
     updateTimeInputs();
     reloadAll().then(initDefaultDates).then(renderPreview);
   });
 
   [trendEl, aDateEl, bDateEl, cDateEl, aTimeEl, bTimeEl, cTimeEl].forEach(function (el) {
     el.addEventListener("change", function () {
-      saveFormState();
+      if (profileStatusEl) profileStatusEl.textContent = "";
+      saveFormState(false);
       renderPreview();
     });
   });
+
+  if (profileSaveBtn) {
+    profileSaveBtn.addEventListener("click", function () {
+      saveFormState(true);
+    });
+  }
+
+  if (profileTabsEl) {
+    profileTabsEl.addEventListener("click", function (ev) {
+      var target = ev.target;
+      if (!target || !target.classList || !target.classList.contains("profile-tab-btn")) return;
+      var idx = Number(target.getAttribute("data-profile") || "1");
+      if (idx === activeProfile) return;
+      switchProfile(idx);
+    });
+  }
 
   backBtn.addEventListener("click", backToMenu);
 
@@ -621,9 +746,8 @@
 
   reloadAll().then(function () {
     initDefaultDates();
-    loadTimeState();
     renderPreview();
-    saveFormState();
+    saveFormState(false);
   });
   setInterval(fetchLiveTick, 5000);
 })();

@@ -20,6 +20,63 @@
       grid-template-columns: 1fr 1fr;
       gap: 8px;
     }
+    .profile-head {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .profile-title {
+      font-size: 14px;
+      color: #d7e7ff;
+      font-weight: 700;
+    }
+    .profile-save-btn {
+      border: 1px solid #3f7ad6;
+      background: #0d2d5f;
+      color: #eaf3ff;
+      border-radius: 9px;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .profile-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 10px;
+    }
+    .profile-tabs {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .profile-tab-btn {
+      border: 1px solid #3a5e95;
+      background: #0a234a;
+      color: #d7e7ff;
+      border-radius: 9px;
+      padding: 8px 0;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .profile-tab-btn.active {
+      border-color: #61a5ff;
+      background: #123e7e;
+      color: #ffffff;
+    }
+    .profile-tab-btn.filled::after {
+      content: " •";
+      color: #8cf0bc;
+    }
+    .profile-status {
+      font-size: 12px;
+      color: #9ab8e6;
+      min-height: 16px;
+    }
     .field label {
       display: block;
       margin-bottom: 6px;
@@ -109,6 +166,19 @@
     </header>
 
     <section class="card">
+      <div class="profile-head">
+        <div class="profile-title">Pilih Profile <span id="activeProfileLabel">#1</span></div>
+      </div>
+      <div class="profile-tabs" id="profileTabs">
+        <button class="profile-tab-btn active" type="button" data-profile="1">1</button>
+        <button class="profile-tab-btn" type="button" data-profile="2">2</button>
+        <button class="profile-tab-btn" type="button" data-profile="3">3</button>
+        <button class="profile-tab-btn" type="button" data-profile="4">4</button>
+        <button class="profile-tab-btn" type="button" data-profile="5">5</button>
+        <button class="profile-tab-btn" type="button" data-profile="6">6</button>
+        <button class="profile-tab-btn" type="button" data-profile="7">7</button>
+      </div>
+      <div id="profileStatus" class="profile-status"></div>
       <div class="field">
         <label for="trend"><strong>Trend</strong></label>
         <select id="trend">
@@ -155,6 +225,9 @@
 
     <section class="preview">
       <div id="previewText">Loading candle data...</div>
+      <div class="profile-actions">
+        <button id="profileSaveBtn" type="button" class="profile-save-btn">Simpan Profile</button>
+      </div>
     </section>
 
     <section class="chart-card">
