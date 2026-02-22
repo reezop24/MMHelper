@@ -8,6 +8,7 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from menu import (
+    fibo_extension_keyboard,
     is_admin_user,
     main_menu_keyboard,
 )
@@ -1178,6 +1179,19 @@ async def _handle_fibo_extension_profile_reset(payload: dict, update: Update, co
     )
 
 
+async def _handle_fibo_extension_back_to_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    user = update.effective_user
+    if not message or not user:
+        return
+    await send_screen(
+        context,
+        message.chat_id,
+        "📐 Menu Fibo Extension dibuka semula.",
+        reply_markup=fibo_extension_keyboard(user.id),
+    )
+
+
 async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     if not message or not message.web_app_data:
@@ -1293,6 +1307,10 @@ async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if payload_type == "fibo_extension_profile_reset":
         await _handle_fibo_extension_profile_reset(payload, update, context)
+        return
+
+    if payload_type == "fibo_extension_back_to_menu":
+        await _handle_fibo_extension_back_to_menu(update, context)
         return
 
     if payload_type == "notification_settings_save":

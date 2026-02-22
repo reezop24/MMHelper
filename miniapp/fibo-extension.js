@@ -1013,6 +1013,14 @@
 
   function backToMenu() {
     if (tg) {
+      try {
+        if (typeof tg.sendData === "function") {
+          tg.sendData(JSON.stringify({ type: "fibo_extension_back_to_menu" }));
+          return;
+        }
+      } catch (_) {
+        // fallback close below
+      }
       tg.close();
       return;
     }
