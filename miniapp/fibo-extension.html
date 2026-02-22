@@ -84,6 +84,14 @@
 
     <section class="card">
       <div class="field">
+        <label for="trend"><strong>Trend</strong></label>
+        <select id="trend">
+          <option value="">-- Pilih Trend --</option>
+          <option value="BUY">Uptrend</option>
+          <option value="SELL">Downtrend</option>
+        </select>
+      </div>
+      <div class="field">
         <label for="tf"><strong>Timeframe</strong></label>
         <select id="tf">
           <option value="h4">H4</option>
@@ -91,6 +99,7 @@
         </select>
       </div>
       <p class="hint">H4 guna tarikh + masa candle 4 jam. Daily guna tarikh sahaja.</p>
+      <p class="hint">Rule point: Uptrend => A/C guna Low, B guna High. Downtrend => A/C guna High, B guna Low.</p>
     </section>
 
     <section class="card row">

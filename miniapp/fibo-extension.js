@@ -9,6 +9,7 @@
   var liveTickUrl = params.get("live_tick_url") || "/api/live-tick";
   var previewUrl = params.get("preview_url") || "/api/dbo-preview";
 
+  var trendEl = document.getElementById("trend");
   var tfEl = document.getElementById("tf");
   var aDateEl = document.getElementById("aDate");
   var bDateEl = document.getElementById("bDate");
@@ -110,6 +111,12 @@
   }
 
   function renderPreview() {
+    var side = String(trendEl.value || "").toUpperCase();
+    if (side !== "BUY" && side !== "SELL") {
+      previewTextEl.textContent = "Sila pilih trend dulu (Uptrend / Downtrend).";
+      return;
+    }
+
     var aC = fetchPointCandle(aDateEl.value, aTimeEl.value);
     var bC = fetchPointCandle(bDateEl.value, bTimeEl.value);
     var cC = fetchPointCandle(cDateEl.value, cTimeEl.value);
@@ -118,10 +125,6 @@
       previewTextEl.textContent = "Sila isi Point A/B/C dulu.\nPastikan tarikh/masa wujud dalam candle timeframe dipilih.";
       return;
     }
-
-    var aClose = Number(aC.close);
-    var bClose = Number(bC.close);
-    var side = bClose >= aClose ? "BUY" : "SELL";
 
     var aPrice = side === "BUY" ? Number(aC.low) : Number(aC.high);
     var bPrice = side === "BUY" ? Number(bC.high) : Number(bC.low);
@@ -244,7 +247,7 @@
     reloadAll().then(initDefaultDates).then(renderPreview);
   });
 
-  [aDateEl, bDateEl, cDateEl, aTimeEl, bTimeEl, cTimeEl].forEach(function (el) {
+  [trendEl, aDateEl, bDateEl, cDateEl, aTimeEl, bTimeEl, cTimeEl].forEach(function (el) {
     el.addEventListener("change", renderPreview);
   });
 
