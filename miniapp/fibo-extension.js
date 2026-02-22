@@ -9,6 +9,8 @@
   var liveTickUrl = params.get("live_tick_url") || "/api/live-tick";
   var previewUrl = params.get("preview_url") || "/api/dbo-preview";
   var devMode = params.get("dev") === "1";
+  var isNextMember = params.get("next_member") === "1";
+  var serverProfilesStateRaw = params.get("profiles_state") || "";
   var devPreviewBase = params.get("dev_preview_base") || "./fibo-dev-preview";
   var devTickUrl = params.get("dev_tick_url") || "./fibo-dev-live-tick.json";
   var dataSource = "api";
@@ -16,7 +18,10 @@
   var trendEl = document.getElementById("trend");
   var tfEl = document.getElementById("tf");
   var profileTabsEl = document.getElementById("profileTabs");
+  var profileResetBtn = document.getElementById("profileResetBtn");
   var profileSaveBtn = document.getElementById("profileSaveBtn");
+  var profileSaveDefaultEl = document.getElementById("profileSaveDefault");
+  var profileSaveLockEl = document.getElementById("profileSaveLock");
   var profileStatusEl = document.getElementById("profileStatus");
   var activeProfileLabelEl = document.getElementById("activeProfileLabel");
   var profileBadgeEl = document.getElementById("profileBadge");
@@ -78,6 +83,17 @@
     return { activeProfile: 1, profiles: {} };
   }
 
+  function parseServerState(raw) {
+    if (!raw) return null;
+    try {
+      var parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return null;
+      return parsed;
+    } catch (_) {
+      return null;
+    }
+  }
+
   function readState() {
     try {
       var raw = localStorage.getItem(stateKey);
@@ -97,6 +113,27 @@
       localStorage.setItem(stateKey, JSON.stringify(state));
     } catch (_) {
       // ignore storage failure
+    }
+  }
+
+  function getCurrentStateForPayload() {
+    var state = readState();
+    state.activeProfile = activeProfile;
+    state.profiles[String(activeProfile)] = collectFormData();
+    return state;
+  }
+
+  function sendProfilePayloadToBot(kind, profileIdx, stateOverride) {
+    if (!tg || typeof tg.sendData !== "function") return;
+    var payload = {
+      type: kind,
+      profile: Number(profileIdx || activeProfile),
+      state: stateOverride || readState(),
+    };
+    try {
+      tg.sendData(JSON.stringify(payload));
+    } catch (_) {
+      // ignore sendData errors in preview/local mode
     }
   }
 
@@ -130,10 +167,26 @@
     if (profileBadgeEl) {
       profileBadgeEl.classList.toggle("show", activeProfile >= 3 && activeProfile <= 7);
     }
+    var locked = activeProfile >= 3 && !isNextMember;
+    if (profileSaveDefaultEl) {
+      profileSaveDefaultEl.style.display = locked ? "none" : "inline-flex";
+    }
+    if (profileSaveLockEl) {
+      profileSaveLockEl.classList.toggle("show", locked);
+    }
+    if (profileSaveBtn) {
+      profileSaveBtn.setAttribute("aria-disabled", locked ? "true" : "false");
+    }
   }
 
   function saveFormState(showMessage) {
     try {
+      if (activeProfile >= 3 && !isNextMember) {
+        if (showMessage && profileStatusEl) {
+          profileStatusEl.textContent = "Profile 3-7 hanya untuk NEXTexclusive member.";
+        }
+        return;
+      }
       var state = readState();
       state.activeProfile = activeProfile;
       state.profiles[String(activeProfile)] = collectFormData();
@@ -141,6 +194,7 @@
       updateProfileTabsUI(state);
       if (showMessage && profileStatusEl) {
         profileStatusEl.textContent = "Profile #" + String(activeProfile) + " disimpan.";
+        sendProfilePayloadToBot("fibo_extension_profile_save", activeProfile, state);
       }
     } catch (_) {
       // ignore storage failure
@@ -159,6 +213,21 @@
     if (p.aTime) aTimeEl.value = p.aTime;
     if (p.bTime) bTimeEl.value = p.bTime;
     if (p.cTime) cTimeEl.value = p.cTime;
+  }
+
+  function resetCurrentProfile() {
+    var state = readState();
+    delete state.profiles[String(activeProfile)];
+    state.activeProfile = activeProfile;
+    writeState(state);
+    applyProfileData({});
+    updateProfileTabsUI(state);
+    clearABCMarkers();
+    renderPreview();
+    if (profileStatusEl) {
+      profileStatusEl.textContent = "Profile #" + String(activeProfile) + " direset.";
+    }
+    sendProfilePayloadToBot("fibo_extension_profile_reset", activeProfile, state);
   }
 
   function loadFormState() {
@@ -180,7 +249,13 @@
     writeState(state);
     applyProfileData(state.profiles[String(activeProfile)] || {});
     updateProfileTabsUI(state);
-    if (profileStatusEl) profileStatusEl.textContent = "Profile #" + String(activeProfile) + " aktif.";
+    if (profileStatusEl) {
+      if (activeProfile >= 3 && !isNextMember) {
+        profileStatusEl.textContent = "Profile #" + String(activeProfile) + " dikunci (NEXTexclusive sahaja).";
+      } else {
+        profileStatusEl.textContent = "Profile #" + String(activeProfile) + " aktif.";
+      }
+    }
     reloadAll().then(initDefaultDates).then(function () {
       renderPreview();
       saveFormState(false);
@@ -504,6 +579,7 @@
   function renderPreview() {
     var side = String(trendEl.value || "").toUpperCase();
     if (side !== "BUY" && side !== "SELL") {
+      clearABCMarkers();
       previewTextEl.textContent = "Sila pilih trend dulu (Uptrend / Downtrend).";
       return;
     }
@@ -733,6 +809,12 @@
     });
   }
 
+  if (profileResetBtn) {
+    profileResetBtn.addEventListener("click", function () {
+      resetCurrentProfile();
+    });
+  }
+
   if (profileTabsEl) {
     profileTabsEl.addEventListener("click", function (ev) {
       var target = ev.target;
@@ -747,6 +829,12 @@
 
   loadFormState();
   updateTimeInputs();
+
+  var serverState = parseServerState(serverProfilesStateRaw);
+  if (serverState) {
+    writeState(serverState);
+    loadFormState();
+  }
 
   reloadAll().then(function () {
     initDefaultDates();

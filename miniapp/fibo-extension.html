@@ -33,9 +33,9 @@
       font-weight: 700;
     }
     .profile-save-btn {
-      border: 1px solid #3f7ad6;
-      background: #0d2d5f;
-      color: #eaf3ff;
+      border: 1px solid #2f9e5a;
+      background: #136f3e;
+      color: #ecfff3;
       border-radius: 9px;
       padding: 8px 12px;
       font-size: 12px;
@@ -44,8 +44,43 @@
     }
     .profile-actions {
       display: flex;
-      justify-content: flex-end;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
       margin-top: 10px;
+    }
+    .profile-reset-btn {
+      border: 1px solid #b74848;
+      background: #7c1f1f;
+      color: #ffe7e7;
+      border-radius: 8px;
+      padding: 5px 8px;
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      width: 50%;
+      min-width: 110px;
+      max-width: 150px;
+      align-self: flex-end;
+      text-align: center;
+    }
+    .save-mode {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .save-mode.lock {
+      display: none;
+    }
+    .save-mode.lock.show {
+      display: inline-flex;
+    }
+    .save-mode.lock img {
+      width: 56px;
+      height: auto;
+      object-fit: contain;
+      vertical-align: middle;
+      filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.35));
     }
     .profile-tabs {
       display: grid;
@@ -64,9 +99,9 @@
       cursor: pointer;
     }
     .profile-tab-btn.active {
-      border-color: #61a5ff;
-      background: #123e7e;
-      color: #ffffff;
+      border-color: #f6a947;
+      background: #7a3b06;
+      color: #ffd9a6;
     }
     .profile-tab-btn.filled::after {
       content: " •";
@@ -244,7 +279,15 @@
     <section class="preview">
       <div id="previewText">Loading candle data...</div>
       <div class="profile-actions">
-        <button id="profileSaveBtn" type="button" class="profile-save-btn">Simpan Profile</button>
+        <button id="profileResetBtn" type="button" class="profile-reset-btn">Reset Profile</button>
+        <button id="profileSaveBtn" type="button" class="profile-save-btn">
+          <span id="profileSaveDefault" class="save-mode default">Simpan Profile</span>
+          <span id="profileSaveLock" class="save-mode lock">
+            <span>Simpan Profile :</span>
+            <img src="nextexc.png" alt="NEXTexclusive" />
+            <span>member only</span>
+          </span>
+        </button>
       </div>
     </section>
 

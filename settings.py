@@ -6,6 +6,8 @@ import json
 import os
 from urllib.parse import urlencode
 
+from storage import has_fibo_next_profile_access, load_fibo_extension_profiles
+
 DEFAULT_SETUP_WEBAPP_URL = "https://example.com/mmhelper/setup"
 
 
@@ -48,7 +50,7 @@ def get_risk_calculator_webapp_url(
     return f"{page}?{query}"
 
 
-def get_fibo_extension_webapp_url() -> str:
+def get_fibo_extension_webapp_url(user_id: int | None = None, is_superuser: bool = False) -> str:
     page = f"{_miniapp_base_url()}/fibo-extension.html"
     live_tick_url = (os.getenv("MMHELPER_LIVE_TICK_URL") or "").strip()
     dbo_preview_url = (os.getenv("MMHELPER_DBO_PREVIEW_URL") or "").strip()
@@ -57,6 +59,11 @@ def get_fibo_extension_webapp_url() -> str:
         query_data["live_tick_url"] = live_tick_url
     if dbo_preview_url:
         query_data["preview_url"] = dbo_preview_url
+    if user_id is not None:
+        next_member = bool(is_superuser) or has_fibo_next_profile_access(int(user_id))
+        query_data["next_member"] = "1" if next_member else "0"
+        state = load_fibo_extension_profiles(int(user_id))
+        query_data["profiles_state"] = json.dumps(state, ensure_ascii=False, separators=(",", ":"))
     if not query_data:
         return page
     return f"{page}?{urlencode(query_data)}"

@@ -1274,7 +1274,7 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
             context,
             message.chat_id,
             EXTRA_OPENED_TEXT,
-            reply_markup=extra_keyboard(),
+            reply_markup=extra_keyboard(user.id),
             parse_mode="Markdown",
         )
         return
@@ -1289,7 +1289,7 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
             context,
             message.chat_id,
             "Coming soon. Feature ni masih dalam pembangunan.",
-            reply_markup=extra_keyboard(),
+            reply_markup=extra_keyboard(user.id),
         )
         return
 

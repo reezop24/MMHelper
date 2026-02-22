@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import sqlite3
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Iterator
@@ -13,6 +15,10 @@ CORE_DB_PATH = Path(__file__).with_name("mmhelper_core.json")
 LEGACY_DB_PATH = Path(__file__).with_name("mmhelper_db.json")
 ACTIVITY_DB_DIR = Path(__file__).with_name("db") / "activity"
 ACTIVITY_FILE_PREFIX = "activity_"
+DEFAULT_SHARED_DB_PATH = Path(__file__).with_name("db") / "mmhelper_shared.db"
+MMHELPER_CORE_KV_KEY = "mmhelper_core_state"
+MMHELPER_ACTIVITY_TABLE = "mmhelper_activity_monthly"
+MMHELPER_FIBO_PROFILES_TABLE = "fibo_extension_profiles"
 
 
 def _default_core_db() -> dict[str, Any]:
@@ -51,6 +57,11 @@ def _to_int(value: Any, default: int = 0) -> int:
         return default
 
 
+def _to_text(value: Any, default: str = "") -> str:
+    text = str(value or "").strip()
+    return text if text else default
+
+
 def _load_json_dict(path: Path, default_factory) -> dict[str, Any]:
     if not path.exists():
         return default_factory()
@@ -70,14 +81,88 @@ def _save_json_dict(path: Path, data: dict[str, Any]) -> None:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def _normalize_core_db(data: dict[str, Any]) -> dict[str, Any]:
-    users = data.get("users")
-    if not isinstance(users, dict):
-        data["users"] = {}
-    return data
+def _get_shared_db_path() -> Path:
+    raw = (os.getenv("MMHELPER_SHARED_DB_PATH") or "").strip()
+    if raw:
+        return Path(raw).expanduser()
+    return DEFAULT_SHARED_DB_PATH
 
 
-def load_core_db() -> dict[str, Any]:
+def _connect_shared_db() -> sqlite3.Connection:
+    db_path = _get_shared_db_path()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def _ensure_mmhelper_kv_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS mmhelper_kv_state (
+            key TEXT PRIMARY KEY,
+            value_json TEXT NOT NULL,
+            updated_at TEXT NOT NULL DEFAULT ''
+        )
+        """
+    )
+
+
+def _ensure_mmhelper_activity_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        f"""
+        CREATE TABLE IF NOT EXISTS {MMHELPER_ACTIVITY_TABLE} (
+            month_key TEXT PRIMARY KEY,
+            payload_json TEXT NOT NULL,
+            updated_at TEXT NOT NULL DEFAULT ''
+        )
+        """
+    )
+
+
+def _ensure_fibo_profiles_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        f"""
+        CREATE TABLE IF NOT EXISTS {MMHELPER_FIBO_PROFILES_TABLE} (
+            user_id TEXT PRIMARY KEY,
+            payload_json TEXT NOT NULL,
+            updated_at TEXT NOT NULL DEFAULT ''
+        )
+        """
+    )
+
+
+def _read_core_state_from_sqlite(conn: sqlite3.Connection) -> dict[str, Any] | None:
+    row = conn.execute(
+        "SELECT value_json FROM mmhelper_kv_state WHERE key = ?",
+        (MMHELPER_CORE_KV_KEY,),
+    ).fetchone()
+    if row is None:
+        return None
+    raw = str(row["value_json"] or "").strip()
+    if not raw:
+        return _default_core_db()
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return _default_core_db()
+    if not isinstance(data, dict):
+        return _default_core_db()
+    return _normalize_core_db(data)
+
+
+def _write_core_state_to_sqlite(conn: sqlite3.Connection, data: dict[str, Any]) -> None:
+    payload = json.dumps(_normalize_core_db(data), ensure_ascii=False)
+    conn.execute(
+        """
+        INSERT OR REPLACE INTO mmhelper_kv_state (key, value_json, updated_at)
+        VALUES (?, ?, ?)
+        """,
+        (MMHELPER_CORE_KV_KEY, payload, malaysia_now().isoformat()),
+    )
+
+
+def _load_core_db_from_files() -> dict[str, Any]:
     core_db = _load_json_dict(CORE_DB_PATH, _default_core_db)
     core_db = _normalize_core_db(core_db)
 
@@ -93,8 +178,36 @@ def load_core_db() -> dict[str, Any]:
     return core_db
 
 
+def _normalize_core_db(data: dict[str, Any]) -> dict[str, Any]:
+    users = data.get("users")
+    if not isinstance(users, dict):
+        data["users"] = {}
+    return data
+
+
+def load_core_db() -> dict[str, Any]:
+    try:
+        with _connect_shared_db() as conn:
+            _ensure_mmhelper_kv_table(conn)
+            db = _read_core_state_from_sqlite(conn)
+            if db is None:
+                db = _load_core_db_from_files()
+                _write_core_state_to_sqlite(conn, db)
+            _save_json_dict(CORE_DB_PATH, db)
+            return _normalize_core_db(db)
+    except sqlite3.Error:
+        return _load_core_db_from_files()
+
+
 def save_core_db(data: dict[str, Any]) -> None:
-    _save_json_dict(CORE_DB_PATH, _normalize_core_db(data))
+    normalized = _normalize_core_db(data)
+    try:
+        with _connect_shared_db() as conn:
+            _ensure_mmhelper_kv_table(conn)
+            _write_core_state_to_sqlite(conn, normalized)
+    except sqlite3.Error:
+        pass
+    _save_json_dict(CORE_DB_PATH, normalized)
 
 
 # Backward-compatible names used by older code.
@@ -232,38 +345,97 @@ def _activity_db_path(month_key: str) -> Path:
     return ACTIVITY_DB_DIR / f"{ACTIVITY_FILE_PREFIX}{month_key}.json"
 
 
+def _read_activity_from_sqlite(conn: sqlite3.Connection, month_key: str) -> dict[str, Any] | None:
+    row = conn.execute(
+        f"SELECT payload_json FROM {MMHELPER_ACTIVITY_TABLE} WHERE month_key = ?",
+        (month_key,),
+    ).fetchone()
+    if row is None:
+        return None
+    raw = str(row["payload_json"] or "").strip()
+    if not raw:
+        return _default_activity_db(month_key)
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        return _default_activity_db(month_key)
+    if not isinstance(parsed, dict):
+        return _default_activity_db(month_key)
+    return parsed
+
+
+def _write_activity_to_sqlite(conn: sqlite3.Connection, month_key: str, data: dict[str, Any]) -> None:
+    payload = json.dumps(data, ensure_ascii=False)
+    conn.execute(
+        f"""
+        INSERT OR REPLACE INTO {MMHELPER_ACTIVITY_TABLE} (month_key, payload_json, updated_at)
+        VALUES (?, ?, ?)
+        """,
+        (month_key, payload, malaysia_now().isoformat()),
+    )
+
+
 def _load_activity_db(month_key: str) -> dict[str, Any]:
-    data = _load_json_dict(_activity_db_path(month_key), lambda: _default_activity_db(month_key))
+    data: dict[str, Any]
+    try:
+        with _connect_shared_db() as conn:
+            _ensure_mmhelper_activity_table(conn)
+            sqlite_data = _read_activity_from_sqlite(conn, month_key)
+            if sqlite_data is not None:
+                data = sqlite_data
+            else:
+                data = _load_json_dict(_activity_db_path(month_key), lambda: _default_activity_db(month_key))
+                _write_activity_to_sqlite(conn, month_key, data)
+    except sqlite3.Error:
+        data = _load_json_dict(_activity_db_path(month_key), lambda: _default_activity_db(month_key))
+
     users = data.get("users")
     if not isinstance(users, dict):
         data["users"] = {}
     if not isinstance(data.get("month"), str):
         data["month"] = month_key.replace("_", "-")
+    # Keep JSON mirror for compatibility/debug.
+    _save_json_dict(_activity_db_path(month_key), data)
     return data
 
 
 def _save_activity_db(month_key: str, data: dict[str, Any]) -> None:
+    try:
+        with _connect_shared_db() as conn:
+            _ensure_mmhelper_activity_table(conn)
+            _write_activity_to_sqlite(conn, month_key, data)
+    except sqlite3.Error:
+        pass
     _save_json_dict(_activity_db_path(month_key), data)
 
 
 def _iter_activity_month_keys() -> list[str]:
-    if not ACTIVITY_DB_DIR.exists():
-        return []
-
     month_keys: list[str] = []
-    for path in ACTIVITY_DB_DIR.glob(f"{ACTIVITY_FILE_PREFIX}*.json"):
-        stem = path.stem
-        raw = stem[len(ACTIVITY_FILE_PREFIX) :]
-        parts = raw.split("_")
-        if len(parts) != 2:
-            continue
-        year, month = parts
-        if not (year.isdigit() and month.isdigit()):
-            continue
-        month_int = int(month)
-        if month_int < 1 or month_int > 12:
-            continue
-        month_keys.append(f"{year}_{month.zfill(2)}")
+    try:
+        with _connect_shared_db() as conn:
+            _ensure_mmhelper_activity_table(conn)
+            rows = conn.execute(f"SELECT month_key FROM {MMHELPER_ACTIVITY_TABLE}").fetchall()
+            for row in rows:
+                key = str(row["month_key"] or "").strip()
+                if key:
+                    month_keys.append(key)
+    except sqlite3.Error:
+        pass
+
+    if ACTIVITY_DB_DIR.exists():
+        for path in ACTIVITY_DB_DIR.glob(f"{ACTIVITY_FILE_PREFIX}*.json"):
+            stem = path.stem
+            raw = stem[len(ACTIVITY_FILE_PREFIX) :]
+            parts = raw.split("_")
+            if len(parts) != 2:
+                continue
+            year, month = parts
+            if not (year.isdigit() and month.isdigit()):
+                continue
+            month_int = int(month)
+            if month_int < 1 or month_int > 12:
+                continue
+            month_keys.append(f"{year}_{month.zfill(2)}")
     return sorted(set(month_keys))
 
 
@@ -2123,6 +2295,14 @@ def reset_all_data() -> None:
                 path.unlink()
             except OSError:
                 continue
+    try:
+        with _connect_shared_db() as conn:
+            _ensure_mmhelper_kv_table(conn)
+            _ensure_mmhelper_activity_table(conn)
+            conn.execute(f"DELETE FROM {MMHELPER_ACTIVITY_TABLE}")
+            _write_core_state_to_sqlite(conn, _default_core_db())
+    except sqlite3.Error:
+        pass
 
 
 def save_user_setup_section(
@@ -2769,3 +2949,187 @@ def mark_notification_sent(user_id: int, category: str, marker: str) -> bool:
     user["updated_at"] = now.isoformat()
     save_core_db(db)
     return True
+
+
+def _empty_fibo_profiles_state() -> dict[str, Any]:
+    return {"active_profile": 1, "profiles": {}}
+
+
+def _normalize_fibo_profile_payload(payload: Any) -> dict[str, str]:
+    if not isinstance(payload, dict):
+        payload = {}
+    out: dict[str, str] = {
+        "trend": "",
+        "tf": "h4",
+        "aDate": "",
+        "bDate": "",
+        "cDate": "",
+        "aTime": "",
+        "bTime": "",
+        "cTime": "",
+    }
+    out["trend"] = _to_text(payload.get("trend")).upper()
+    if out["trend"] not in {"BUY", "SELL"}:
+        out["trend"] = ""
+    out["tf"] = _to_text(payload.get("tf"), "h4").lower()
+    if out["tf"] not in {"h4", "d1"}:
+        out["tf"] = "h4"
+    for key in ("aDate", "bDate", "cDate", "aTime", "bTime", "cTime"):
+        out[key] = _to_text(payload.get(key))
+    return out
+
+
+def _normalize_fibo_profiles_state(payload: Any) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+        payload = {}
+    active_profile = max(1, min(7, _to_int(payload.get("active_profile"), 1)))
+    raw_profiles = payload.get("profiles", {})
+    profiles_out: dict[str, dict[str, str]] = {}
+    if isinstance(raw_profiles, dict):
+        for key, row in raw_profiles.items():
+            idx = _to_int(key, -1)
+            if 1 <= idx <= 7:
+                profiles_out[str(idx)] = _normalize_fibo_profile_payload(row)
+    return {"active_profile": active_profile, "profiles": profiles_out}
+
+
+def load_fibo_extension_profiles(user_id: int) -> dict[str, Any]:
+    try:
+        with _connect_shared_db() as conn:
+            _ensure_fibo_profiles_table(conn)
+            row = conn.execute(
+                f"SELECT payload_json FROM {MMHELPER_FIBO_PROFILES_TABLE} WHERE user_id = ?",
+                (str(int(user_id)),),
+            ).fetchone()
+            if row is None:
+                return _empty_fibo_profiles_state()
+            raw = _to_text(row["payload_json"])
+            if not raw:
+                return _empty_fibo_profiles_state()
+            try:
+                parsed = json.loads(raw)
+            except json.JSONDecodeError:
+                return _empty_fibo_profiles_state()
+            return _normalize_fibo_profiles_state(parsed)
+    except sqlite3.Error:
+        return _empty_fibo_profiles_state()
+
+
+def save_fibo_extension_profiles(user_id: int, payload: Any) -> bool:
+    normalized = _normalize_fibo_profiles_state(payload)
+    try:
+        with _connect_shared_db() as conn:
+            _ensure_fibo_profiles_table(conn)
+            conn.execute(
+                f"""
+                INSERT OR REPLACE INTO {MMHELPER_FIBO_PROFILES_TABLE}
+                (user_id, payload_json, updated_at)
+                VALUES (?, ?, ?)
+                """,
+                (
+                    str(int(user_id)),
+                    json.dumps(normalized, ensure_ascii=False),
+                    malaysia_now().isoformat(),
+                ),
+            )
+        return True
+    except sqlite3.Error:
+        return False
+
+
+def has_fibo_next_profile_access(user_id: int) -> bool:
+    try:
+        with _connect_shared_db() as conn:
+            row = conn.execute(
+                """
+                SELECT 1 AS ok
+                FROM vip_whitelist
+                WHERE user_id = ?
+                  AND tier IN ('vip1', 'vip2')
+                  AND status IN ('active', 'approved')
+                LIMIT 1
+                """,
+                (str(int(user_id)),),
+            ).fetchone()
+            if row is not None:
+                return True
+    except sqlite3.Error:
+        pass
+    return False
+
+
+def get_shared_db_health_snapshot() -> dict[str, Any]:
+    db_path = _get_shared_db_path()
+    snapshot: dict[str, Any] = {
+        "shared_db_path": str(db_path),
+        "exists": db_path.exists(),
+        "size_bytes": int(db_path.stat().st_size) if db_path.exists() else 0,
+        "tables": {},
+        "core_users": 0,
+        "activity_month_keys": _iter_activity_month_keys(),
+    }
+
+    db = load_core_db()
+    users = db.get("users", {}) if isinstance(db, dict) else {}
+    snapshot["core_users"] = len(users) if isinstance(users, dict) else 0
+
+    if not db_path.exists():
+        return snapshot
+
+    try:
+        with _connect_shared_db() as conn:
+            _ensure_mmhelper_kv_table(conn)
+            _ensure_mmhelper_activity_table(conn)
+            _ensure_fibo_profiles_table(conn)
+            table_names = [
+                "mmhelper_kv_state",
+                "mmhelper_activity_monthly",
+                "fibo_extension_profiles",
+                "vip_whitelist",
+                "sidebot_users",
+                "sidebot_submissions",
+                "sidebot_kv_state",
+            ]
+            tables: dict[str, int | None] = {}
+            for table in table_names:
+                try:
+                    row = conn.execute(f"SELECT COUNT(*) AS c FROM {table}").fetchone()
+                    tables[table] = int(row["c"] if row is not None else 0)
+                except sqlite3.Error:
+                    tables[table] = None
+            snapshot["tables"] = tables
+    except sqlite3.Error:
+        snapshot["tables"] = {}
+    return snapshot
+
+
+def backup_shared_db(target_path: str | Path) -> tuple[bool, str]:
+    out_path = Path(target_path).expanduser()
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        with _connect_shared_db() as src:
+            _ensure_mmhelper_kv_table(src)
+            _ensure_mmhelper_activity_table(src)
+            with sqlite3.connect(out_path) as dst:
+                src.backup(dst)
+    except sqlite3.Error as exc:
+        return False, f"backup_failed:{exc}"
+    return True, str(out_path)
+
+
+def restore_shared_db(source_path: str | Path) -> tuple[bool, str]:
+    src_path = Path(source_path).expanduser()
+    if not src_path.exists():
+        return False, "source_not_found"
+
+    try:
+        with sqlite3.connect(src_path) as src:
+            with _connect_shared_db() as dst:
+                src.backup(dst)
+    except sqlite3.Error as exc:
+        return False, f"restore_failed:{exc}"
+
+    # Refresh JSON mirror after restore.
+    _save_json_dict(CORE_DB_PATH, load_core_db())
+    return True, str(_get_shared_db_path())

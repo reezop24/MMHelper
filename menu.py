@@ -255,8 +255,11 @@ def records_reports_keyboard(account_summary_url: str, transaction_history_url: 
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
 
-def extra_keyboard() -> ReplyKeyboardMarkup:
-    fibo_extension_url = get_fibo_extension_webapp_url()
+def extra_keyboard(user_id: int | None = None) -> ReplyKeyboardMarkup:
+    fibo_extension_url = get_fibo_extension_webapp_url(
+        user_id=user_id,
+        is_superuser=is_admin_user(user_id),
+    )
     fibo_extension_button: KeyboardButton | str
     if fibo_extension_url:
         fibo_extension_button = KeyboardButton(

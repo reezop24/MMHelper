@@ -38,7 +38,10 @@ from storage import (
     save_notification_settings,
     set_beta_date_override,
     clear_beta_date_override,
+    has_fibo_next_profile_access,
+    load_fibo_extension_profiles,
     save_user_setup_section,
+    save_fibo_extension_profiles,
     start_project_grow_mission,
     reset_user_all_settings,
 )
@@ -1064,6 +1067,117 @@ async def _handle_date_override_save(payload: dict, update: Update, context: Con
     )
 
 
+def _fibo_has_extended_access(user_id: int) -> bool:
+    return is_admin_user(user_id) or has_fibo_next_profile_access(user_id)
+
+
+async def _handle_fibo_extension_profile_save(payload: dict, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    user = update.effective_user
+    if not message or not user:
+        return
+
+    state = payload.get("state", {})
+    if not isinstance(state, dict):
+        state = {}
+
+    active_profile = 1
+    try:
+        active_profile = int(payload.get("profile") or state.get("active_profile") or 1)
+    except (TypeError, ValueError):
+        active_profile = 1
+    active_profile = max(1, min(7, active_profile))
+
+    has_access = _fibo_has_extended_access(user.id)
+    if active_profile >= 3 and not has_access:
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Profile 3-7 hanya untuk NEXTexclusive member.",
+            reply_markup=main_menu_keyboard(user.id),
+        )
+        return
+
+    if not has_access:
+        raw_profiles = state.get("profiles", {})
+        if isinstance(raw_profiles, dict):
+            filtered: dict[str, dict] = {}
+            for key, row in raw_profiles.items():
+                try:
+                    idx = int(key)
+                except (TypeError, ValueError):
+                    continue
+                if 1 <= idx <= 2 and isinstance(row, dict):
+                    filtered[str(idx)] = row
+            state["profiles"] = filtered
+        if int(state.get("active_profile") or 1) >= 3:
+            state["active_profile"] = 1
+
+    ok = save_fibo_extension_profiles(user.id, state)
+    if not ok:
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Gagal simpan profile Fibo Extension. Cuba lagi.",
+            reply_markup=main_menu_keyboard(user.id),
+        )
+        return
+
+    await send_screen(
+        context,
+        message.chat_id,
+        f"✅ Profile Fibo #{active_profile} disimpan.",
+        reply_markup=main_menu_keyboard(user.id),
+    )
+
+
+async def _handle_fibo_extension_profile_reset(payload: dict, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    user = update.effective_user
+    if not message or not user:
+        return
+
+    try:
+        profile_idx = int(payload.get("profile") or 1)
+    except (TypeError, ValueError):
+        profile_idx = 1
+    profile_idx = max(1, min(7, profile_idx))
+
+    if profile_idx >= 3 and not _fibo_has_extended_access(user.id):
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Profile 3-7 hanya untuk NEXTexclusive member.",
+            reply_markup=main_menu_keyboard(user.id),
+        )
+        return
+
+    state = load_fibo_extension_profiles(user.id)
+    raw_profiles = state.get("profiles", {})
+    if isinstance(raw_profiles, dict):
+        raw_profiles.pop(str(profile_idx), None)
+        state["profiles"] = raw_profiles
+    if int(state.get("active_profile") or 1) == profile_idx:
+        state["active_profile"] = 1 if profile_idx >= 3 and not _fibo_has_extended_access(user.id) else profile_idx
+
+    ok = save_fibo_extension_profiles(user.id, state)
+    if not ok:
+        await send_screen(
+            context,
+            message.chat_id,
+            "❌ Gagal reset profile Fibo Extension. Cuba lagi.",
+            reply_markup=main_menu_keyboard(user.id),
+        )
+        return
+
+    await send_screen(
+        context,
+        message.chat_id,
+        f"✅ Profile Fibo #{profile_idx} direset.",
+        reply_markup=main_menu_keyboard(user.id),
+    )
+
+
 async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     if not message or not message.web_app_data:
@@ -1171,6 +1285,14 @@ async def handle_setup_webapp(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if payload_type == "risk_calculator_back_to_menu":
         await _handle_risk_calculator_back_to_menu(update, context)
+        return
+
+    if payload_type == "fibo_extension_profile_save":
+        await _handle_fibo_extension_profile_save(payload, update, context)
+        return
+
+    if payload_type == "fibo_extension_profile_reset":
+        await _handle_fibo_extension_profile_reset(payload, update, context)
         return
 
     if payload_type == "notification_settings_save":
