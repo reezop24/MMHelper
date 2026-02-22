@@ -60,6 +60,7 @@ from settings import (
     get_system_info_webapp_url,
 )
 from storage import (
+    get_shared_db_health_snapshot,
     get_balance_adjustment_rules,
     can_open_project_grow_mission,
     get_current_balance_usd,
@@ -910,6 +911,44 @@ def _build_admin_panel_keyboard_for_user(user_id: int):
     return admin_panel_keyboard(notification_url, date_override_url, user_log_url)
 
 
+async def handle_db_health_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    user = update.effective_user
+    if not message or not user:
+        return
+    if not is_admin_user(user.id):
+        await message.reply_text("❌ Access denied.")
+        return
+
+    snap = get_shared_db_health_snapshot()
+    tables = snap.get("tables", {}) if isinstance(snap.get("tables"), dict) else {}
+
+    def _c(name: str) -> str:
+        value = tables.get(name)
+        if value is None:
+            return "-"
+        return str(value)
+
+    month_keys = snap.get("activity_month_keys", [])
+    month_count = len(month_keys) if isinstance(month_keys, list) else 0
+    text = (
+        "📊 MMHELPER DB Health\n\n"
+        f"Path: {snap.get('shared_db_path')}\n"
+        f"Exists: {'yes' if snap.get('exists') else 'no'}\n"
+        f"Size: {int(snap.get('size_bytes') or 0)} bytes\n"
+        f"Core users: {int(snap.get('core_users') or 0)}\n"
+        f"Activity months: {month_count}\n\n"
+        "Tables:\n"
+        f"- mmhelper_kv_state: {_c('mmhelper_kv_state')}\n"
+        f"- mmhelper_activity_monthly: {_c('mmhelper_activity_monthly')}\n"
+        f"- vip_whitelist: {_c('vip_whitelist')}\n"
+        f"- sidebot_users: {_c('sidebot_users')}\n"
+        f"- sidebot_submissions: {_c('sidebot_submissions')}\n"
+        f"- sidebot_kv_state: {_c('sidebot_kv_state')}"
+    )
+    await message.reply_text(text)
+
+
 def _build_records_reports_keyboard_for_user(user_id: int):
     summary = get_initial_setup_summary(user_id)
     reference_date = current_user_date(user_id)
@@ -1242,7 +1281,6 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if text in {
         SUBMENU_EXTRA_BUTTON_FIBO_DEWA,
-        SUBMENU_EXTRA_BUTTON_FIBO_EXTENSION,
         SUBMENU_EXTRA_BUTTON_SCALPING_STRATEGY,
         SUBMENU_EXTRA_BUTTON_TRADING_ADVICE,
         SUBMENU_EXTRA_BUTTON_EDUCATION_VIDEO,

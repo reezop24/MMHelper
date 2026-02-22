@@ -48,6 +48,20 @@ def get_risk_calculator_webapp_url(
     return f"{page}?{query}"
 
 
+def get_fibo_extension_webapp_url() -> str:
+    page = f"{_miniapp_base_url()}/fibo-extension.html"
+    live_tick_url = (os.getenv("MMHELPER_LIVE_TICK_URL") or "").strip()
+    dbo_preview_url = (os.getenv("MMHELPER_DBO_PREVIEW_URL") or "").strip()
+    query_data: dict[str, str] = {}
+    if live_tick_url:
+        query_data["live_tick_url"] = live_tick_url
+    if dbo_preview_url:
+        query_data["preview_url"] = dbo_preview_url
+    if not query_data:
+        return page
+    return f"{page}?{urlencode(query_data)}"
+
+
 def get_user_log_webapp_url(user_log_payload_json: str) -> str:
     page = f"{_miniapp_base_url()}/user-log.html"
     query = urlencode({"data": user_log_payload_json})

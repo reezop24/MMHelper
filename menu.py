@@ -4,6 +4,7 @@ from telegram import KeyboardButton, ReplyKeyboardMarkup, WebAppInfo
 
 from settings import (
     get_activity_hub_webapp_url,
+    get_fibo_extension_webapp_url,
     get_next_exclusive_webapp_url,
     get_risk_calculator_webapp_url,
 )
@@ -43,7 +44,7 @@ SUBMENU_STAT_BUTTON_ACCOUNT_SUMMARY = "🧾 Account Summary"
 SUBMENU_STAT_BUTTON_WEEKLY_REPORTS = "📆 Weekly Reports (beta)"
 SUBMENU_STAT_BUTTON_MONTHLY_REPORTS = "🗓️ Monthly Reports (beta)"
 SUBMENU_EXTRA_BUTTON_FIBO_DEWA = "🌀 Fibo Dewa (coming soon)"
-SUBMENU_EXTRA_BUTTON_FIBO_EXTENSION = "📐 Fibo Extension (coming soon)"
+SUBMENU_EXTRA_BUTTON_FIBO_EXTENSION = "📐 Fibo Extension"
 SUBMENU_EXTRA_BUTTON_SCALPING_STRATEGY = "⚡ Scalping Strategy (coming soon)"
 SUBMENU_EXTRA_BUTTON_TRADING_ADVICE = "💡 Trading Advice (coming soon)"
 SUBMENU_EXTRA_BUTTON_EDUCATION_VIDEO = "🎓 Education Video (coming soon)"
@@ -255,9 +256,19 @@ def records_reports_keyboard(account_summary_url: str, transaction_history_url: 
 
 
 def extra_keyboard() -> ReplyKeyboardMarkup:
+    fibo_extension_url = get_fibo_extension_webapp_url()
+    fibo_extension_button: KeyboardButton | str
+    if fibo_extension_url:
+        fibo_extension_button = KeyboardButton(
+            SUBMENU_EXTRA_BUTTON_FIBO_EXTENSION,
+            web_app=WebAppInfo(url=fibo_extension_url),
+        )
+    else:
+        fibo_extension_button = SUBMENU_EXTRA_BUTTON_FIBO_EXTENSION
+
     rows = [
         [SUBMENU_EXTRA_BUTTON_FIBO_DEWA],
-        [SUBMENU_EXTRA_BUTTON_FIBO_EXTENSION],
+        [fibo_extension_button],
         [SUBMENU_EXTRA_BUTTON_SCALPING_STRATEGY],
         [SUBMENU_EXTRA_BUTTON_TRADING_ADVICE],
         [SUBMENU_EXTRA_BUTTON_EDUCATION_VIDEO],
