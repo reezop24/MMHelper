@@ -447,7 +447,18 @@
         reached1618 = postLow <= level1618;
       }
     }
-    var superHighRiskActive = reached1382 || reached1618;
+    var liveReached1382 = false;
+    var liveReached1618 = false;
+    if (Number.isFinite(currentPrice)) {
+      if (side === "BUY") {
+        liveReached1382 = currentPrice >= level1382;
+        liveReached1618 = currentPrice >= level1618;
+      } else {
+        liveReached1382 = currentPrice <= level1382;
+        liveReached1618 = currentPrice <= level1618;
+      }
+    }
+    var superHighRiskActive = reached1382 || reached1618 || liveReached1382 || liveReached1618;
 
     var lines = [];
     lines.push("Fibo Extension Preview");
@@ -467,12 +478,6 @@
     lines.push("Point B: " + (bMyt ? (bMyt.full + " MYT") : normalizeTs(bC.time || bC.ts || "")) + " @ " + f2(bPrice));
     lines.push("Point C: " + (cMyt ? (cMyt.full + " MYT") : normalizeTs(cC.time || cC.ts || "")) + " @ " + f2(cPrice));
     lines.push("");
-    lines.push("Matched candle UTC:");
-    lines.push("- A UTC: " + normalizeTs(aC.time || aC.ts || ""));
-    lines.push("- B UTC: " + normalizeTs(bC.time || bC.ts || ""));
-    lines.push("- C UTC: " + normalizeTs(cC.time || cC.ts || ""));
-    lines.push("");
-
     if (!broken1) {
       lines.push("Belum pecah level 1.");
       lines.push("Fokus awal:");
