@@ -32,6 +32,10 @@
   var aTimeEl = document.getElementById("aTime");
   var bTimeEl = document.getElementById("bTime");
   var cTimeEl = document.getElementById("cTime");
+  var pickABtn = document.getElementById("pickABtn");
+  var pickBBtn = document.getElementById("pickBBtn");
+  var pickCBtn = document.getElementById("pickCBtn");
+  var clearPointsBtn = document.getElementById("clearPointsBtn");
   var previewTextEl = document.getElementById("previewText");
   var backBtn = document.getElementById("topBackBtn");
   var chartInfoEl = document.getElementById("chartInfo");
@@ -51,6 +55,7 @@
   var chart = null;
   var candleSeries = null;
   var livePriceLine = null;
+  var activePickTarget = "";
   var builtinCandles = {
     h4: [
       { time: "2026-02-18 23:00:00", open: 4961.2, high: 4978.3, low: 4958.9, close: 4970.1 },
@@ -424,6 +429,12 @@
         " C:" + f2(c.close);
     });
 
+    chart.subscribeClick(function (param) {
+      if (!activePickTarget) return;
+      if (!param || !param.time) return;
+      assignPickFromChartTime(param.time, "chart_click");
+    });
+
     window.addEventListener("resize", function () {
       if (!chart) return;
       chart.applyOptions({
@@ -431,6 +442,50 @@
         height: chartWrapEl.clientHeight,
       });
     });
+  }
+
+  function findNearestCandleByChartTime(rawTime) {
+    var clickedTs = Number(rawTime);
+    if (!Number.isFinite(clickedTs) || clickedTs <= 0) return null;
+    var nearest = null;
+    var nearestDiff = Number.POSITIVE_INFINITY;
+    for (var i = 0; i < candles.length; i++) {
+      var row = candles[i];
+      var rowTs = toChartTime(row.time || row.ts || "");
+      if (!(rowTs > 0)) continue;
+      var diff = Math.abs(rowTs - clickedTs);
+      if (diff < nearestDiff) {
+        nearestDiff = diff;
+        nearest = row;
+      }
+    }
+    return nearest;
+  }
+
+  function assignPickFromChartTime(rawTime, source) {
+    if (!activePickTarget) return;
+    var nearest = findNearestCandleByChartTime(rawTime);
+    if (!nearest) return;
+    var p = toMYTParts(nearest.time || nearest.ts || "");
+    if (!p) return;
+    var tf = String(tfEl.value || "").toLowerCase();
+    var intraday = Boolean(INTRADAY_TF[tf]);
+    if (activePickTarget === "A") {
+      aDateEl.value = p.date;
+      if (intraday) aTimeEl.value = p.time;
+    } else if (activePickTarget === "B") {
+      bDateEl.value = p.date;
+      if (intraday) bTimeEl.value = p.time;
+    } else if (activePickTarget === "C") {
+      cDateEl.value = p.date;
+      if (intraday) cTimeEl.value = p.time;
+    }
+    if (profileStatusEl) {
+      profileStatusEl.textContent = "Point " + activePickTarget + " set dari chart (" + source + ").";
+    }
+    setPickTarget("");
+    saveFormState(false);
+    renderPreview();
   }
 
   function updateChart(resetView) {
@@ -950,6 +1005,26 @@
     window.history.back();
   }
 
+  function setPickTarget(target) {
+    activePickTarget = String(target || "");
+    if (pickABtn) pickABtn.classList.toggle("active", activePickTarget === "A");
+    if (pickBBtn) pickBBtn.classList.toggle("active", activePickTarget === "B");
+    if (pickCBtn) pickCBtn.classList.toggle("active", activePickTarget === "C");
+  }
+
+  function clearAllPoints() {
+    aDateEl.value = "";
+    bDateEl.value = "";
+    cDateEl.value = "";
+    aTimeEl.value = "";
+    bTimeEl.value = "";
+    cTimeEl.value = "";
+    setPickTarget("");
+    clearABCMarkers();
+    saveFormState(false);
+    renderPreview();
+  }
+
   async function reloadAll() {
     previewTextEl.textContent = "Loading candle data...";
     try {
@@ -999,6 +1074,48 @@
   if (profileResetBtn) {
     profileResetBtn.addEventListener("click", function () {
       resetCurrentProfile();
+    });
+  }
+
+  if (pickABtn) {
+    pickABtn.addEventListener("click", function () {
+      setPickTarget(activePickTarget === "A" ? "" : "A");
+    });
+  }
+  if (pickBBtn) {
+    pickBBtn.addEventListener("click", function () {
+      setPickTarget(activePickTarget === "B" ? "" : "B");
+    });
+  }
+  if (pickCBtn) {
+    pickCBtn.addEventListener("click", function () {
+      setPickTarget(activePickTarget === "C" ? "" : "C");
+    });
+  }
+  if (clearPointsBtn) {
+    clearPointsBtn.addEventListener("click", function () {
+      clearAllPoints();
+    });
+  }
+
+  if (chartWrapEl) {
+    chartWrapEl.addEventListener("click", function (ev) {
+      if (!activePickTarget || !chart) return;
+      var rect = chartWrapEl.getBoundingClientRect();
+      var x = ev.clientX - rect.left;
+      var time = chart.timeScale().coordinateToTime(x);
+      if (!time) return;
+      assignPickFromChartTime(time, "wrap_click");
+    });
+    chartWrapEl.addEventListener("touchend", function (ev) {
+      if (!activePickTarget || !chart) return;
+      if (!ev.changedTouches || !ev.changedTouches.length) return;
+      var t = ev.changedTouches[0];
+      var rect = chartWrapEl.getBoundingClientRect();
+      var x = t.clientX - rect.left;
+      var time = chart.timeScale().coordinateToTime(x);
+      if (!time) return;
+      assignPickFromChartTime(time, "wrap_tap");
     });
   }
 
