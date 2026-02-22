@@ -296,8 +296,38 @@
     return date + " " + time + " MYT";
   }
 
+  function shouldHideWeekendCandle(rawTs) {
+    var d = parseUtcDate(rawTs);
+    if (Number.isNaN(d.getTime())) return false;
+    var parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Kuala_Lumpur",
+      weekday: "short",
+      hour: "2-digit",
+      hour12: false,
+    }).formatToParts(d);
+    var weekday = "";
+    var hour = -1;
+    parts.forEach(function (p) {
+      if (p.type === "weekday") weekday = String(p.value || "");
+      if (p.type === "hour") {
+        var h = Number(p.value);
+        if (Number.isFinite(h)) hour = h;
+      }
+    });
+    if (weekday === "Sun") return true;
+    if (weekday === "Sat" && hour >= 6) return true;
+    if (weekday === "Mon" && hour >= 0 && hour < 7) return true;
+    return false;
+  }
+
   function buildChartData() {
+    var tf = String(tfEl.value || "").toLowerCase();
+    var filterWeekend = Boolean(INTRADAY_TF[tf]);
     return candles
+      .filter(function (c) {
+        if (!filterWeekend) return true;
+        return !shouldHideWeekendCandle(c.time || c.ts || "");
+      })
       .map(function (c) {
         return {
           time: toChartTime(c.time || c.ts || ""),
