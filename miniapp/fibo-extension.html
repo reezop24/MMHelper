@@ -77,6 +77,21 @@
       color: #9ab8e6;
       min-height: 16px;
     }
+    .profile-badge {
+      margin: 2px 0 10px;
+      display: none;
+      justify-content: center;
+    }
+    .profile-badge.show {
+      display: flex;
+    }
+    .profile-badge img {
+      width: 120px;
+      max-width: 46%;
+      height: auto;
+      object-fit: contain;
+      filter: drop-shadow(0 5px 12px rgba(0, 0, 0, 0.35));
+    }
     .field label {
       display: block;
       margin-bottom: 6px;
@@ -177,6 +192,9 @@
         <button class="profile-tab-btn" type="button" data-profile="5">5</button>
         <button class="profile-tab-btn" type="button" data-profile="6">6</button>
         <button class="profile-tab-btn" type="button" data-profile="7">7</button>
+      </div>
+      <div id="profileBadge" class="profile-badge">
+        <img src="nextexc.png" alt="NEXTexclusive" />
       </div>
       <div id="profileStatus" class="profile-status"></div>
       <div class="field">

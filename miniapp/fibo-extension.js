@@ -19,6 +19,7 @@
   var profileSaveBtn = document.getElementById("profileSaveBtn");
   var profileStatusEl = document.getElementById("profileStatus");
   var activeProfileLabelEl = document.getElementById("activeProfileLabel");
+  var profileBadgeEl = document.getElementById("profileBadge");
   var aDateEl = document.getElementById("aDate");
   var bDateEl = document.getElementById("bDate");
   var cDateEl = document.getElementById("cDate");
@@ -126,6 +127,9 @@
       btn.classList.toggle("filled", hasProfileData(p));
     });
     if (activeProfileLabelEl) activeProfileLabelEl.textContent = "#" + String(activeProfile);
+    if (profileBadgeEl) {
+      profileBadgeEl.classList.toggle("show", activeProfile >= 3 && activeProfile <= 7);
+    }
   }
 
   function saveFormState(showMessage) {
