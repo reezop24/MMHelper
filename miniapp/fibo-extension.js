@@ -926,8 +926,10 @@
     html.push('<span class="zone-title">Entry Zone</span>');
     for (var e = 0; e < entryKeys.length; e++) {
       var ek = entryKeys[e];
-      var entryPriceClass = ek === "0.5" && !Boolean(invalidMap[ek]) ? "price-green" : "";
-      html.push(levelLine("Entry Zone " + String(e + 1), ek, statusMap[ek] || "-", Boolean(invalidMap[ek]), entryPriceClass, ""));
+      var isHalfLevel = ek === "0.5" && !Boolean(invalidMap[ek]);
+      var entryPriceClass = isHalfLevel ? "zone-purple" : "";
+      var entryStatusClass = isHalfLevel ? "zone-purple" : "";
+      html.push(levelLine("Entry Zone " + String(e + 1), ek, statusMap[ek] || "-", Boolean(invalidMap[ek]), entryPriceClass, entryStatusClass));
     }
 
     html.push("");
@@ -1032,8 +1034,15 @@
     bTimeEl.value = "";
     cTimeEl.value = "";
     setPickTarget("");
+    pickTouchStartMs = 0;
+    pickTouchStartX = 0;
+    pickTouchMoved = false;
+    pickCandidateTime = 0;
     clearABCMarkers();
     saveFormState(false);
+    if (profileStatusEl) {
+      profileStatusEl.textContent = "Point A/B/C dikosongkan. Pilih Pick A/B/C untuk tandakan semula.";
+    }
     renderPreview();
   }
 
@@ -1092,16 +1101,19 @@
   if (pickABtn) {
     pickABtn.addEventListener("click", function () {
       setPickTarget(activePickTarget === "A" ? "" : "A");
+      pickCandidateTime = 0;
     });
   }
   if (pickBBtn) {
     pickBBtn.addEventListener("click", function () {
       setPickTarget(activePickTarget === "B" ? "" : "B");
+      pickCandidateTime = 0;
     });
   }
   if (pickCBtn) {
     pickCBtn.addEventListener("click", function () {
       setPickTarget(activePickTarget === "C" ? "" : "C");
+      pickCandidateTime = 0;
     });
   }
   if (clearPointsBtn) {
@@ -1157,7 +1169,7 @@
       var x = t.clientX - rect.left;
       var endTime = chart.timeScale().coordinateToTime(x);
       var heldMs = Date.now() - pickTouchStartMs;
-      var longHold = heldMs >= 220;
+      var longHold = heldMs >= 140;
       if (!pickTouchMoved && !longHold) {
         if (profileStatusEl) {
           profileStatusEl.textContent = "Hold & drag pada chart untuk pilih candle.";
