@@ -891,6 +891,12 @@
 
     var extToneMap = {};
     var extKeys = ["1.382", "1.618", "2.618", "3.618", "4.236"];
+    var postCloseHigh = null;
+    var postCloseLow = null;
+    if (postC.length) {
+      postCloseHigh = Math.max.apply(null, postC.map(function (r) { return Number(r.close); }).filter(Number.isFinite));
+      postCloseLow = Math.min.apply(null, postC.map(function (r) { return Number(r.close); }).filter(Number.isFinite));
+    }
     for (var t = 0; t < extKeys.length; t++) {
       var keyTone = extKeys[t];
       if (Boolean(invalidMap[keyTone])) {
@@ -898,13 +904,18 @@
         continue;
       }
       var lv = Number(levels[keyTone]);
-      var brokeNow = Number.isFinite(currentPrice) && (side === "BUY" ? currentPrice >= lv : currentPrice <= lv);
+      var reachedLive = Number.isFinite(currentPrice) && (
+        side === "BUY" ? currentPrice >= lv : currentPrice <= lv
+      );
       var reachedBefore = Number.isFinite(postHigh) && Number.isFinite(postLow) && (
         side === "BUY" ? postHigh >= lv : postLow <= lv
       );
-      if (brokeNow) {
+      var brokeByClose = Number.isFinite(postCloseHigh) && Number.isFinite(postCloseLow) && (
+        side === "BUY" ? postCloseHigh >= lv : postCloseLow <= lv
+      );
+      if (brokeByClose) {
         extToneMap[keyTone] = "green";
-      } else if (reachedBefore) {
+      } else if (reachedLive || reachedBefore) {
         extToneMap[keyTone] = "yellow";
       } else {
         extToneMap[keyTone] = "";
