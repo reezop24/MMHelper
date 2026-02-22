@@ -40,6 +40,38 @@
     return s;
   }
 
+  function parseUtcDate(raw) {
+    var s = normalizeTs(raw).replace(" ", "T");
+    if (!s) return new Date(NaN);
+    if (!s.endsWith("Z")) s = s + "Z";
+    return new Date(s);
+  }
+
+  function toMYTParts(raw) {
+    var d = parseUtcDate(raw);
+    if (Number.isNaN(d.getTime())) return null;
+    var fmt = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kuala_Lumpur",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    });
+    var parts = fmt.formatToParts(d);
+    var out = {};
+    parts.forEach(function (p) {
+      out[p.type] = p.value;
+    });
+    return {
+      date: (out.year || "") + "-" + (out.month || "") + "-" + (out.day || ""),
+      time: (out.hour || "") + ":" + (out.minute || ""),
+      full: (out.year || "") + "-" + (out.month || "") + "-" + (out.day || "") + " " + (out.hour || "") + ":" + (out.minute || "") + ":" + (out.second || ""),
+    };
+  }
+
   function setH4Times(selectEl) {
     selectEl.innerHTML = "";
     var rows = h4Times.length ? h4Times : ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00"];
@@ -55,9 +87,9 @@
     if (tfEl.value !== "h4") return;
     var uniq = {};
     candles.forEach(function (c) {
-      var ts = normalizeTs(c.time || c.ts || "");
-      if (ts.length >= 16) {
-        uniq[ts.slice(11, 16)] = true;
+      var p = toMYTParts(c.time || c.ts || "");
+      if (p && p.time) {
+        uniq[p.time] = true;
       }
     });
     h4Times = Object.keys(uniq).sort();
@@ -78,14 +110,14 @@
     var key = tf === "h4" ? (dateValue + " " + (timeValue || "00:00") + ":00") : dateValue;
     if (tf === "d1") {
       for (var i = candles.length - 1; i >= 0; i--) {
-        var ts = normalizeTs(candles[i].time || candles[i].ts || "");
-        if (ts.startsWith(dateValue)) return candles[i];
+        var p = toMYTParts(candles[i].time || candles[i].ts || "");
+        if (p && p.date === dateValue) return candles[i];
       }
       return null;
     }
     for (var j = candles.length - 1; j >= 0; j--) {
-      var ts2 = normalizeTs(candles[j].time || candles[j].ts || "");
-      if (ts2 === key) return candles[j];
+      var p2 = toMYTParts(candles[j].time || candles[j].ts || "");
+      if (p2 && ((p2.date + " " + p2.time + ":00") === key)) return candles[j];
     }
     return null;
   }
@@ -153,9 +185,17 @@
       lines.push("Break level 1: unknown");
     }
     lines.push("");
-    lines.push("Point A: " + normalizeTs(aC.time || aC.ts || "") + " @ " + f2(aPrice));
-    lines.push("Point B: " + normalizeTs(bC.time || bC.ts || "") + " @ " + f2(bPrice));
-    lines.push("Point C: " + normalizeTs(cC.time || cC.ts || "") + " @ " + f2(cPrice));
+    var aMyt = toMYTParts(aC.time || aC.ts || "");
+    var bMyt = toMYTParts(bC.time || bC.ts || "");
+    var cMyt = toMYTParts(cC.time || cC.ts || "");
+    lines.push("Point A: " + (aMyt ? (aMyt.full + " MYT") : normalizeTs(aC.time || aC.ts || "")) + " @ " + f2(aPrice));
+    lines.push("Point B: " + (bMyt ? (bMyt.full + " MYT") : normalizeTs(bC.time || bC.ts || "")) + " @ " + f2(bPrice));
+    lines.push("Point C: " + (cMyt ? (cMyt.full + " MYT") : normalizeTs(cC.time || cC.ts || "")) + " @ " + f2(cPrice));
+    lines.push("");
+    lines.push("Matched candle UTC:");
+    lines.push("- A UTC: " + normalizeTs(aC.time || aC.ts || ""));
+    lines.push("- B UTC: " + normalizeTs(bC.time || bC.ts || ""));
+    lines.push("- C UTC: " + normalizeTs(cC.time || cC.ts || ""));
     lines.push("");
 
     if (!broken1) {
