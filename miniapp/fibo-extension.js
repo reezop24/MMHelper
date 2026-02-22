@@ -682,6 +682,7 @@
     var level1382 = Number(levels["1.382"]);
     var level1618 = Number(levels["1.618"]);
     var level2618 = Number(levels["2.618"]);
+    var level4236 = Number(levels["4.236"]);
     var mid1618To2618 = (level1618 + level2618) / 2;
     var cTs = toChartTime(cC.time || cC.ts || "");
     var postC = candles.filter(function (row) {
@@ -729,17 +730,29 @@
     }
     var reachedMidByLive = false;
     var broke2618ByLive = false;
+    var broke4236ByLive = false;
     if (Number.isFinite(currentPrice)) {
       if (side === "BUY") {
         reachedMidByLive = currentPrice >= mid1618To2618;
         broke2618ByLive = currentPrice >= level2618;
+        broke4236ByLive = currentPrice >= level4236;
       } else {
         reachedMidByLive = currentPrice <= mid1618To2618;
         broke2618ByLive = currentPrice <= level2618;
+        broke4236ByLive = currentPrice <= level4236;
       }
     }
     var reachedMidState = reachedMidByHistory || reachedMidByLive;
     var broke2618State = broke2618ByHistory || broke2618ByLive;
+    var broke4236ByHistory = false;
+    if (Number.isFinite(postHigh) && Number.isFinite(postLow)) {
+      if (side === "BUY") {
+        broke4236ByHistory = postHigh >= level4236;
+      } else {
+        broke4236ByHistory = postLow <= level4236;
+      }
+    }
+    var broke4236State = broke4236ByHistory || broke4236ByLive;
 
     var sideHtml = side === "BUY"
       ? '<span class="side-buy">BUY</span>'
@@ -799,6 +812,12 @@
         statusMap[k] = "INVALID";
       });
     }
+    if (broke4236State) {
+      ["0", "0.5", "0.618", "0.786", "1", "1.382", "1.618", "2.618", "3.618", "4.236"].forEach(function (k) {
+        invalidMap[k] = true;
+        statusMap[k] = "INVALID";
+      });
+    }
 
     var html = [];
     for (var i = 0; i < lines.length; i++) {
@@ -810,7 +829,7 @@
       }
     }
 
-    var entryKeys = ["0", "0.5", "0.618", "0.786", "1"];
+    var entryKeys = ["1", "0.786", "0.618", "0.5", "0"];
     var extKeys = ["1.382", "1.618", "2.618", "3.618", "4.236"];
     html.push("");
     html.push('<span class="zone-title">Entry Zone</span>');
@@ -824,6 +843,10 @@
     for (var x = 0; x < extKeys.length; x++) {
       var xk = extKeys[x];
       html.push(levelLine("Extension Zone " + String(x + 1), xk, statusMap[xk] || "-", Boolean(invalidMap[xk])));
+    }
+    if (broke4236State) {
+      html.push("");
+      html.push('<span class="status-invalid">Extension Completed. Sila buat penandaan baru pada structure semasa.</span>');
     }
 
     previewTextEl.innerHTML = html.join("<br>");
