@@ -20,6 +20,32 @@
       grid-template-columns: 1fr 1fr;
       gap: 8px;
     }
+    .pick-tools {
+      margin-top: 8px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .pick-btn {
+      border: 1px solid #4f6f98;
+      background: #10294f;
+      color: #e6f0ff;
+      border-radius: 9px;
+      padding: 7px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .pick-btn.active {
+      border-color: #f59e0b;
+      background: #7a3b06;
+      color: #ffd9a6;
+    }
+    .pick-btn.clear {
+      border-color: #b74848;
+      background: #7c1f1f;
+      color: #ffe7e7;
+    }
     .profile-head {
       display: flex;
       align-items: center;
@@ -258,8 +284,8 @@
     .pill.warn { background: rgba(255, 181, 73, 0.2); color: #ffd08c; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
     @media (max-width: 640px) {
-      .point-grid {
-        grid-template-columns: 1fr;
+      .pick-tools {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
   </style>
@@ -314,7 +340,7 @@
       </div>
       <p class="hint">M15/M30/H1/H4 guna tarikh + masa candle. Daily/Weekly guna tarikh sahaja.</p>
       <p class="hint">Rule point: Uptrend => A/C guna Low, B guna High. Downtrend => A/C guna High, B guna Low.</p>
-      <p class="hint">Dev lokal: buka `fibo-extension.html?dev=1` untuk guna data mock tanpa backend bot.</p>
+      <p class="hint">Anda boleh masukkan tarikh/masa dari chart TradingView atau terus pilih point pada preview chart di bawah.</p>
     </section>
 
     <section class="card row">
@@ -339,6 +365,26 @@
           <select id="cTime"></select>
         </div>
       </div>
+      <div class="pick-tools">
+        <button id="pickABtn" class="pick-btn" type="button">Pick A</button>
+        <button id="pickBBtn" class="pick-btn" type="button">Pick B</button>
+        <button id="pickCBtn" class="pick-btn" type="button">Pick C</button>
+        <button id="clearPointsBtn" class="pick-btn clear" type="button">Clear Semua</button>
+      </div>
+    </section>
+
+    <section class="chart-card">
+      <div class="chart-meta">
+        <div id="chartInfo">Chart: -</div>
+        <div id="liveInfo">LIVE: -</div>
+        <div id="crosshairInfo">Crosshair: -</div>
+      </div>
+      <div id="chartWrap">
+        <div id="chartBox"></div>
+        <div class="chart-brand">
+          <img src="reezo.png" alt="Reezo" />
+        </div>
+      </div>
     </section>
 
     <section class="preview">
@@ -354,20 +400,6 @@
           </span>
         </button>
         <button id="bottomBackBtn" type="button" class="profile-back-btn">Back</button>
-      </div>
-    </section>
-
-    <section class="chart-card">
-      <div class="chart-meta">
-        <div id="chartInfo">Chart: -</div>
-        <div id="liveInfo">LIVE: -</div>
-        <div id="crosshairInfo">Crosshair: -</div>
-      </div>
-      <div id="chartWrap">
-        <div id="chartBox"></div>
-        <div class="chart-brand">
-          <img src="reezo.png" alt="Reezo" />
-        </div>
       </div>
     </section>
   </main>
