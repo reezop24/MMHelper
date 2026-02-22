@@ -426,9 +426,28 @@
     }
     var level1382 = Number(levels["1.382"]);
     var level1618 = Number(levels["1.618"]);
-    var rangeLow = Math.min(level1382, level1618);
-    var rangeHigh = Math.max(level1382, level1618);
-    var in1382To1618 = Number.isFinite(currentPrice) && currentPrice >= rangeLow && currentPrice <= rangeHigh;
+    var cTs = toChartTime(cC.time || cC.ts || "");
+    var postC = candles.filter(function (row) {
+      return toChartTime(row.time || row.ts || "") >= cTs;
+    });
+    var postHigh = null;
+    var postLow = null;
+    if (postC.length) {
+      postHigh = Math.max.apply(null, postC.map(function (r) { return Number(r.high); }).filter(Number.isFinite));
+      postLow = Math.min.apply(null, postC.map(function (r) { return Number(r.low); }).filter(Number.isFinite));
+    }
+    var reached1382 = false;
+    var reached1618 = false;
+    if (Number.isFinite(postHigh) && Number.isFinite(postLow)) {
+      if (side === "BUY") {
+        reached1382 = postHigh >= level1382;
+        reached1618 = postHigh >= level1618;
+      } else {
+        reached1382 = postLow <= level1382;
+        reached1618 = postLow <= level1618;
+      }
+    }
+    var superHighRiskActive = reached1382 || reached1618;
 
     var lines = [];
     lines.push("Fibo Extension Preview");
@@ -464,13 +483,17 @@
       lines.push("Zon entry (risk berbeza):");
       lines.push("- 0.5   : " + f2(levels["0.5"]) + "  [Low Risk]");
       lines.push("- 0.618 : " + f2(levels["0.618"]) + "  [Medium Risk]");
-      lines.push("- 0.786 : " + f2(levels["0.786"]) + "  [" + (in1382To1618 ? "Super High Risk" : "High Risk") + "]");
-      lines.push("- 1.0   : " + f2(levels["1"]) + "  [Breakout Risk]");
+      lines.push("- 0.786 : " + f2(levels["0.786"]) + "  [" + (superHighRiskActive ? "Super High Risk" : "High Risk") + "]");
+      lines.push("- 1.0   : " + f2(levels["1"]) + "  [" + (superHighRiskActive ? "Super High Risk" : "Breakout Risk") + "]");
       lines.push("");
       lines.push("Checkpoint seterusnya:");
       lines.push("- 1.382 : " + f2(levels["1.382"]));
       lines.push("- 1.618 : " + f2(levels["1.618"]));
       lines.push("- 2.618 : " + f2(levels["2.618"]));
+      if (superHighRiskActive) {
+        lines.push("");
+        lines.push("Risk note: Price sudah capai FE 1.382/1.618 selepas Point C, jadi zon 0.786 & 1.0 diklasifikasikan Super High Risk.");
+      }
       lines.push("");
       lines.push("Possible reverse / trend continue / new structure:");
       lines.push("- 3.618 : " + f2(levels["3.618"]));
