@@ -214,7 +214,7 @@
     bDateEl.value = p.bDate || "";
     cDateEl.value = p.cDate || "";
     updateTimeInputs();
-    [aTimeEl, bTimeEl, cTimeEl].forEach(setH4Times);
+    [aTimeEl, bTimeEl, cTimeEl].forEach(setIntradayTimes);
     if (p.aTime) aTimeEl.value = p.aTime;
     if (p.bTime) bTimeEl.value = p.bTime;
     if (p.cTime) cTimeEl.value = p.cTime;
@@ -248,11 +248,13 @@
 
   function switchProfile(profileIdx) {
     saveFormState(false);
+    var prevTf = String(tfEl.value || "").toLowerCase();
     var state = readState();
     activeProfile = Math.max(1, Math.min(profileCount, Number(profileIdx || 1)));
     state.activeProfile = activeProfile;
     writeState(state);
     applyProfileData(state.profiles[String(activeProfile)] || {});
+    var nextTf = String(tfEl.value || "").toLowerCase();
     updateProfileTabsUI(state);
     if (profileStatusEl) {
       if (activeProfile >= 3 && !isNextMember) {
@@ -261,10 +263,16 @@
         profileStatusEl.textContent = "Profile #" + String(activeProfile) + " aktif.";
       }
     }
-    reloadAll().then(initDefaultDates).then(function () {
-      renderPreview();
-      saveFormState(false);
-    });
+    if (prevTf !== nextTf || !candles.length) {
+      reloadAll().then(initDefaultDates).then(function () {
+        renderPreview();
+        saveFormState(false);
+      });
+      return;
+    }
+    updateChart(false);
+    renderPreview();
+    saveFormState(false);
   }
 
   function normalizeTs(raw) {
