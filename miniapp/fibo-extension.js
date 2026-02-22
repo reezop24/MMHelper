@@ -784,16 +784,19 @@
         "4.236": "Possible Reverse/New Structure",
       };
       var invalidMap = {};
+      var retraceOnlyKeys = ["0.618", "0.786", "1"];
       if (reachedMidState && !broke2618State) {
         statusMap["0.5"] = "Super High Risk";
         statusMap["0"] = "High Risk / Possible Reversal";
-        ["0.618", "0.786", "1", "1.382", "1.618", "2.618", "3.618", "4.236"].forEach(function (k) {
+        retraceOnlyKeys.forEach(function (k) {
           invalidMap[k] = true;
           statusMap[k] = "INVALID";
         });
       }
       if (broke2618State) {
-        ["0", "0.5", "0.618", "0.786", "1", "1.382", "1.618", "2.618", "3.618", "4.236"].forEach(function (k) {
+        statusMap["0"] = "High Risk / Possible Reversal";
+        statusMap["0.5"] = "Super High Risk";
+        ["0.5", "0.618", "0.786", "1"].forEach(function (k) {
           invalidMap[k] = true;
           statusMap[k] = "INVALID";
         });
@@ -805,13 +808,6 @@
       for (var j = 0; j < ordered.length; j++) {
         var key = ordered[j];
         html.push(levelLine(key, statusMap[key] || "-", Boolean(invalidMap[key])));
-      }
-      if (broke2618State) {
-        html.push("");
-        html.push('<span class="status-invalid">Semua zon invalid: price sudah break level 2.618.</span>');
-      } else if (reachedMidState) {
-        html.push("");
-        html.push("Price sudah capai 50% range 1.618-2.618: majoriti zon invalid, kecuali level 0.5 & 0.");
       }
       previewTextEl.innerHTML = html.join("<br>");
       return;
