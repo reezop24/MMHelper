@@ -638,11 +638,11 @@
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
     }
-    function levelLine(levelKey, statusText, isInvalid) {
+    function levelLine(zoneName, levelKey, statusText, isInvalid) {
       var status = isInvalid
         ? '<span class="status-invalid">' + esc(statusText) + "</span>"
         : esc(statusText);
-      return "- " + esc(levelKey) + " : " + esc(f2(levels[levelKey])) + " [" + status + "]";
+      return "- " + esc(zoneName) + " : " + esc(f2(levels[levelKey])) + " [" + status + "]";
     }
 
     var side = String(trendEl.value || "").toUpperCase();
@@ -741,15 +741,19 @@
     var reachedMidState = reachedMidByHistory || reachedMidByLive;
     var broke2618State = broke2618ByHistory || broke2618ByLive;
 
+    var sideHtml = side === "BUY"
+      ? '<span class="side-buy">BUY</span>'
+      : '<span class="side-sell">SELL</span>';
     var lines = [];
     lines.push("Fibo Extension Preview");
-    lines.push("TF: " + String(tfEl.value).toUpperCase() + " | Side: " + side);
+    lines.push("TF: " + String(tfEl.value).toUpperCase());
+    lines.push("__SIDE__" + side);
     if (Number.isFinite(currentPrice)) {
       lines.push("Current price: " + f2(currentPrice) + " (" + (latestTs || "latest") + ")");
-      lines.push("Break level 1: " + (broken1 ? "YES" : "NO"));
+      lines.push("Break Of Structure: " + (broken1 ? "YES" : "NO"));
     } else {
       lines.push("Current price: -");
-      lines.push("Break level 1: unknown");
+      lines.push("Break Of Structure: unknown");
     }
     lines.push("");
     var aMyt = toMYTParts(aC.time || aC.ts || "");
@@ -761,57 +765,69 @@
     lines.push("");
     if (!broken1) {
       lines.push("Belum pecah level 1.");
-      lines.push("Fokus awal:");
-      lines.push("- Level 0.5 : " + f2(levels["0.5"]) + " (kawasan pullback awal)");
-      lines.push("- Level 0   : " + f2(levels["0"]) + " (anchor C, invalidasi idea jika reject kuat)");
-      previewTextEl.textContent = lines.join("\n");
-      return;
     } else {
       lines.push("Level 1 sudah pecah.");
-      lines.push("");
-      lines.push("Status Level:");
-
-      var statusMap = {
-        "0": "Anchor",
-        "0.5": "Low Risk",
-        "0.618": "Medium Risk",
-        "0.786": superHighRiskActive ? "Super High Risk" : "High Risk",
-        "1": superHighRiskActive ? "Super High Risk" : "Breakout Risk",
-        "1.382": "Checkpoint",
-        "1.618": "Checkpoint",
-        "2.618": "Checkpoint",
-        "3.618": "Possible Reverse/New Structure",
-        "4.236": "Possible Reverse/New Structure",
-      };
-      var invalidMap = {};
-      var retraceOnlyKeys = ["0.618", "0.786", "1"];
-      if (reachedMidState && !broke2618State) {
-        statusMap["0.5"] = "Super High Risk";
-        statusMap["0"] = "High Risk / Possible Reversal";
-        retraceOnlyKeys.forEach(function (k) {
-          invalidMap[k] = true;
-          statusMap[k] = "INVALID";
-        });
-      }
-      if (broke2618State) {
-        statusMap["0"] = "High Risk / Possible Reversal";
-        statusMap["0.5"] = "Super High Risk";
-        ["0.5", "0.618", "0.786", "1"].forEach(function (k) {
-          invalidMap[k] = true;
-          statusMap[k] = "INVALID";
-        });
-      }
-
-      var ordered = ["0", "0.5", "0.618", "0.786", "1", "1.382", "1.618", "2.618", "3.618", "4.236"];
-      var html = [];
-      for (var i = 0; i < lines.length; i++) html.push(esc(lines[i]));
-      for (var j = 0; j < ordered.length; j++) {
-        var key = ordered[j];
-        html.push(levelLine(key, statusMap[key] || "-", Boolean(invalidMap[key])));
-      }
-      previewTextEl.innerHTML = html.join("<br>");
-      return;
     }
+
+    var statusMap = {
+      "0": "Anchor",
+      "0.5": "Low Risk",
+      "0.618": "Medium Risk",
+      "0.786": superHighRiskActive ? "Super High Risk" : "High Risk",
+      "1": superHighRiskActive ? "Super High Risk" : "Breakout Risk",
+      "1.382": "Checkpoint",
+      "1.618": "Checkpoint",
+      "2.618": "Checkpoint",
+      "3.618": "Possible Reverse/New Structure",
+      "4.236": "Possible Reverse/New Structure",
+    };
+    var invalidMap = {};
+    var retraceOnlyKeys = ["0.618", "0.786", "1"];
+    if (reachedMidState && !broke2618State) {
+      statusMap["0.5"] = "Super High Risk";
+      statusMap["0"] = "High Risk / Possible Reversal";
+      retraceOnlyKeys.forEach(function (k) {
+        invalidMap[k] = true;
+        statusMap[k] = "INVALID";
+      });
+    }
+    if (broke2618State) {
+      statusMap["0"] = "High Risk / Possible Reversal";
+      statusMap["0.5"] = "Super High Risk";
+      ["0.5", "0.618", "0.786", "1"].forEach(function (k) {
+        invalidMap[k] = true;
+        statusMap[k] = "INVALID";
+      });
+    }
+
+    var html = [];
+    for (var i = 0; i < lines.length; i++) {
+      var line = String(lines[i] || "");
+      if (line.indexOf("__SIDE__") === 0) {
+        html.push("Side: " + sideHtml);
+      } else {
+        html.push(esc(line));
+      }
+    }
+
+    var entryKeys = ["0", "0.5", "0.618", "0.786", "1"];
+    var extKeys = ["1.382", "1.618", "2.618", "3.618", "4.236"];
+    html.push("");
+    html.push('<span class="zone-title">Entry Zone</span>');
+    for (var e = 0; e < entryKeys.length; e++) {
+      var ek = entryKeys[e];
+      html.push(levelLine("Entry Zone " + String(e + 1), ek, statusMap[ek] || "-", Boolean(invalidMap[ek])));
+    }
+
+    html.push("");
+    html.push('<span class="zone-title">Extension Zone</span>');
+    for (var x = 0; x < extKeys.length; x++) {
+      var xk = extKeys[x];
+      html.push(levelLine("Extension Zone " + String(x + 1), xk, statusMap[xk] || "-", Boolean(invalidMap[xk])));
+    }
+
+    previewTextEl.innerHTML = html.join("<br>");
+    return;
   }
 
   async function fetchCandles() {
