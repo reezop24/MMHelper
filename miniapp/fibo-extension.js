@@ -56,6 +56,11 @@
   var candleSeries = null;
   var livePriceLine = null;
   var activePickTarget = "";
+  var isTouchDevice = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0);
+  var pickTouchStartMs = 0;
+  var pickTouchStartX = 0;
+  var pickTouchMoved = false;
+  var pickCandidateTime = 0;
   var builtinCandles = {
     h4: [
       { time: "2026-02-18 23:00:00", open: 4961.2, high: 4978.3, low: 4958.9, close: 4970.1 },
@@ -415,6 +420,12 @@
         crosshairInfoEl.textContent = "Crosshair: -";
         return;
       }
+      if (activePickTarget) {
+        var ct = Number(param.time);
+        if (Number.isFinite(ct) && ct > 0) {
+          pickCandidateTime = ct;
+        }
+      }
       var c = param.seriesData.get(candleSeries);
       if (!c) {
         crosshairInfoEl.textContent = "Crosshair: -";
@@ -431,6 +442,7 @@
 
     chart.subscribeClick(function (param) {
       if (!activePickTarget) return;
+      if (isTouchDevice) return;
       if (!param || !param.time) return;
       assignPickFromChartTime(param.time, "chart_click");
     });
@@ -1100,12 +1112,42 @@
 
   if (chartWrapEl) {
     chartWrapEl.addEventListener("click", function (ev) {
-      if (!activePickTarget || !chart) return;
+      if (!activePickTarget || !chart || isTouchDevice) return;
       var rect = chartWrapEl.getBoundingClientRect();
       var x = ev.clientX - rect.left;
       var time = chart.timeScale().coordinateToTime(x);
       if (!time) return;
       assignPickFromChartTime(time, "wrap_click");
+    });
+    chartWrapEl.addEventListener("touchstart", function (ev) {
+      if (!activePickTarget || !chart) return;
+      if (!ev.touches || !ev.touches.length) return;
+      var t = ev.touches[0];
+      var rect = chartWrapEl.getBoundingClientRect();
+      var x = t.clientX - rect.left;
+      pickTouchStartMs = Date.now();
+      pickTouchStartX = x;
+      pickTouchMoved = false;
+      var time = chart.timeScale().coordinateToTime(x);
+      if (time) {
+        var ts = Number(time);
+        if (Number.isFinite(ts) && ts > 0) pickCandidateTime = ts;
+      }
+    });
+    chartWrapEl.addEventListener("touchmove", function (ev) {
+      if (!activePickTarget || !chart) return;
+      if (!ev.touches || !ev.touches.length) return;
+      var t = ev.touches[0];
+      var rect = chartWrapEl.getBoundingClientRect();
+      var x = t.clientX - rect.left;
+      if (Math.abs(x - pickTouchStartX) >= 8) {
+        pickTouchMoved = true;
+      }
+      var time = chart.timeScale().coordinateToTime(x);
+      if (time) {
+        var ts = Number(time);
+        if (Number.isFinite(ts) && ts > 0) pickCandidateTime = ts;
+      }
     });
     chartWrapEl.addEventListener("touchend", function (ev) {
       if (!activePickTarget || !chart) return;
@@ -1113,9 +1155,23 @@
       var t = ev.changedTouches[0];
       var rect = chartWrapEl.getBoundingClientRect();
       var x = t.clientX - rect.left;
-      var time = chart.timeScale().coordinateToTime(x);
-      if (!time) return;
-      assignPickFromChartTime(time, "wrap_tap");
+      var endTime = chart.timeScale().coordinateToTime(x);
+      var heldMs = Date.now() - pickTouchStartMs;
+      var longHold = heldMs >= 220;
+      if (!pickTouchMoved && !longHold) {
+        if (profileStatusEl) {
+          profileStatusEl.textContent = "Hold & drag pada chart untuk pilih candle.";
+        }
+        return;
+      }
+      var finalTime = pickCandidateTime || Number(endTime || 0);
+      if (!finalTime) {
+        if (profileStatusEl) {
+          profileStatusEl.textContent = "Tak dapat baca candle. Cuba hold lebih lama.";
+        }
+        return;
+      }
+      assignPickFromChartTime(finalTime, "hold_drag");
     });
   }
 
