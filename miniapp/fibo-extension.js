@@ -632,6 +632,19 @@
   }
 
   function renderPreview() {
+    function esc(text) {
+      return String(text || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+    function levelLine(levelKey, statusText, isInvalid) {
+      var status = isInvalid
+        ? '<span class="status-invalid">' + esc(statusText) + "</span>"
+        : esc(statusText);
+      return "- " + esc(levelKey) + " : " + esc(f2(levels[levelKey])) + " [" + status + "]";
+    }
+
     var side = String(trendEl.value || "").toUpperCase();
     if (side !== "BUY" && side !== "SELL") {
       clearABCMarkers();
@@ -668,6 +681,8 @@
     }
     var level1382 = Number(levels["1.382"]);
     var level1618 = Number(levels["1.618"]);
+    var level2618 = Number(levels["2.618"]);
+    var mid1618To2618 = (level1618 + level2618) / 2;
     var cTs = toChartTime(cC.time || cC.ts || "");
     var postC = candles.filter(function (row) {
       return toChartTime(row.time || row.ts || "") >= cTs;
@@ -701,6 +716,30 @@
       }
     }
     var superHighRiskActive = reached1382 || reached1618 || liveReached1382 || liveReached1618;
+    var reachedMidByHistory = false;
+    var broke2618ByHistory = false;
+    if (Number.isFinite(postHigh) && Number.isFinite(postLow)) {
+      if (side === "BUY") {
+        reachedMidByHistory = postHigh >= mid1618To2618;
+        broke2618ByHistory = postHigh >= level2618;
+      } else {
+        reachedMidByHistory = postLow <= mid1618To2618;
+        broke2618ByHistory = postLow <= level2618;
+      }
+    }
+    var reachedMidByLive = false;
+    var broke2618ByLive = false;
+    if (Number.isFinite(currentPrice)) {
+      if (side === "BUY") {
+        reachedMidByLive = currentPrice >= mid1618To2618;
+        broke2618ByLive = currentPrice >= level2618;
+      } else {
+        reachedMidByLive = currentPrice <= mid1618To2618;
+        broke2618ByLive = currentPrice <= level2618;
+      }
+    }
+    var reachedMidState = reachedMidByHistory || reachedMidByLive;
+    var broke2618State = broke2618ByHistory || broke2618ByLive;
 
     var lines = [];
     lines.push("Fibo Extension Preview");
@@ -725,29 +764,58 @@
       lines.push("Fokus awal:");
       lines.push("- Level 0.5 : " + f2(levels["0.5"]) + " (kawasan pullback awal)");
       lines.push("- Level 0   : " + f2(levels["0"]) + " (anchor C, invalidasi idea jika reject kuat)");
+      previewTextEl.textContent = lines.join("\n");
+      return;
     } else {
       lines.push("Level 1 sudah pecah.");
-      lines.push("Zon entry (risk berbeza):");
-      lines.push("- 0.5   : " + f2(levels["0.5"]) + "  [Low Risk]");
-      lines.push("- 0.618 : " + f2(levels["0.618"]) + "  [Medium Risk]");
-      lines.push("- 0.786 : " + f2(levels["0.786"]) + "  [" + (superHighRiskActive ? "Super High Risk" : "High Risk") + "]");
-      lines.push("- 1.0   : " + f2(levels["1"]) + "  [" + (superHighRiskActive ? "Super High Risk" : "Breakout Risk") + "]");
       lines.push("");
-      lines.push("Checkpoint seterusnya:");
-      lines.push("- 1.382 : " + f2(levels["1.382"]));
-      lines.push("- 1.618 : " + f2(levels["1.618"]));
-      lines.push("- 2.618 : " + f2(levels["2.618"]));
-      if (superHighRiskActive) {
-        lines.push("");
-        lines.push("Risk note: Price sudah capai FE 1.382/1.618 selepas Point C, jadi zon 0.786 & 1.0 diklasifikasikan Super High Risk.");
-      }
-      lines.push("");
-      lines.push("Possible reverse / trend continue / new structure:");
-      lines.push("- 3.618 : " + f2(levels["3.618"]));
-      lines.push("- 4.236 : " + f2(levels["4.236"]));
-    }
+      lines.push("Status Level:");
 
-    previewTextEl.textContent = lines.join("\n");
+      var statusMap = {
+        "0": "Anchor",
+        "0.5": "Low Risk",
+        "0.618": "Medium Risk",
+        "0.786": superHighRiskActive ? "Super High Risk" : "High Risk",
+        "1": superHighRiskActive ? "Super High Risk" : "Breakout Risk",
+        "1.382": "Checkpoint",
+        "1.618": "Checkpoint",
+        "2.618": "Checkpoint",
+        "3.618": "Possible Reverse/New Structure",
+        "4.236": "Possible Reverse/New Structure",
+      };
+      var invalidMap = {};
+      if (reachedMidState && !broke2618State) {
+        statusMap["0.5"] = "Super High Risk";
+        statusMap["0"] = "High Risk / Possible Reversal";
+        ["0.618", "0.786", "1", "1.382", "1.618", "2.618", "3.618", "4.236"].forEach(function (k) {
+          invalidMap[k] = true;
+          statusMap[k] = "INVALID";
+        });
+      }
+      if (broke2618State) {
+        ["0", "0.5", "0.618", "0.786", "1", "1.382", "1.618", "2.618", "3.618", "4.236"].forEach(function (k) {
+          invalidMap[k] = true;
+          statusMap[k] = "INVALID";
+        });
+      }
+
+      var ordered = ["0", "0.5", "0.618", "0.786", "1", "1.382", "1.618", "2.618", "3.618", "4.236"];
+      var html = [];
+      for (var i = 0; i < lines.length; i++) html.push(esc(lines[i]));
+      for (var j = 0; j < ordered.length; j++) {
+        var key = ordered[j];
+        html.push(levelLine(key, statusMap[key] || "-", Boolean(invalidMap[key])));
+      }
+      if (broke2618State) {
+        html.push("");
+        html.push('<span class="status-invalid">Semua zon invalid: price sudah break level 2.618.</span>');
+      } else if (reachedMidState) {
+        html.push("");
+        html.push("Price sudah capai 50% range 1.618-2.618: majoriti zon invalid, kecuali level 0.5 & 0.");
+      }
+      previewTextEl.innerHTML = html.join("<br>");
+      return;
+    }
   }
 
   async function fetchCandles() {
