@@ -26,6 +26,7 @@ from menu import (
     SUBMENU_EXTRA_BUTTON_SCALPING_STRATEGY,
     SUBMENU_EXTRA_BUTTON_TRADING_ADVICE,
     SUBMENU_FIBO_BACK_TOOLS,
+    SUBMENU_FIBO_TUTORIAL,
     SUBMENU_FIBO_MARKET_INSIGHT,
     SUBMENU_FIBO_RESET_ALL,
     SUBMENU_FIBO_PROFILE,
@@ -1291,9 +1292,27 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
         await send_screen(
             context,
             message.chat_id,
-            "Fibo Extension tools _dibuka_.",
+            (
+                "⚠️ *Fibo Extension* masih dalam fasa *experimental (Beta stage)*.\n\n"
+                "Gunakan sebagai rujukan tambahan sahaja, bukan jaminan keputusan trade.\n\n"
+                "Cara guna ringkas:\n"
+                "1. Dapatkan point A, B, C pada chart sendiri (TradingView digalakkan).\n"
+                "2. Ambil *tarikh + masa candle* bagi setiap point.\n"
+                "3. Masukkan input point dalam FE Profile dan semak preview.\n"
+                "4. Simpan profile untuk rujukan semula.\n\n"
+                "Untuk panduan penandaan Fibo Extension, rujuk `Tutorial FE`."
+            ),
             reply_markup=fibo_extension_keyboard(user.id),
             parse_mode="Markdown",
+        )
+        return
+
+    if text == SUBMENU_FIBO_TUTORIAL:
+        await send_screen(
+            context,
+            message.chat_id,
+            "Tutorial FE belum siap. Akan ditambah dalam update seterusnya.",
+            reply_markup=fibo_extension_keyboard(user.id),
         )
         return
 

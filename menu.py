@@ -44,12 +44,13 @@ SUBMENU_STAT_BUTTON_ACCOUNT_SUMMARY = "🧾 Account Summary"
 SUBMENU_STAT_BUTTON_WEEKLY_REPORTS = "📆 Weekly Reports (beta)"
 SUBMENU_STAT_BUTTON_MONTHLY_REPORTS = "🗓️ Monthly Reports (beta)"
 SUBMENU_EXTRA_BUTTON_FIBO_DEWA = "🌀 Fibo Dewa (coming soon)"
-SUBMENU_EXTRA_BUTTON_FIBO_EXTENSION = "📐 Fibo Extension"
+SUBMENU_EXTRA_BUTTON_FIBO_EXTENSION = "📐 Fibo Extension (Beta stage)"
 SUBMENU_EXTRA_BUTTON_SCALPING_STRATEGY = "⚡ Scalping Strategy (coming soon)"
 SUBMENU_EXTRA_BUTTON_TRADING_ADVICE = "💡 Trading Advice (coming soon)"
 SUBMENU_EXTRA_BUTTON_EDUCATION_VIDEO = "🎓 Education Video (coming soon)"
+SUBMENU_FIBO_TUTORIAL = "🎬 Tutorial FE (coming soon)"
 SUBMENU_FIBO_PROFILE = "🧩 FE Profile"
-SUBMENU_FIBO_MARKET_INSIGHT = "📈 Market Insight (Fibo Extension)"
+SUBMENU_FIBO_MARKET_INSIGHT = "📈 Market Insight (Fibo Extension) (coming soon)"
 SUBMENU_FIBO_RESET_ALL = "🗑️ Reset All Profile"
 SUBMENU_FIBO_BACK_TOOLS = "⬅️ Back to Trading Tools"
 
@@ -286,6 +287,7 @@ def fibo_extension_keyboard(user_id: int | None = None) -> ReplyKeyboardMarkup:
         profile_button = SUBMENU_FIBO_PROFILE
 
     rows = [
+        [SUBMENU_FIBO_TUTORIAL],
         [profile_button],
         [SUBMENU_FIBO_MARKET_INSIGHT],
         [SUBMENU_FIBO_RESET_ALL],
