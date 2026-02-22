@@ -8,6 +8,10 @@
   var params = new URLSearchParams(window.location.search);
   var liveTickUrl = params.get("live_tick_url") || "/api/live-tick";
   var previewUrl = params.get("preview_url") || "/api/dbo-preview";
+  var devMode = params.get("dev") === "1";
+  var devPreviewBase = params.get("dev_preview_base") || "./fibo-dev-preview";
+  var devTickUrl = params.get("dev_tick_url") || "./fibo-dev-live-tick.json";
+  var dataSource = "api";
 
   var trendEl = document.getElementById("trend");
   var tfEl = document.getElementById("tf");
@@ -28,14 +32,88 @@
   var candles = [];
   var latestPrice = null;
   var latestTs = "";
+  var stateKey = "fibofbo_fibo_extension_form_v1";
 
   var h4Times = [];
   var chart = null;
   var candleSeries = null;
   var livePriceLine = null;
+  var builtinCandles = {
+    h4: [
+      { time: "2026-02-18 23:00:00", open: 4961.2, high: 4978.3, low: 4958.9, close: 4970.1 },
+      { time: "2026-02-19 03:00:00", open: 4970.1, high: 4989.4, low: 4968.2, close: 4983.7 },
+      { time: "2026-02-19 07:00:00", open: 4983.7, high: 5002.2, low: 4979.8, close: 4998.3 },
+      { time: "2026-02-19 11:00:00", open: 4998.3, high: 5008.1, low: 4988.2, close: 4992.5 },
+      { time: "2026-02-19 15:00:00", open: 4992.5, high: 5001.6, low: 4976.3, close: 4980.4 },
+      { time: "2026-02-19 19:00:00", open: 4980.4, high: 4988.7, low: 4969.1, close: 4974.8 },
+      { time: "2026-02-19 23:00:00", open: 4974.8, high: 4990.5, low: 4970.7, close: 4986.9 },
+      { time: "2026-02-20 03:00:00", open: 4986.9, high: 5005.8, low: 4982.6, close: 5001.4 },
+      { time: "2026-02-20 07:00:00", open: 5001.4, high: 5013.2, low: 4994, close: 5007.9 },
+      { time: "2026-02-20 11:00:00", open: 5007.9, high: 5010.6, low: 4996.2, close: 5000.3 },
+      { time: "2026-02-20 15:00:00", open: 5000.3, high: 5006.1, low: 4988.2, close: 4992.4 },
+      { time: "2026-02-20 19:00:00", open: 4992.4, high: 5003.4, low: 4987.7, close: 4999.8 },
+    ],
+    d1: [
+      { time: "2026-02-12 23:00:00", open: 4922.1, high: 4960.4, low: 4908.2, close: 4944.3 },
+      { time: "2026-02-13 23:00:00", open: 4944.3, high: 4979.6, low: 4936.5, close: 4968.1 },
+      { time: "2026-02-16 23:00:00", open: 4968.1, high: 5001.9, low: 4954.8, close: 4993.2 },
+      { time: "2026-02-17 23:00:00", open: 4993.2, high: 5015.3, low: 4970.4, close: 4981.7 },
+      { time: "2026-02-18 23:00:00", open: 4981.7, high: 5008.2, low: 4960.3, close: 4995.6 },
+      { time: "2026-02-19 23:00:00", open: 4995.6, high: 5018.4, low: 4984.2, close: 5008.9 },
+    ],
+  };
 
   function f2(v) {
     return Number(v || 0).toFixed(2);
+  }
+
+  function saveFormState() {
+    try {
+      var payload = {
+        trend: String(trendEl.value || ""),
+        tf: String(tfEl.value || ""),
+        aDate: String(aDateEl.value || ""),
+        bDate: String(bDateEl.value || ""),
+        cDate: String(cDateEl.value || ""),
+        aTime: String(aTimeEl.value || ""),
+        bTime: String(bTimeEl.value || ""),
+        cTime: String(cTimeEl.value || ""),
+      };
+      localStorage.setItem(stateKey, JSON.stringify(payload));
+    } catch (_) {
+      // ignore storage failure
+    }
+  }
+
+  function loadFormState() {
+    try {
+      var raw = localStorage.getItem(stateKey);
+      if (!raw) return;
+      var s = JSON.parse(raw);
+      if (s && typeof s === "object") {
+        if (s.trend) trendEl.value = s.trend;
+        if (s.tf) tfEl.value = s.tf;
+        if (s.aDate) aDateEl.value = s.aDate;
+        if (s.bDate) bDateEl.value = s.bDate;
+        if (s.cDate) cDateEl.value = s.cDate;
+      }
+    } catch (_) {
+      // ignore storage failure
+    }
+  }
+
+  function loadTimeState() {
+    try {
+      var raw = localStorage.getItem(stateKey);
+      if (!raw) return;
+      var s = JSON.parse(raw);
+      if (!s || typeof s !== "object") return;
+      if (s.aTime) aTimeEl.value = s.aTime;
+      if (s.bTime) bTimeEl.value = s.bTime;
+      if (s.cTime) cTimeEl.value = s.cTime;
+    } catch (_) {
+      // ignore storage failure
+    }
   }
 
   function normalizeTs(raw) {
@@ -174,9 +252,9 @@
       chart.timeScale().fitContent();
     }
     if (data.length) {
-      chartInfoEl.textContent = "Chart " + String(tfEl.value || "").toUpperCase() + " | Candles: " + data.length;
+      chartInfoEl.textContent = "Chart " + String(tfEl.value || "").toUpperCase() + " | Candles: " + data.length + " | Source: " + dataSource;
     } else {
-      chartInfoEl.textContent = "Chart " + String(tfEl.value || "").toUpperCase() + " | Candles: 0";
+      chartInfoEl.textContent = "Chart " + String(tfEl.value || "").toUpperCase() + " | Candles: 0 | Source: " + dataSource;
     }
     updateLiveLine();
   }
@@ -246,7 +324,7 @@
 
   function setH4Times(selectEl) {
     selectEl.innerHTML = "";
-    var rows = h4Times.length ? h4Times : ["00:00", "04:00", "08:00", "12:00", "16:00", "20:00"];
+    var rows = h4Times.length ? h4Times : ["03:00", "07:00", "11:00", "15:00", "19:00", "23:00"];
     rows.forEach(function (t) {
       var opt = document.createElement("option");
       opt.value = t;
@@ -266,6 +344,7 @@
     });
     h4Times = Object.keys(uniq).sort();
     [aTimeEl, bTimeEl, cTimeEl].forEach(setH4Times);
+    loadTimeState();
   }
 
   function updateTimeInputs() {
@@ -295,7 +374,7 @@
   }
 
   function computeLevels(side, a, b, c) {
-    var ratios = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1, 1.272, 1.414, 1.618, 2.272, 2.618, 3.618, 4.236];
+    var ratios = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1, 1.272, 1.382, 1.414, 1.618, 2.272, 2.618, 3.618, 4.236];
     var ab = Math.abs(b - a);
     var levels = {};
     ratios.forEach(function (r) {
@@ -345,6 +424,11 @@
     if (Number.isFinite(currentPrice)) {
       broken1 = side === "BUY" ? currentPrice >= level1 : currentPrice <= level1;
     }
+    var level1382 = Number(levels["1.382"]);
+    var level1618 = Number(levels["1.618"]);
+    var rangeLow = Math.min(level1382, level1618);
+    var rangeHigh = Math.max(level1382, level1618);
+    var in1382To1618 = Number.isFinite(currentPrice) && currentPrice >= rangeLow && currentPrice <= rangeHigh;
 
     var lines = [];
     lines.push("Fibo Extension Preview");
@@ -380,10 +464,11 @@
       lines.push("Zon entry (risk berbeza):");
       lines.push("- 0.5   : " + f2(levels["0.5"]) + "  [Low Risk]");
       lines.push("- 0.618 : " + f2(levels["0.618"]) + "  [Medium Risk]");
-      lines.push("- 0.786 : " + f2(levels["0.786"]) + "  [High Risk]");
+      lines.push("- 0.786 : " + f2(levels["0.786"]) + "  [" + (in1382To1618 ? "Super High Risk" : "High Risk") + "]");
       lines.push("- 1.0   : " + f2(levels["1"]) + "  [Breakout Risk]");
       lines.push("");
       lines.push("Checkpoint seterusnya:");
+      lines.push("- 1.382 : " + f2(levels["1.382"]));
       lines.push("- 1.618 : " + f2(levels["1.618"]));
       lines.push("- 2.618 : " + f2(levels["2.618"]));
       lines.push("");
@@ -397,22 +482,53 @@
 
   async function fetchCandles() {
     var tf = String(tfEl.value || "h4").toLowerCase();
-    var url = previewUrl + "?tf=" + encodeURIComponent(tf) + "&limit=1200&t=" + Date.now();
-    var res = await fetch(url, { cache: "no-store" });
-    var payload = await res.json();
-    if (!res.ok || (payload && payload.ok === false)) {
-      throw new Error((payload && payload.error) || ("http_" + res.status));
+    var payload = null;
+    if (devMode) {
+      dataSource = "dev-json";
+      try {
+        var devUrl = devPreviewBase + "-" + tf + ".json?t=" + Date.now();
+        var devRes = await fetch(devUrl, { cache: "no-store" });
+        payload = await devRes.json();
+        if (!devRes.ok) {
+          throw new Error("dev_preview_http_" + devRes.status);
+        }
+      } catch (_devErr) {
+        dataSource = "dev-builtin";
+        payload = { ok: true, candles: builtinCandles[tf] || [] };
+      }
+    } else {
+      dataSource = "api";
+      var url = previewUrl + "?tf=" + encodeURIComponent(tf) + "&limit=1200&t=" + Date.now();
+      var res = await fetch(url, { cache: "no-store" });
+      payload = await res.json();
+      if (!res.ok || (payload && payload.ok === false)) {
+        throw new Error((payload && payload.error) || ("http_" + res.status));
+      }
     }
-    candles = Array.isArray(payload.candles) ? payload.candles : [];
+    candles = Array.isArray(payload && payload.candles) ? payload.candles : [];
     refreshH4TimeOptionsFromCandles();
     updateChart(true);
   }
 
   async function fetchLiveTick() {
     try {
-      var res = await fetch(liveTickUrl + "?t=" + Date.now(), { cache: "no-store" });
-      if (!res.ok) return;
-      var payload = await res.json();
+      var payload = null;
+      if (devMode) {
+        try {
+          var devRes = await fetch(devTickUrl + "?t=" + Date.now(), { cache: "no-store" });
+          if (!devRes.ok) return;
+          payload = await devRes.json();
+        } catch (_devTickErr) {
+          var tf = String(tfEl.value || "h4").toLowerCase();
+          var c = (builtinCandles[tf] || []).slice(-1)[0];
+          if (!c) return;
+          payload = { price: c.close, ts: c.time };
+        }
+      } else {
+        var res = await fetch(liveTickUrl + "?t=" + Date.now(), { cache: "no-store" });
+        if (!res.ok) return;
+        payload = await res.json();
+      }
       var p = Number(payload.price);
       if (Number.isFinite(p)) {
         latestPrice = p;
@@ -458,19 +574,28 @@
   updateTimeInputs();
 
   tfEl.addEventListener("change", function () {
+    saveFormState();
     updateTimeInputs();
     reloadAll().then(initDefaultDates).then(renderPreview);
   });
 
   [trendEl, aDateEl, bDateEl, cDateEl, aTimeEl, bTimeEl, cTimeEl].forEach(function (el) {
-    el.addEventListener("change", renderPreview);
+    el.addEventListener("change", function () {
+      saveFormState();
+      renderPreview();
+    });
   });
 
   backBtn.addEventListener("click", backToMenu);
 
+  loadFormState();
+  updateTimeInputs();
+
   reloadAll().then(function () {
     initDefaultDates();
+    loadTimeState();
     renderPreview();
+    saveFormState();
   });
   setInterval(fetchLiveTick, 5000);
 })();
