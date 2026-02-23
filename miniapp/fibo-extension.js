@@ -860,6 +860,30 @@
     clearEntryLines();
     if (!candleSeries || !levels) return;
     var rows = Array.isArray(rowsFromSetup) ? rowsFromSetup : [];
+    var isBuy = String(side || "").toUpperCase() === "BUY";
+    var isSell = String(side || "").toUpperCase() === "SELL";
+    if (!isBuy && !isSell) return;
+
+    // Rule: direction valid only after level 1 breakout.
+    var lv1 = Number(levels["1"]);
+    if (!Number.isFinite(lv1) || !rows.length) return;
+    var bosIdx = -1;
+    for (var bi = 0; bi < rows.length; bi++) {
+      var br = rows[bi];
+      var bh = Number(br.high);
+      var bl = Number(br.low);
+      if (!Number.isFinite(bh) || !Number.isFinite(bl)) continue;
+      if ((isBuy && bh >= lv1) || (isSell && bl <= lv1)) {
+        bosIdx = bi;
+        break;
+      }
+    }
+    if (bosIdx < 0) return;
+    var postBosRows = rows.slice(bosIdx);
+
+    var nearBand = 5.0;   // 50 pips
+    var failBand = 10.0;  // 100 pips
+
     var defs = [
       { key: "1", label: "Entry Zone 1" },
       { key: "0.786", label: "Entry Zone 2" },
@@ -871,14 +895,50 @@
       var d = defs[i];
       var lv = Number(levels[d.key]);
       if (!Number.isFinite(lv)) continue;
-      var visual = computeBreakoutVisual(side, lv, currentPrice, rows) || { lineColor: "#ffffff", labelColor: "#ffffff", broken: false };
+      var zMin = lv - nearBand;
+      var zMax = lv + nearBand;
+
+      // Find first touch after BOS.
+      var touchIdx = -1;
+      for (var ti = 0; ti < postBosRows.length; ti++) {
+        var tr = postBosRows[ti];
+        var th = Number(tr.high);
+        var tl = Number(tr.low);
+        if (!Number.isFinite(th) || !Number.isFinite(tl)) continue;
+        if (th >= zMin && tl <= zMax) {
+          touchIdx = ti;
+          break;
+        }
+      }
+
+      // If touched, invalidate when price overshoots adverse by >100 pips.
+      var failed = false;
+      if (touchIdx >= 0) {
+        for (var fi = touchIdx + 1; fi < postBosRows.length; fi++) {
+          var fr = postBosRows[fi];
+          var fc = Number(fr.close);
+          if (!Number.isFinite(fc)) continue;
+          if ((isBuy && fc <= (lv - failBand)) || (isSell && fc >= (lv + failBand))) {
+            failed = true;
+            break;
+          }
+        }
+      }
+      if (failed) {
+        // Invalid zones should not be shown on chart.
+        continue;
+      }
+
+      var inBandNow = Number.isFinite(currentPrice) && currentPrice >= zMin && currentPrice <= zMax;
+      var lineColor = inBandNow ? "#facc15" : "#22c55e";
+      var labelColor = inBandNow ? "#facc15" : "#22c55e";
       var pl = candleSeries.createPriceLine({
         price: lv,
-        color: visual.lineColor,
+        color: lineColor,
         lineWidth: 1,
         lineStyle: window.LightweightCharts.LineStyle.Dashed,
         axisLabelVisible: true,
-        axisLabelColor: visual.labelColor,
+        axisLabelColor: labelColor,
         axisLabelTextColor: "#0b1220",
         title: d.label,
       });
