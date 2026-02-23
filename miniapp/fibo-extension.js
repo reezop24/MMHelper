@@ -731,7 +731,7 @@
     }
   }
 
-  function computeBreakoutVisual(side, level1, currentPrice, rowsFromSetup) {
+  function computeBreakoutVisual(side, level1, currentPrice, rowsFromSetup, zoneBlock) {
     var lv = Number(level1);
     var cp = Number(currentPrice);
     var rows = Array.isArray(rowsFromSetup) ? rowsFromSetup : [];
@@ -747,8 +747,7 @@
       };
     }
 
-    // XAU pip convention used here: 1 pip = 0.10 => 50 pips = 5.00
-    var nearBand = 5.00;
+    var nearBand = Number.isFinite(zoneBlock) && zoneBlock > 0 ? zoneBlock : 5.00;
 
     var everBrokenByCandles = false;
     var latestClose = null;
@@ -801,7 +800,7 @@
     };
   }
 
-  function updateBreakoutLine(level1, side, currentPrice, rowsFromSetup) {
+  function updateBreakoutLine(level1, side, currentPrice, rowsFromSetup, zoneBlock) {
     if (!candleSeries) return;
     var lv = Number(level1);
     if (!Number.isFinite(lv)) {
@@ -815,7 +814,7 @@
       }
       return;
     }
-    var visual = computeBreakoutVisual(side, lv, currentPrice, rowsFromSetup) || { lineColor: "#ffffff", labelColor: "#ffffff", broken: false };
+    var visual = computeBreakoutVisual(side, lv, currentPrice, rowsFromSetup, zoneBlock) || { lineColor: "#ffffff", labelColor: "#ffffff", broken: false };
     if (!breakoutLevelLine) {
       breakoutLevelLine = candleSeries.createPriceLine({
         price: lv,
@@ -856,7 +855,7 @@
     entryLevelLines = [];
   }
 
-  function updateEntryLines(levels, side, currentPrice, rowsFromSetup) {
+  function updateEntryLines(levels, side, currentPrice, rowsFromSetup, zoneBlock) {
     clearEntryLines();
     if (!candleSeries || !levels) return;
     var rows = Array.isArray(rowsFromSetup) ? rowsFromSetup : [];
@@ -881,8 +880,7 @@
     if (bosIdx < 0) return;
     var postBosRows = rows.slice(bosIdx);
 
-    var nearBand = 5.0;   // 50 pips
-    var failBand = 10.0;  // 100 pips
+    var band = Number.isFinite(zoneBlock) && zoneBlock > 0 ? zoneBlock : 5.0;
 
     var defs = [
       { key: "1", label: "Entry Zone 1" },
@@ -895,43 +893,22 @@
       var d = defs[i];
       var lv = Number(levels[d.key]);
       if (!Number.isFinite(lv)) continue;
-      var zMin = lv - nearBand;
-      var zMax = lv + nearBand;
-
-      // Find first touch after BOS.
-      var touchIdx = -1;
-      for (var ti = 0; ti < postBosRows.length; ti++) {
-        var tr = postBosRows[ti];
-        var th = Number(tr.high);
-        var tl = Number(tr.low);
-        if (!Number.isFinite(th) || !Number.isFinite(tl)) continue;
-        if (th >= zMin && tl <= zMax) {
-          touchIdx = ti;
-          break;
-        }
-      }
-
-      // If touched, invalidate when price overshoots adverse by >100 pips.
-      var failed = false;
-      if (touchIdx >= 0) {
-        for (var fi = touchIdx + 1; fi < postBosRows.length; fi++) {
-          var fr = postBosRows[fi];
-          var fc = Number(fr.close);
-          if (!Number.isFinite(fc)) continue;
-          if ((isBuy && fc <= (lv - failBand)) || (isSell && fc >= (lv + failBand))) {
-            failed = true;
-            break;
-          }
-        }
-      }
-      if (failed) {
-        // Invalid zones should not be shown on chart.
-        continue;
-      }
+      var zMin = lv - band;
+      var zMax = lv + band;
 
       var inBandNow = Number.isFinite(currentPrice) && currentPrice >= zMin && currentPrice <= zMax;
-      var lineColor = inBandNow ? "#facc15" : "#22c55e";
-      var labelColor = inBandNow ? "#facc15" : "#22c55e";
+      var adverseNow = Number.isFinite(currentPrice) && (
+        (isBuy && currentPrice < zMin) || (isSell && currentPrice > zMax)
+      );
+      var lineColor = "#22c55e";
+      var labelColor = "#22c55e";
+      if (inBandNow) {
+        lineColor = "#facc15";
+        labelColor = "#facc15";
+      } else if (adverseNow) {
+        lineColor = "#ef4444";
+        labelColor = "#ef4444";
+      }
       var pl = candleSeries.createPriceLine({
         price: lv,
         color: lineColor,
@@ -963,7 +940,7 @@
     extensionLevelLines = [];
   }
 
-  function updateExtensionLines(levels, side, currentPrice, rowsFromSetup, breakoutBroken) {
+  function updateExtensionLines(levels, side, currentPrice, rowsFromSetup, breakoutBroken, zoneBlock) {
     clearExtensionLines();
     if (!candleSeries || !levels) return;
 
@@ -983,7 +960,7 @@
       }
       var lv = Number(levels[d.key]);
       if (!Number.isFinite(lv)) continue;
-      var visual = computeBreakoutVisual(side, lv, currentPrice, rows) || { lineColor: "#ffffff", labelColor: "#ffffff", broken: false };
+      var visual = computeBreakoutVisual(side, lv, currentPrice, rows, zoneBlock) || { lineColor: "#ffffff", labelColor: "#ffffff", broken: false };
       var pl = candleSeries.createPriceLine({
         price: lv,
         color: visual.lineColor,
@@ -1291,7 +1268,7 @@
     var side = String(trendEl.value || "").toUpperCase();
     if (side !== "BUY" && side !== "SELL") {
       refreshABCPickVisuals("", false);
-      updateBreakoutLine(NaN, "", NaN);
+      updateBreakoutLine(NaN, "", NaN, [], NaN);
       clearEntryLines();
       clearExtensionLines();
       previewTextEl.textContent = "Sila pilih trend dulu (Uptrend / Downtrend).";
@@ -1304,7 +1281,7 @@
 
     if (!aC || !bC || !cC) {
       refreshABCPickVisuals(side, false);
-      updateBreakoutLine(NaN, "", NaN);
+      updateBreakoutLine(NaN, "", NaN, [], NaN);
       clearEntryLines();
       clearExtensionLines();
       previewTextEl.textContent = "Sila isi Point A/B/C dulu.\nPastikan tarikh/masa wujud dalam candle timeframe dipilih.";
@@ -1316,15 +1293,16 @@
     var bPrice = side === "BUY" ? Number(bC.high) : Number(bC.low);
     var cPrice = side === "BUY" ? Number(cC.low) : Number(cC.high);
     var levelsForLine = computeLevels(side, aPrice, bPrice, cPrice);
+    var zoneBlock = Math.abs(bPrice - aPrice) * 0.10;
     var cp = getCurrentPriceFallback();
     var cTs = toChartTime(cC.time || cC.ts || "");
     var rowsFromSetup = candles.filter(function (row) {
       return toChartTime(row.time || row.ts || "") >= cTs;
     });
-    var bosVisual = computeBreakoutVisual(side, levelsForLine["1"], cp, rowsFromSetup) || { broken: false };
-    updateBreakoutLine(levelsForLine["1"], side, cp, rowsFromSetup);
-    updateEntryLines(levelsForLine, side, cp, rowsFromSetup);
-    updateExtensionLines(levelsForLine, side, cp, rowsFromSetup, Boolean(bosVisual.broken));
+    var bosVisual = computeBreakoutVisual(side, levelsForLine["1"], cp, rowsFromSetup, zoneBlock) || { broken: false };
+    updateBreakoutLine(levelsForLine["1"], side, cp, rowsFromSetup, zoneBlock);
+    updateEntryLines(levelsForLine, side, cp, rowsFromSetup, zoneBlock);
+    updateExtensionLines(levelsForLine, side, cp, rowsFromSetup, Boolean(bosVisual.broken), zoneBlock);
     if (!window.FEEngine || typeof window.FEEngine.calculate !== "function") {
       previewTextEl.textContent = "FE engine belum tersedia.";
       return;

@@ -20,10 +20,15 @@
   var TF_WEIGHT = { w1: 60, d1: 50, h4: 40, h1: 30, m30: 20, m15: 10 };
   var KEY_LEVELS = ["0.5", "1", "1.382", "1.618"];
   var PIP_SIZE = 0.10;
-  var CONFLUENCE_BAND_PIPS = 50;
+  var CONFLUENCE_BAND_BLOCKS = 1;
 
   function f2(v) { return Number(v || 0).toFixed(2); }
   function pipDiff(a, b) { return Math.abs(Number(a) - Number(b)) / PIP_SIZE; }
+  function blockDiff(a, b, blockSize) {
+    var bs = Number(blockSize);
+    if (!Number.isFinite(bs) || bs <= 0) return NaN;
+    return Math.abs(Number(a) - Number(b)) / bs;
+  }
   function levelLabel(k) { return k === "1" ? "1.0" : String(k); }
   function levelText(k, price, pips, mode) {
     var cls = "price-hl";
@@ -32,7 +37,7 @@
     return "L" + levelLabel(k) + " @ <span class=\"" + cls + "\">" + f2(price) + "</span> (" + (Number.isFinite(pips) ? pips.toFixed(1) : "-") + " pips)";
   }
 
-  function computeBosAndCollected(side, levels, rowsFromSetup) {
+  function computeBosAndCollected(side, levels, rowsFromSetup, blockSize) {
     var out = { bosBroken: false, collected: {} };
     KEY_LEVELS.forEach(function (k) { out.collected[k] = 0; });
     var rows = Array.isArray(rowsFromSetup) ? rowsFromSetup : [];
@@ -55,8 +60,8 @@
 
     out.bosBroken = true;
     var postBos = rows.slice(bosIdx);
-    var touchBand = 5.0; // 50 pips
-    var moveBand = 10.0; // 100 pips
+    var touchBand = Number.isFinite(blockSize) && blockSize > 0 ? blockSize : 5.0;
+    var moveBand = touchBand;
 
     KEY_LEVELS.forEach(function (k) {
       var lv = Number(levels[k]);
@@ -359,6 +364,7 @@
   function ltfHtfConfluence(ltf, htf) {
     var ext = ["2.618", "3.618", "4.236"];
     var htfZones = ["0.5", "1", "1.382", "1.618"];
+    var htfBlock = Math.abs(Number(htf.aPrice) - Number(htf.bPrice)) * 0.10;
     var best = null;
     for (var i = 0; i < ext.length; i++) {
       var ek = ext[i];
@@ -368,27 +374,34 @@
         var hk = htfZones[j];
         var hv = Number(htf.levels[hk]);
         if (!Number.isFinite(hv)) continue;
-        var d = pipDiff(ev, hv);
-        if (d <= CONFLUENCE_BAND_PIPS && (!best || d < best.pips)) {
-          best = { extKey: ek, extPrice: ev, htfKey: hk, htfPrice: hv, pips: d };
+        var dBlocks = blockDiff(ev, hv, htfBlock);
+        if (dBlocks <= CONFLUENCE_BAND_BLOCKS && (!best || dBlocks < best.blocks)) {
+          best = {
+            extKey: ek,
+            extPrice: ev,
+            htfKey: hk,
+            htfPrice: hv,
+            blocks: dBlocks,
+            pips: pipDiff(ev, hv),
+          };
         }
       }
     }
     return best;
   }
 
-  function nearestEntryAndCheckpoint(side, cp, lv) {
+  function nearestEntryAndCheckpoint(side, cp, lv, blockSize) {
     var entries = ["0.5", "0.618", "0.786", "1"];
     var checkpoints = ["1.382", "1.618", "2.618"];
     var nearestEntry = entries[0];
-    var nearestEntryPips = Number.POSITIVE_INFINITY;
+    var nearestEntryDelta = Number.POSITIVE_INFINITY;
     for (var i = 0; i < entries.length; i++) {
       var ek = entries[i];
       var ev = Number(lv[ek]);
       if (!Number.isFinite(ev) || !Number.isFinite(cp)) continue;
-      var d = pipDiff(cp, ev);
-      if (d < nearestEntryPips) {
-        nearestEntryPips = d;
+      var d = Math.abs(cp - ev);
+      if (d < nearestEntryDelta) {
+        nearestEntryDelta = d;
         nearestEntry = ek;
       }
     }
@@ -397,10 +410,11 @@
     var l05 = Number(lv["0.5"]);
     var l0786 = Number(lv["0.786"]);
     var level1Broken = Number.isFinite(cp) && Number.isFinite(l1) ? (side === "BUY" ? (cp >= l1) : (cp <= l1)) : false;
-    var atBandPips = 5.0;
+    var atBandPips = (Number.isFinite(blockSize) && blockSize > 0) ? (blockSize / PIP_SIZE) : 50.0;
 
     // Friendly nearest-entry text: if currently at level, mark as "sedang berada".
     var nearestEntryVal = Number(lv[nearestEntry]);
+    var nearestEntryPips = Number.isFinite(cp) && Number.isFinite(nearestEntryVal) ? pipDiff(cp, nearestEntryVal) : NaN;
     var nearestEntryLabel = levelText(nearestEntry, nearestEntryVal, nearestEntryPips, "");
     if (Number.isFinite(nearestEntryPips) && nearestEntryPips <= atBandPips) {
       nearestEntryLabel = "Sedang di " + levelText(nearestEntry, nearestEntryVal, nearestEntryPips, "warn");
@@ -440,31 +454,31 @@
     }
 
     var nextCp = checkpoints[0];
-    var nextCpPips = Number.POSITIVE_INFINITY;
+    var nextCpDelta = Number.POSITIVE_INFINITY;
     for (var j = 0; j < checkpoints.length; j++) {
       var ck = checkpoints[j];
       var cv = Number(lv[ck]);
       if (!Number.isFinite(cv) || !Number.isFinite(cp)) continue;
       if (side === "BUY") {
         if (cv >= cp) {
-          var dBuy = pipDiff(cp, cv);
-          if (dBuy < nextCpPips) {
-            nextCpPips = dBuy;
+          var dBuy = Math.abs(cp - cv);
+          if (dBuy < nextCpDelta) {
+            nextCpDelta = dBuy;
             nextCp = ck;
           }
         }
       } else if (cv <= cp) {
-        var dSell = pipDiff(cp, cv);
-        if (dSell < nextCpPips) {
-          nextCpPips = dSell;
+        var dSell = Math.abs(cp - cv);
+        if (dSell < nextCpDelta) {
+          nextCpDelta = dSell;
           nextCp = ck;
         }
       }
     }
-
-    if (!Number.isFinite(nextCpPips)) {
-      var fallback = Number(lv[nextCp]);
-      nextCpPips = Number.isFinite(fallback) && Number.isFinite(cp) ? pipDiff(cp, fallback) : NaN;
+    var nextCpPips = NaN;
+    var nextCpVal = Number(lv[nextCp]);
+    if (Number.isFinite(nextCpVal) && Number.isFinite(cp)) {
+      nextCpPips = pipDiff(cp, nextCpVal);
     }
 
     return {
@@ -526,20 +540,23 @@
       if (![aPrice, bPrice, cPrice].every(Number.isFinite)) continue;
 
       var lv = computeLevels(v.side, aPrice, bPrice, cPrice);
+      var blockSize = Math.abs(bPrice - aPrice) * 0.10;
       var stage = stageForProfile(v.side, currentPrice, lv);
-      var target = nearestEntryAndCheckpoint(v.side, currentPrice, lv);
+      var target = nearestEntryAndCheckpoint(v.side, currentPrice, lv, blockSize);
       var invalidStatus = invalidByExtension(v.side, currentPrice, lv);
       var cTs = parseUtcDate(c.time || c.ts || "").getTime();
       var rowsFromSetup = cset.filter(function (row) {
         var t = parseUtcDate(row.time || row.ts || "").getTime();
         return Number.isFinite(t) && Number.isFinite(cTs) && t >= cTs;
       });
-      var bosCollected = computeBosAndCollected(v.side, lv, rowsFromSetup);
+      var bosCollected = computeBosAndCollected(v.side, lv, rowsFromSetup, blockSize);
       analysed.push({
         profile: v.profile,
         tf: v.tf,
         side: v.side,
         weight: v.weight,
+        aPrice: aPrice,
+        bPrice: bPrice,
         levels: lv,
         stage: stage,
         currentPrice: currentPrice,
@@ -610,15 +627,11 @@
       for (var ci = 0; ci < ltf.length; ci++) {
         var conf = ltfHtfConfluence(ltf[ci], primary);
         if (!conf) continue;
-        confluenceMsgs.push(
-          "P#" + ltf[ci].profile + " L" + conf.extKey + " @" + f2(conf.extPrice) +
-          " cross HTF L" + levelLabel(conf.htfKey) + " @" + f2(conf.htfPrice) +
-          " (" + conf.pips.toFixed(1) + " pips)"
-        );
+        confluenceMsgs.push("P#" + ltf[ci].profile + " (" + ltf[ci].tf.toUpperCase() + ")");
       }
       summary.push(confluenceMsgs.length
-        ? ("Cross-zone (LTF ext vs HTF zone): " + confluenceMsgs.join(" | "))
-        : "Cross-zone (LTF ext vs HTF zone): tiada confluence rapat dalam 50 pips.");
+        ? ("Cross-zone: ada confluence LTF extension dengan zon HTF pada " + confluenceMsgs.join(" | ") + ".")
+        : "Cross-zone: tiada confluence kritikal antara extension LTF dan zon HTF setakat ini.");
     }
     summary.push("Level fokus FE: 0.5, 1.0, 1.382, 1.618. Level lain (0/0.618/0.786/2.618+) kekal dipantau sebagai konteks lanjutan.");
     summaryListEl.innerHTML = summary.map(function (s) { return "<li>" + s + "</li>"; }).join("");

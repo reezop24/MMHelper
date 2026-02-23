@@ -294,8 +294,7 @@
     }
 
     var entryKeys = ["1", "0.786", "0.618", "0.5", "0"];
-    var PIP_SIZE = 0.10;
-    var entryBuffer = 50 * PIP_SIZE; // 50 pips = 5.00 (example: 5140.68 -> 5145.68)
+    var entryBuffer = Math.abs(bPrice - aPrice) * 0.10; // 1 blok = 10% jarak A-B
     html.push("");
     html.push('<span class="zone-title">Entry Zone</span>');
     for (var e = 0; e < entryKeys.length; e++) {
@@ -321,8 +320,15 @@
         }
         var inZoneNow = Number.isFinite(currentPrice) && currentPrice >= zMin && currentPrice <= zMax;
         var entered = enteredByHistory || inZoneNow;
-        if (entered) {
-          entryLineClass = inZoneNow ? "entry-zone-yellow" : "entry-zone-green";
+        var adverseNow = Number.isFinite(currentPrice) && (
+          (side === "BUY" && currentPrice < zMin) || (side === "SELL" && currentPrice > zMax)
+        );
+        if (inZoneNow) {
+          entryLineClass = "entry-zone-yellow";
+        } else if (adverseNow && entered) {
+          entryLineClass = "entry-zone-red";
+        } else if (entered) {
+          entryLineClass = "entry-zone-green";
         }
       }
       html.push(levelLine("Entry Zone " + String(e + 1), ek, statusMap[ek] || "-", Boolean(invalidMap[ek]), entryPriceClass, entryStatusClass, entryLineClass));
