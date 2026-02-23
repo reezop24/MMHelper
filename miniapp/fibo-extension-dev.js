@@ -520,11 +520,13 @@
     if (resetView) {
       chart.timeScale().fitContent();
     }
-    if (data.length) {
-      chartInfoEl.textContent = "Chart " + String(tfEl.value || "").toUpperCase() + " | Candles: " + data.length + " | Source: " + dataSource;
-    } else {
-      chartInfoEl.textContent = "Chart " + String(tfEl.value || "").toUpperCase() + " | Candles: 0 | Source: " + dataSource;
-    }
+    var tfLabel = String(tfEl.value || "").toUpperCase();
+    var candleCount = data.length ? data.length : 0;
+    chartInfoEl.innerHTML =
+      "Chart " + tfLabel +
+      " | Candles: " + String(candleCount) +
+      " | " +
+      '<img class="chart-source-logo" src="reezo.png" alt="Reezo" />Chart Engine';
     updateLiveLine();
   }
 
