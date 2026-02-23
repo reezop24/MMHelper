@@ -355,11 +355,9 @@
 
   function buildChartData() {
     var tf = String(tfEl.value || "").toLowerCase();
-    var filterWeekend = Boolean(INTRADAY_TF[tf]);
-    return candles
+    return getWorkingCandles(tf)
       .filter(function (c) {
-        if (!filterWeekend) return true;
-        return !shouldHideWeekendCandle(c.time || c.ts || "");
+        return Boolean(c);
       })
       .map(function (c) {
         return {
@@ -373,6 +371,15 @@
       .filter(function (c) {
         return c.time > 0 && Number.isFinite(c.open) && Number.isFinite(c.high) && Number.isFinite(c.low) && Number.isFinite(c.close);
       });
+  }
+
+  function getWorkingCandles(tfHint) {
+    var tf = String(tfHint || tfEl.value || "").toLowerCase();
+    var filterWeekend = Boolean(INTRADAY_TF[tf]);
+    if (!filterWeekend) return candles.slice();
+    return candles.filter(function (c) {
+      return !shouldHideWeekendCandle(c.time || c.ts || "");
+    });
   }
 
   function initChart() {
@@ -507,10 +514,11 @@
   function findNearestCandleByChartTime(rawTime) {
     var clickedTs = Number(rawTime);
     if (!Number.isFinite(clickedTs) || clickedTs <= 0) return null;
+    var sourceRows = getWorkingCandles();
     var nearest = null;
     var nearestDiff = Number.POSITIVE_INFINITY;
-    for (var i = 0; i < candles.length; i++) {
-      var row = candles[i];
+    for (var i = 0; i < sourceRows.length; i++) {
+      var row = sourceRows[i];
       var rowTs = toChartTime(row.time || row.ts || "");
       if (!(rowTs > 0)) continue;
       var diff = Math.abs(rowTs - clickedTs);
@@ -1202,7 +1210,7 @@
     var tf = String(tfEl.value || "h4").toLowerCase();
     if (!INTRADAY_TF[tf]) return;
     var uniq = {};
-    candles.forEach(function (c) {
+    getWorkingCandles(tf).forEach(function (c) {
       var p = toMYTParts(c.time || c.ts || "");
       if (p && p.time) {
         uniq[p.time] = true;
@@ -1229,17 +1237,18 @@
   function fetchPointCandle(dateValue, timeValue) {
     if (!dateValue) return null;
     var tf = tfEl.value;
+    var sourceRows = getWorkingCandles(tf);
     var key = INTRADAY_TF[tf] ? (dateValue + " " + (timeValue || "00:00") + ":00") : dateValue;
     if (tf === "d1" || tf === "w1") {
-      for (var i = candles.length - 1; i >= 0; i--) {
-        var p = toMYTParts(candles[i].time || candles[i].ts || "");
-        if (p && p.date === dateValue) return candles[i];
+      for (var i = sourceRows.length - 1; i >= 0; i--) {
+        var p = toMYTParts(sourceRows[i].time || sourceRows[i].ts || "");
+        if (p && p.date === dateValue) return sourceRows[i];
       }
       return null;
     }
-    for (var j = candles.length - 1; j >= 0; j--) {
-      var p2 = toMYTParts(candles[j].time || candles[j].ts || "");
-      if (p2 && ((p2.date + " " + p2.time + ":00") === key)) return candles[j];
+    for (var j = sourceRows.length - 1; j >= 0; j--) {
+      var p2 = toMYTParts(sourceRows[j].time || sourceRows[j].ts || "");
+      if (p2 && ((p2.date + " " + p2.time + ":00") === key)) return sourceRows[j];
     }
     return null;
   }
@@ -1431,16 +1440,17 @@
     var aRow = fetchPointCandle(aDateEl.value, aTimeEl.value);
     var bRow = fetchPointCandle(bDateEl.value, bTimeEl.value);
     var cRow = fetchPointCandle(cDateEl.value, cTimeEl.value);
-    if (!(aRow && bRow && cRow) && candles.length >= 3) {
-      var midIdx = Math.floor(candles.length / 2);
+    var sourceRows = getWorkingCandles();
+    if (!(aRow && bRow && cRow) && sourceRows.length >= 3) {
+      var midIdx = Math.floor(sourceRows.length / 2);
       if (chart && chart.timeScale && typeof chart.timeScale().getVisibleRange === "function") {
         var vr = chart.timeScale().getVisibleRange();
         if (vr && Number.isFinite(Number(vr.from)) && Number.isFinite(Number(vr.to))) {
           var centerTs = (Number(vr.from) + Number(vr.to)) / 2;
           var nearestIdx = 0;
           var nearestDiff = Number.POSITIVE_INFINITY;
-          for (var i = 0; i < candles.length; i++) {
-            var ts = toChartTime(candles[i].time || candles[i].ts || "");
+          for (var i = 0; i < sourceRows.length; i++) {
+            var ts = toChartTime(sourceRows[i].time || sourceRows[i].ts || "");
             var diff = Math.abs(ts - centerTs);
             if (diff < nearestDiff) {
               nearestDiff = diff;
@@ -1451,10 +1461,10 @@
         }
       }
       if (midIdx <= 0) midIdx = 1;
-      if (midIdx >= candles.length - 1) midIdx = candles.length - 2;
-      aRow = candles[midIdx - 1];
-      bRow = candles[midIdx];
-      cRow = candles[midIdx + 1];
+      if (midIdx >= sourceRows.length - 1) midIdx = sourceRows.length - 2;
+      aRow = sourceRows[midIdx - 1];
+      bRow = sourceRows[midIdx];
+      cRow = sourceRows[midIdx + 1];
       _updatePointInputsFromRow("A", aRow);
       _updatePointInputsFromRow("B", bRow);
       _updatePointInputsFromRow("C", cRow);
