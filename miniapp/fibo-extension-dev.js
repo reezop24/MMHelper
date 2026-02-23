@@ -823,7 +823,7 @@
         lineStyle: window.LightweightCharts.LineStyle.Dashed,
         axisLabelVisible: true,
         axisLabelColor: visual.labelColor,
-        axisLabelTextColor: "#ffffff",
+        axisLabelTextColor: "#0b1220",
         title: "Breakout Level",
       });
       return;
@@ -833,7 +833,7 @@
       title: "Breakout Level",
       color: visual.lineColor,
       axisLabelColor: visual.labelColor,
-      axisLabelTextColor: "#ffffff",
+      axisLabelTextColor: "#0b1220",
       lineStyle: window.LightweightCharts.LineStyle.Dashed,
     });
   }
@@ -883,7 +883,7 @@
         lineStyle: window.LightweightCharts.LineStyle.Dashed,
         axisLabelVisible: true,
         axisLabelColor: visual.labelColor,
-        axisLabelTextColor: "#ffffff",
+        axisLabelTextColor: "#0b1220",
         title: d.label,
       });
       extensionLevelLines.push(pl);
