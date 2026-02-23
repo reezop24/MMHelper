@@ -58,6 +58,7 @@
   var chart = null;
   var candleSeries = null;
   var livePriceLine = null;
+  var breakoutLevelLine = null;
   var activePickTarget = "";
   var isTouchDevice = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0);
   var pickTouchStartMs = 0;
@@ -728,6 +729,111 @@
     }
   }
 
+  function computeBreakoutVisual(side, level1, currentPrice) {
+    var lv = Number(level1);
+    var cp = Number(currentPrice);
+    if (!Number.isFinite(lv)) {
+      return null;
+    }
+    var isBuy = String(side || "").toUpperCase() === "BUY";
+    var isSell = String(side || "").toUpperCase() === "SELL";
+    if (!isBuy && !isSell) {
+      return {
+        lineColor: "#ffffff",
+        labelColor: "#ffffff",
+      };
+    }
+
+    // XAU pip convention used here: 1 pip = 0.10 => 50 pips = 5.00
+    var nearBand = 5.00;
+
+    var everBrokenByCandles = false;
+    var latestClose = null;
+    if (candles.length) {
+      latestClose = Number(candles[candles.length - 1].close);
+      for (var i = 0; i < candles.length; i++) {
+        var r = candles[i];
+        var h = Number(r.high);
+        var l = Number(r.low);
+        if (!Number.isFinite(h) || !Number.isFinite(l)) continue;
+        if (isBuy && h >= lv) {
+          everBrokenByCandles = true;
+          break;
+        }
+        if (isSell && l <= lv) {
+          everBrokenByCandles = true;
+          break;
+        }
+      }
+    }
+    var brokenNow = Number.isFinite(cp) && (isBuy ? (cp >= lv) : (cp <= lv));
+    var everBroken = everBrokenByCandles || brokenNow;
+    if (!everBroken) {
+      return {
+        lineColor: "#ffffff",
+        labelColor: "#ffffff",
+      };
+    }
+
+    var lineColor = "#22c55e";
+    var labelColor = "#22c55e";
+    var nearBreak = Number.isFinite(cp) && Math.abs(cp - lv) <= nearBand;
+    if (nearBreak) {
+      labelColor = "#facc15";
+    }
+
+    // After breakout, if latest candle closes back through level, flag red label.
+    var failedRetest = Number.isFinite(latestClose) && (
+      isBuy ? (latestClose < lv) : (latestClose > lv)
+    );
+    if (failedRetest) {
+      labelColor = "#ef4444";
+    }
+
+    return {
+      lineColor: lineColor,
+      labelColor: labelColor,
+    };
+  }
+
+  function updateBreakoutLine(level1, side, currentPrice) {
+    if (!candleSeries) return;
+    var lv = Number(level1);
+    if (!Number.isFinite(lv)) {
+      if (breakoutLevelLine) {
+        try {
+          candleSeries.removePriceLine(breakoutLevelLine);
+        } catch (_) {
+          // ignore
+        }
+        breakoutLevelLine = null;
+      }
+      return;
+    }
+    var visual = computeBreakoutVisual(side, lv, currentPrice) || { lineColor: "#ffffff", labelColor: "#ffffff" };
+    if (!breakoutLevelLine) {
+      breakoutLevelLine = candleSeries.createPriceLine({
+        price: lv,
+        color: visual.lineColor,
+        lineWidth: 2,
+        lineStyle: window.LightweightCharts.LineStyle.Dashed,
+        axisLabelVisible: true,
+        axisLabelColor: visual.labelColor,
+        axisLabelTextColor: "#ffffff",
+        title: "Breakout Level",
+      });
+      return;
+    }
+    breakoutLevelLine.applyOptions({
+      price: lv,
+      title: "Breakout Level",
+      color: visual.lineColor,
+      axisLabelColor: visual.labelColor,
+      axisLabelTextColor: "#ffffff",
+      lineStyle: window.LightweightCharts.LineStyle.Dashed,
+    });
+  }
+
   function clearABCMarkers() {
     setChartInteractionLocked(false);
     abcPointsCache = [];
@@ -1021,6 +1127,7 @@
     var side = String(trendEl.value || "").toUpperCase();
     if (side !== "BUY" && side !== "SELL") {
       refreshABCPickVisuals("", false);
+      updateBreakoutLine(NaN, "", NaN);
       previewTextEl.textContent = "Sila pilih trend dulu (Uptrend / Downtrend).";
       return;
     }
@@ -1031,11 +1138,17 @@
 
     if (!aC || !bC || !cC) {
       refreshABCPickVisuals(side, false);
+      updateBreakoutLine(NaN, "", NaN);
       previewTextEl.textContent = "Sila isi Point A/B/C dulu.\nPastikan tarikh/masa wujud dalam candle timeframe dipilih.";
       return;
     }
 
     updateABCMarkersAndFocus(side, aC, bC, cC);
+    var aPrice = side === "BUY" ? Number(aC.low) : Number(aC.high);
+    var bPrice = side === "BUY" ? Number(bC.high) : Number(bC.low);
+    var cPrice = side === "BUY" ? Number(cC.low) : Number(cC.high);
+    var levelsForLine = computeLevels(side, aPrice, bPrice, cPrice);
+    updateBreakoutLine(levelsForLine["1"], side, getCurrentPriceFallback());
     if (!window.FEEngine || typeof window.FEEngine.calculate !== "function") {
       previewTextEl.textContent = "FE engine belum tersedia.";
       return;

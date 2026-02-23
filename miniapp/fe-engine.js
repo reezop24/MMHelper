@@ -294,7 +294,8 @@
     }
 
     var entryKeys = ["1", "0.786", "0.618", "0.5", "0"];
-    var entryBuffer = 0.50; // 50 pips for XAU-style quoting (0.01 per pip)
+    var PIP_SIZE = 0.10;
+    var entryBuffer = 50 * PIP_SIZE; // 50 pips = 5.00 (example: 5140.68 -> 5145.68)
     html.push("");
     html.push('<span class="zone-title">Entry Zone</span>');
     for (var e = 0; e < entryKeys.length; e++) {
