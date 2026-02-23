@@ -1201,15 +1201,27 @@
   }
 
   function setIntradayTimes(selectEl) {
+    var prev = String(selectEl.value || "");
     selectEl.innerHTML = "";
     var tf = String(tfEl.value || "h4").toLowerCase();
     var rows = tfTimes.length ? tfTimes : defaultTimesForTf(tf);
+    var hasPrev = false;
     rows.forEach(function (t) {
       var opt = document.createElement("option");
       opt.value = t;
       opt.textContent = t;
+      if (t === prev) hasPrev = true;
       selectEl.appendChild(opt);
     });
+    if (prev && !hasPrev) {
+      var extra = document.createElement("option");
+      extra.value = prev;
+      extra.textContent = prev;
+      selectEl.appendChild(extra);
+    }
+    if (prev) {
+      selectEl.value = prev;
+    }
   }
 
   function refreshTimeOptionsFromCandles() {
@@ -1242,7 +1254,7 @@
 
   function fetchPointCandle(dateValue, timeValue) {
     if (!dateValue) return null;
-    var tf = tfEl.value;
+    var tf = String(tfEl.value || "").toLowerCase();
     var sourceRows = getWorkingCandles(tf);
     var key = INTRADAY_TF[tf] ? (dateValue + " " + (timeValue || "00:00") + ":00") : dateValue;
     if (tf === "d1" || tf === "w1") {
@@ -1255,6 +1267,30 @@
     for (var j = sourceRows.length - 1; j >= 0; j--) {
       var p2 = toMYTParts(sourceRows[j].time || sourceRows[j].ts || "");
       if (p2 && ((p2.date + " " + p2.time + ":00") === key)) return sourceRows[j];
+    }
+    if (!INTRADAY_TF[tf]) return null;
+
+    // Fallback: jika exact time tak jumpa, guna candle paling hampir pada tarikh/masa target.
+    var target = new Date((dateValue + "T" + (timeValue || "00:00") + ":00+08:00")).getTime();
+    if (!Number.isFinite(target)) return null;
+    var stepSec = Number(TF_SECONDS[tf] || 3600);
+    var maxDiffMs = Math.max(1, stepSec) * 1000;
+    var nearest = null;
+    var nearestDiff = Number.POSITIVE_INFINITY;
+    for (var k = 0; k < sourceRows.length; k++) {
+      var p3 = toMYTParts(sourceRows[k].time || sourceRows[k].ts || "");
+      if (!p3) continue;
+      if (p3.date !== dateValue) continue;
+      var rowMs = new Date((p3.date + "T" + p3.time + ":00+08:00")).getTime();
+      if (!Number.isFinite(rowMs)) continue;
+      var diff = Math.abs(rowMs - target);
+      if (diff < nearestDiff) {
+        nearestDiff = diff;
+        nearest = sourceRows[k];
+      }
+    }
+    if (nearest && nearestDiff <= maxDiffMs) {
+      return nearest;
     }
     return null;
   }
