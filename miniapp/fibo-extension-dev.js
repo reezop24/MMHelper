@@ -54,6 +54,7 @@
   var tfTimes = [];
   var chart = null;
   var candleSeries = null;
+  var pickPathSeries = null;
   var livePriceLine = null;
   var activePickTarget = "";
   var isTouchDevice = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0);
@@ -426,6 +427,23 @@
       previewTextEl.textContent = "Chart library tak support candlestick series.";
       return;
     }
+    var pickLineOptions = {
+      color: "#facc15",
+      lineWidth: 2,
+      lineStyle: window.LightweightCharts.LineStyle.Dashed,
+      priceLineVisible: false,
+      lastValueVisible: false,
+      crosshairMarkerVisible: false,
+    };
+    if (typeof chart.addLineSeries === "function") {
+      pickPathSeries = chart.addLineSeries(pickLineOptions);
+    } else if (
+      typeof chart.addSeries === "function" &&
+      window.LightweightCharts &&
+      window.LightweightCharts.LineSeries
+    ) {
+      pickPathSeries = chart.addSeries(window.LightweightCharts.LineSeries, pickLineOptions);
+    }
 
     chart.subscribeCrosshairMove(function (param) {
       if (!param || !param.time || !candleSeries) {
@@ -488,26 +506,32 @@
 
   function assignPickFromChartTime(rawTime, source) {
     if (!activePickTarget) return;
+    var currentTarget = activePickTarget;
     var nearest = findNearestCandleByChartTime(rawTime);
     if (!nearest) return;
     var p = toMYTParts(nearest.time || nearest.ts || "");
     if (!p) return;
     var tf = String(tfEl.value || "").toLowerCase();
     var intraday = Boolean(INTRADAY_TF[tf]);
-    if (activePickTarget === "A") {
+    if (currentTarget === "A") {
       aDateEl.value = p.date;
       if (intraday) aTimeEl.value = p.time;
-    } else if (activePickTarget === "B") {
+    } else if (currentTarget === "B") {
       bDateEl.value = p.date;
       if (intraday) bTimeEl.value = p.time;
-    } else if (activePickTarget === "C") {
+    } else if (currentTarget === "C") {
       cDateEl.value = p.date;
       if (intraday) cTimeEl.value = p.time;
     }
+    var nextTarget = "";
+    if (currentTarget === "A") nextTarget = "B";
+    else if (currentTarget === "B") nextTarget = "C";
     if (profileStatusEl) {
-      profileStatusEl.textContent = "Point " + activePickTarget + " set dari chart (" + source + ").";
+      profileStatusEl.textContent = nextTarget
+        ? ("Point " + currentTarget + " set (" + source + "). Seterusnya pilih Point " + nextTarget + ".")
+        : ("Point " + currentTarget + " set (" + source + ").");
     }
-    setPickTarget("");
+    setPickTarget(nextTarget);
     saveFormState(false);
     renderPreview();
   }
@@ -562,36 +586,78 @@
   }
 
   function clearABCMarkers() {
-    if (!candleSeries || typeof candleSeries.setMarkers !== "function") return;
-    candleSeries.setMarkers([]);
+    if (candleSeries && typeof candleSeries.setMarkers === "function") {
+      candleSeries.setMarkers([]);
+    }
+    if (pickPathSeries && typeof pickPathSeries.setData === "function") {
+      pickPathSeries.setData([]);
+    }
   }
 
-  function updateABCMarkersAndFocus(side, aC, bC, cC) {
+  function _pointValueBySide(side, label, row) {
+    if (!row) return null;
+    if (side === "BUY") {
+      if (label === "B") return Number(row.high);
+      return Number(row.low);
+    }
+    if (side === "SELL") {
+      if (label === "B") return Number(row.low);
+      return Number(row.high);
+    }
+    return Number(row.close);
+  }
+
+  function refreshABCPickVisuals(sideHint, focusWhenFull) {
     if (!chart || !candleSeries || typeof candleSeries.setMarkers !== "function") return;
-    var aTime = toChartTime(aC.time || aC.ts || "");
-    var bTime = toChartTime(bC.time || bC.ts || "");
-    var cTime = toChartTime(cC.time || cC.ts || "");
-    if (!(aTime > 0 && bTime > 0 && cTime > 0)) {
-      clearABCMarkers();
-      return;
+    var side = String(sideHint || "").toUpperCase();
+    var aRow = fetchPointCandle(aDateEl.value, aTimeEl.value);
+    var bRow = fetchPointCandle(bDateEl.value, bTimeEl.value);
+    var cRow = fetchPointCandle(cDateEl.value, cTimeEl.value);
+
+    var seq = [
+      { label: "A", row: aRow, color: "#60a5fa" },
+      { label: "B", row: bRow, color: "#f59e0b" },
+      { label: "C", row: cRow, color: "#c084fc" },
+    ];
+    var isBuy = side === "BUY";
+    var markers = [];
+    var lineData = [];
+    for (var i = 0; i < seq.length; i++) {
+      var item = seq[i];
+      if (!item.row) continue;
+      var t = toChartTime(item.row.time || item.row.ts || "");
+      if (!(t > 0)) continue;
+      var v = _pointValueBySide(side, item.label, item.row);
+      if (!Number.isFinite(v)) continue;
+      markers.push({
+        time: t,
+        position: isBuy ? (item.label === "B" ? "aboveBar" : "belowBar") : (item.label === "B" ? "belowBar" : "aboveBar"),
+        color: item.color,
+        shape: "circle",
+        text: item.label,
+      });
+      lineData.push({ time: t, value: v });
+    }
+    candleSeries.setMarkers(markers);
+    if (pickPathSeries && typeof pickPathSeries.setData === "function") {
+      pickPathSeries.setData(lineData);
     }
 
-    var isBuy = side === "BUY";
-    var markers = [
-      { time: aTime, position: isBuy ? "belowBar" : "aboveBar", color: "#60a5fa", shape: "circle", text: "A" },
-      { time: bTime, position: isBuy ? "aboveBar" : "belowBar", color: "#f59e0b", shape: "circle", text: "B" },
-      { time: cTime, position: isBuy ? "belowBar" : "aboveBar", color: "#c084fc", shape: "circle", text: "C" },
-    ];
-    candleSeries.setMarkers(markers);
+    if (focusWhenFull && lineData.length === 3) {
+      var times = lineData.map(function (x) { return x.time; });
+      var minT = Math.min.apply(null, times);
+      var maxT = Math.max.apply(null, times);
+      var span = Math.max(maxT - minT, 1);
+      var pad = Math.max(Math.floor(span * 0.4), 3600 * 4);
+      chart.timeScale().setVisibleRange({
+        from: minT - pad,
+        to: maxT + pad,
+      });
+    }
+  }
 
-    var minT = Math.min(aTime, bTime, cTime);
-    var maxT = Math.max(aTime, bTime, cTime);
-    var span = Math.max(maxT - minT, 1);
-    var pad = Math.max(Math.floor(span * 0.4), 3600 * 4);
-    chart.timeScale().setVisibleRange({
-      from: minT - pad,
-      to: maxT + pad,
-    });
+  function updateABCMarkersAndFocus(side, aC, bC, cC) { // eslint-disable-line no-unused-vars
+    refreshABCPickVisuals(side, true);
   }
 
   function parseUtcDate(raw) {
@@ -715,7 +781,7 @@
   function renderPreview() {
     var side = String(trendEl.value || "").toUpperCase();
     if (side !== "BUY" && side !== "SELL") {
-      clearABCMarkers();
+      refreshABCPickVisuals("", false);
       previewTextEl.textContent = "Sila pilih trend dulu (Uptrend / Downtrend).";
       return;
     }
@@ -725,7 +791,7 @@
     var cC = fetchPointCandle(cDateEl.value, cTimeEl.value);
 
     if (!aC || !bC || !cC) {
-      clearABCMarkers();
+      refreshABCPickVisuals(side, false);
       previewTextEl.textContent = "Sila isi Point A/B/C dulu.\nPastikan tarikh/masa wujud dalam candle timeframe dipilih.";
       return;
     }
