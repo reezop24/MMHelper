@@ -73,6 +73,9 @@
   }
 
   function parseProfilesState(raw) {
+    if (raw && typeof raw === "object") {
+      return raw;
+    }
     if (!raw) {
       try {
         var localRaw = localStorage.getItem("fibofbo_fibo_extension_form_v2") || "";
@@ -89,6 +92,19 @@
       var parsed = JSON.parse(raw);
       if (!parsed || typeof parsed !== "object") return null;
       return parsed;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async function loadProfilesState() {
+    var parsed = parseProfilesState(profilesStateRaw);
+    if (parsed) return parsed;
+    try {
+      var res = await fetch("./fibo-dev-profiles-state.json?t=" + Date.now(), { cache: "no-store" });
+      if (!res.ok) return null;
+      var payload = await res.json();
+      return parseProfilesState(payload);
     } catch (_) {
       return null;
     }
@@ -253,7 +269,7 @@
   }
 
   async function main() {
-    var parsed = parseProfilesState(profilesStateRaw);
+    var parsed = await loadProfilesState();
     var profiles = parsed && parsed.profiles ? parsed.profiles : {};
     var valid = [];
     var idxs = Object.keys(profiles).sort(function (a, b) { return Number(a) - Number(b); });
