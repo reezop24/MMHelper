@@ -64,6 +64,7 @@
   var pickTouchMoved = false;
   var pickCandidateTime = 0;
   var abcPointsCache = [];
+  var pickedRows = { A: null, B: null, C: null };
   var builtinCandles = {
     h4: [
       { time: "2026-02-18 23:00:00", open: 4961.2, high: 4978.3, low: 4958.9, close: 4970.1 },
@@ -519,12 +520,15 @@
     if (currentTarget === "A") {
       aDateEl.value = p.date;
       if (intraday) aTimeEl.value = p.time;
+      pickedRows.A = nearest;
     } else if (currentTarget === "B") {
       bDateEl.value = p.date;
       if (intraday) bTimeEl.value = p.time;
+      pickedRows.B = nearest;
     } else if (currentTarget === "C") {
       cDateEl.value = p.date;
       if (intraday) cTimeEl.value = p.time;
+      pickedRows.C = nearest;
     }
     var nextTarget = "";
     if (currentTarget === "A") nextTarget = "B";
@@ -595,6 +599,7 @@
       pickPathSeries.setData([]);
     }
     abcPointsCache = [];
+    pickedRows = { A: null, B: null, C: null };
     renderABCOverlay();
   }
 
@@ -628,9 +633,9 @@
   function refreshABCPickVisuals(sideHint, focusWhenFull) {
     if (!chart || !candleSeries || typeof candleSeries.setMarkers !== "function") return;
     var side = String(sideHint || "").toUpperCase();
-    var aRow = fetchPointCandle(aDateEl.value, aTimeEl.value);
-    var bRow = fetchPointCandle(bDateEl.value, bTimeEl.value);
-    var cRow = fetchPointCandle(cDateEl.value, cTimeEl.value);
+    var aRow = pickedRows.A || fetchPointCandle(aDateEl.value, aTimeEl.value);
+    var bRow = pickedRows.B || fetchPointCandle(bDateEl.value, bTimeEl.value);
+    var cRow = pickedRows.C || fetchPointCandle(cDateEl.value, cTimeEl.value);
 
     var seq = [
       { label: "A", row: aRow, color: "#60a5fa" },
@@ -1032,6 +1037,9 @@
 
   tfEl.addEventListener("change", function () {
     if (profileStatusEl) profileStatusEl.textContent = "";
+    pickedRows = { A: null, B: null, C: null };
+    abcPointsCache = [];
+    renderABCOverlay();
     saveFormState(false);
     updateTimeInputs();
     reloadAll().then(initDefaultDates).then(renderPreview);
