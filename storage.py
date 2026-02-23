@@ -2972,7 +2972,7 @@ def _normalize_fibo_profile_payload(payload: Any) -> dict[str, str]:
     if out["trend"] not in {"BUY", "SELL"}:
         out["trend"] = ""
     out["tf"] = _to_text(payload.get("tf"), "h4").lower()
-    if out["tf"] not in {"h4", "d1"}:
+    if out["tf"] not in {"m15", "m30", "h1", "h4", "d1", "w1"}:
         out["tf"] = "h4"
     for key in ("aDate", "bDate", "cDate", "aTime", "bTime", "cTime"):
         out[key] = _to_text(payload.get(key))
@@ -2982,7 +2982,10 @@ def _normalize_fibo_profile_payload(payload: Any) -> dict[str, str]:
 def _normalize_fibo_profiles_state(payload: Any) -> dict[str, Any]:
     if not isinstance(payload, dict):
         payload = {}
-    active_profile = max(1, min(7, _to_int(payload.get("active_profile"), 1)))
+    active_profile_raw = payload.get("active_profile")
+    if active_profile_raw is None:
+        active_profile_raw = payload.get("activeProfile")
+    active_profile = max(1, min(7, _to_int(active_profile_raw, 1)))
     raw_profiles = payload.get("profiles", {})
     profiles_out: dict[str, dict[str, str]] = {}
     if isinstance(raw_profiles, dict):

@@ -116,6 +116,9 @@
     try {
       var parsed = JSON.parse(raw);
       if (!parsed || typeof parsed !== "object") return null;
+      if (!Number.isFinite(Number(parsed.activeProfile)) && Number.isFinite(Number(parsed.active_profile))) {
+        parsed.activeProfile = Number(parsed.active_profile);
+      }
       return parsed;
     } catch (_) {
       return null;
@@ -128,6 +131,9 @@
       if (!raw) return getEmptyState();
       var parsed = JSON.parse(raw);
       if (!parsed || typeof parsed !== "object") return getEmptyState();
+      if (!Number.isFinite(Number(parsed.activeProfile)) && Number.isFinite(Number(parsed.active_profile))) {
+        parsed.activeProfile = Number(parsed.active_profile);
+      }
       if (!parsed.profiles || typeof parsed.profiles !== "object") parsed.profiles = {};
       if (!Number.isFinite(Number(parsed.activeProfile))) parsed.activeProfile = 1;
       return parsed;
