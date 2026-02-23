@@ -405,7 +405,7 @@
         mode: window.LightweightCharts.CrosshairMode.Normal,
       },
     });
-    candleSeries = chart.addCandlestickSeries({
+    var candleOptions = {
       upColor: "#16a34a",
       downColor: "#dc2626",
       borderVisible: false,
@@ -413,7 +413,19 @@
       wickDownColor: "#dc2626",
       priceLineVisible: true,
       lastValueVisible: true,
-    });
+    };
+    if (typeof chart.addCandlestickSeries === "function") {
+      candleSeries = chart.addCandlestickSeries(candleOptions);
+    } else if (
+      typeof chart.addSeries === "function" &&
+      window.LightweightCharts &&
+      window.LightweightCharts.CandlestickSeries
+    ) {
+      candleSeries = chart.addSeries(window.LightweightCharts.CandlestickSeries, candleOptions);
+    } else {
+      previewTextEl.textContent = "Chart library tak support candlestick series.";
+      return;
+    }
 
     chart.subscribeCrosshairMove(function (param) {
       if (!param || !param.time || !candleSeries) {
