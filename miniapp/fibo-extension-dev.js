@@ -586,11 +586,23 @@
   }
 
   function clearABCMarkers() {
-    if (candleSeries && typeof candleSeries.setMarkers === "function") {
-      candleSeries.setMarkers([]);
-    }
+    applySeriesMarkers([]);
     if (pickPathSeries && typeof pickPathSeries.setData === "function") {
       pickPathSeries.setData([]);
+    }
+  }
+
+  function applySeriesMarkers(markers) {
+    if (!candleSeries) return;
+    if (typeof candleSeries.setMarkers === "function") {
+      candleSeries.setMarkers(markers);
+      return;
+    }
+    if (
+      window.LightweightCharts &&
+      typeof window.LightweightCharts.createSeriesMarkers === "function"
+    ) {
+      window.LightweightCharts.createSeriesMarkers(candleSeries, markers);
     }
   }
 
@@ -638,7 +650,8 @@
       });
       lineData.push({ time: t, value: v });
     }
-    candleSeries.setMarkers(markers);
+    applySeriesMarkers(markers);
+    lineData.sort(function (a, b) { return Number(a.time) - Number(b.time); });
     if (pickPathSeries && typeof pickPathSeries.setData === "function") {
       pickPathSeries.setData(lineData);
     }
