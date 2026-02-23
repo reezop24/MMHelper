@@ -5,6 +5,7 @@ from telegram import KeyboardButton, ReplyKeyboardMarkup, WebAppInfo
 from settings import (
     get_activity_hub_webapp_url,
     get_fibo_extension_webapp_url,
+    get_fibo_market_insight_webapp_url,
     get_next_exclusive_webapp_url,
     get_risk_calculator_webapp_url,
 )
@@ -50,7 +51,7 @@ SUBMENU_EXTRA_BUTTON_TRADING_ADVICE = "💡 Trading Advice (coming soon)"
 SUBMENU_EXTRA_BUTTON_EDUCATION_VIDEO = "🎓 Education Video (coming soon)"
 SUBMENU_FIBO_TUTORIAL = "🎬 Tutorial FE (coming soon)"
 SUBMENU_FIBO_PROFILE = "🧩 FE Profile"
-SUBMENU_FIBO_MARKET_INSIGHT = "📈 Market Insight (Fibo Extension) (coming soon)"
+SUBMENU_FIBO_MARKET_INSIGHT = "📈 Market Insight (Fibo Extension)"
 SUBMENU_FIBO_RESET_ALL = "🗑️ Reset All Profile"
 SUBMENU_FIBO_BACK_TOOLS = "⬅️ Back to Trading Tools"
 
@@ -285,11 +286,23 @@ def fibo_extension_keyboard(user_id: int | None = None) -> ReplyKeyboardMarkup:
         )
     else:
         profile_button = SUBMENU_FIBO_PROFILE
+    insight_url = get_fibo_market_insight_webapp_url(
+        user_id=user_id,
+        is_superuser=is_admin_user(user_id),
+    )
+    insight_button: KeyboardButton | str
+    if insight_url:
+        insight_button = KeyboardButton(
+            SUBMENU_FIBO_MARKET_INSIGHT,
+            web_app=WebAppInfo(url=insight_url),
+        )
+    else:
+        insight_button = SUBMENU_FIBO_MARKET_INSIGHT
 
     rows = [
         [SUBMENU_FIBO_TUTORIAL],
         [profile_button],
-        [SUBMENU_FIBO_MARKET_INSIGHT],
+        [insight_button],
         [SUBMENU_FIBO_RESET_ALL],
         [SUBMENU_FIBO_BACK_TOOLS],
     ]

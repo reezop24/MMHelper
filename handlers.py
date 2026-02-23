@@ -1331,8 +1331,9 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
         await send_screen(
             context,
             message.chat_id,
-            "Market Insight (Fibo Extension) akan ditambah seterusnya.",
+            "Gunakan butang `Market Insight (Fibo Extension)` untuk buka miniapp analisa FE.",
             reply_markup=fibo_extension_keyboard(user.id),
+            parse_mode="Markdown",
         )
         return
 

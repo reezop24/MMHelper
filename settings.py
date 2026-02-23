@@ -72,6 +72,24 @@ def get_fibo_extension_webapp_url(user_id: int | None = None, is_superuser: bool
     return f"{page}?{urlencode(query_data)}"
 
 
+def get_fibo_market_insight_webapp_url(user_id: int | None = None, is_superuser: bool = False) -> str:
+    page = f"{_miniapp_base_url()}/fibo-market-insight.html"
+    live_tick_url = (os.getenv("MMHELPER_LIVE_TICK_URL") or "").strip()
+    dbo_preview_url = (os.getenv("MMHELPER_DBO_PREVIEW_URL") or "").strip()
+    version = (os.getenv("MMHELPER_FE_INSIGHT_WEBAPP_VERSION") or "").strip() or "fe_insight_v20260223_1"
+    query_data: dict[str, str] = {"v": version}
+    if live_tick_url:
+        query_data["live_tick_url"] = live_tick_url
+    if dbo_preview_url:
+        query_data["preview_url"] = dbo_preview_url
+    if user_id is not None:
+        next_member = bool(is_superuser) or has_fibo_next_profile_access(int(user_id))
+        query_data["next_member"] = "1" if next_member else "0"
+        state = load_fibo_extension_profiles(int(user_id))
+        query_data["profiles_state"] = json.dumps(state, ensure_ascii=False, separators=(",", ":"))
+    return f"{page}?{urlencode(query_data)}"
+
+
 def get_fibo_extension_dev_webapp_url(user_id: int | None = None, is_superuser: bool = False) -> str:
     page = f"{_miniapp_base_url()}/fibo-extension-dev.html"
     live_tick_url = (os.getenv("MMHELPER_LIVE_TICK_URL") or "").strip()
