@@ -73,7 +73,18 @@
   }
 
   function parseProfilesState(raw) {
-    if (!raw) return null;
+    if (!raw) {
+      try {
+        var localRaw = localStorage.getItem("fibofbo_fibo_extension_form_v2") || "";
+        if (localRaw) {
+          var localParsed = JSON.parse(localRaw);
+          if (localParsed && typeof localParsed === "object") return localParsed;
+        }
+      } catch (_) {
+        // ignore
+      }
+      return null;
+    }
     try {
       var parsed = JSON.parse(raw);
       if (!parsed || typeof parsed !== "object") return null;
@@ -85,18 +96,38 @@
 
   async function fetchCandles(tf, limit) {
     var url = previewUrl + "?tf=" + encodeURIComponent(tf) + "&limit=" + String(limit || 400) + "&t=" + Date.now();
-    var res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) throw new Error("fetch " + tf + " failed");
-    var payload = await res.json();
-    return Array.isArray(payload && payload.candles) ? payload.candles : [];
+    try {
+      var res = await fetch(url, { cache: "no-store" });
+      if (res.ok) {
+        var payload = await res.json();
+        var rows = Array.isArray(payload && payload.candles) ? payload.candles : [];
+        if (rows.length) return rows;
+      }
+    } catch (_) {
+      // fallback below
+    }
+    var fallback = await fetch("./fibo-dev-preview-" + tf + ".json?t=" + Date.now(), { cache: "no-store" });
+    if (!fallback.ok) throw new Error("fetch " + tf + " failed");
+    var fp = await fallback.json();
+    return Array.isArray(fp && fp.candles) ? fp.candles : [];
   }
 
   async function fetchLivePrice() {
     try {
       var res = await fetch(liveTickUrl + "?t=" + Date.now(), { cache: "no-store" });
-      if (!res.ok) return NaN;
-      var payload = await res.json();
-      return Number(payload && payload.price);
+      if (res.ok) {
+        var payload = await res.json();
+        var p = Number(payload && payload.price);
+        if (Number.isFinite(p)) return p;
+      }
+    } catch (_) {
+      // fallback below
+    }
+    try {
+      var dev = await fetch("./fibo-dev-live-tick.json?t=" + Date.now(), { cache: "no-store" });
+      if (!dev.ok) return NaN;
+      var dp = await dev.json();
+      return Number(dp && dp.price);
     } catch (_) {
       return NaN;
     }
