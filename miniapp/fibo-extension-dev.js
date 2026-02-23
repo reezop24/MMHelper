@@ -43,6 +43,7 @@
   var crosshairInfoEl = document.getElementById("crosshairInfo");
   var chartWrapEl = document.getElementById("chartWrap");
   var chartBoxEl = document.getElementById("chartBox");
+  var abcOverlayEl = document.getElementById("abcOverlay");
 
   var candles = [];
   var latestPrice = null;
@@ -62,6 +63,7 @@
   var pickTouchStartX = 0;
   var pickTouchMoved = false;
   var pickCandidateTime = 0;
+  var abcPointsCache = [];
   var builtinCandles = {
     h4: [
       { time: "2026-02-18 23:00:00", open: 4961.2, high: 4978.3, low: 4958.9, close: 4970.1 },
@@ -483,6 +485,7 @@
         width: chartWrapEl.clientWidth,
         height: chartWrapEl.clientHeight,
       });
+      renderABCOverlay();
     });
   }
 
@@ -552,6 +555,7 @@
       " | " +
       '<img class="chart-source-logo" src="reezo.png" alt="Reezo" />Chart Engine';
     updateLiveLine();
+    renderABCOverlay();
   }
 
   function updateLiveLine() {
@@ -590,6 +594,8 @@
     if (pickPathSeries && typeof pickPathSeries.setData === "function") {
       pickPathSeries.setData([]);
     }
+    abcPointsCache = [];
+    renderABCOverlay();
   }
 
   function applySeriesMarkers(markers) {
@@ -634,6 +640,7 @@
     var isBuy = side === "BUY";
     var markers = [];
     var lineData = [];
+    var overlayPoints = [];
     for (var i = 0; i < seq.length; i++) {
       var item = seq[i];
       if (!item.row) continue;
@@ -649,12 +656,21 @@
         text: item.label,
       });
       lineData.push({ time: t, value: v });
+      overlayPoints.push({
+        time: t,
+        value: v,
+        label: item.label,
+        color: item.color,
+      });
     }
     applySeriesMarkers(markers);
     lineData.sort(function (a, b) { return Number(a.time) - Number(b.time); });
+    overlayPoints.sort(function (a, b) { return Number(a.time) - Number(b.time); });
     if (pickPathSeries && typeof pickPathSeries.setData === "function") {
       pickPathSeries.setData(lineData);
     }
+    abcPointsCache = overlayPoints;
+    renderABCOverlay();
 
     if (focusWhenFull && lineData.length === 3) {
       var times = lineData.map(function (x) { return x.time; });
@@ -666,6 +682,59 @@
         from: minT - pad,
         to: maxT + pad,
       });
+    }
+  }
+
+  function renderABCOverlay() {
+    if (!abcOverlayEl) return;
+    abcOverlayEl.innerHTML = "";
+    if (!chart || !candleSeries || !abcPointsCache.length) return;
+
+    var width = chartWrapEl ? chartWrapEl.clientWidth : 0;
+    var height = chartWrapEl ? chartWrapEl.clientHeight : 0;
+    if (!(width > 0 && height > 0)) return;
+
+    var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("width", String(width));
+    svg.setAttribute("height", String(height));
+    svg.setAttribute("viewBox", "0 0 " + String(width) + " " + String(height));
+    svg.style.position = "absolute";
+    svg.style.left = "0";
+    svg.style.top = "0";
+    svg.style.width = "100%";
+    svg.style.height = "100%";
+
+    var pathD = "";
+    for (var i = 0; i < abcPointsCache.length; i++) {
+      var p = abcPointsCache[i];
+      var x = chart.timeScale().timeToCoordinate(p.time);
+      var y = candleSeries.priceToCoordinate(p.value);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+      pathD += (pathD ? " L " : "M ") + String(x.toFixed(2)) + " " + String(y.toFixed(2));
+    }
+    if (pathD) {
+      var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", pathD);
+      path.setAttribute("fill", "none");
+      path.setAttribute("stroke", "#facc15");
+      path.setAttribute("stroke-width", "2");
+      path.setAttribute("stroke-dasharray", "6 5");
+      path.setAttribute("opacity", "0.95");
+      svg.appendChild(path);
+    }
+    abcOverlayEl.appendChild(svg);
+
+    for (var j = 0; j < abcPointsCache.length; j++) {
+      var p2 = abcPointsCache[j];
+      var x2 = chart.timeScale().timeToCoordinate(p2.time);
+      var y2 = candleSeries.priceToCoordinate(p2.value);
+      if (!Number.isFinite(x2) || !Number.isFinite(y2)) continue;
+      var tag = document.createElement("div");
+      tag.className = "abc-label " + String(p2.label || "").toLowerCase();
+      tag.textContent = String(p2.label || "");
+      tag.style.left = x2 + "px";
+      tag.style.top = y2 + "px";
+      abcOverlayEl.appendChild(tag);
     }
   }
 
