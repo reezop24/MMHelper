@@ -229,12 +229,14 @@
       }
     }
 
-    function levelLine(zoneName, levelKey, statusText, isInvalid, priceClass, statusClass) {
+    function levelLine(zoneName, levelKey, statusText, isInvalid, priceClass, statusClass, lineClass) {
       var status = isInvalid
         ? '<span class="status-invalid">' + esc(statusText) + "</span>"
         : wrapByClass(statusText, statusClass);
       var priceText = wrapByClass(f2(levels[levelKey]), priceClass);
-      return "- " + esc(zoneName) + " : " + priceText + " [" + status + "]";
+      var body = "- " + esc(zoneName) + " : " + priceText + " [" + status + "]";
+      if (!lineClass) return body;
+      return '<span class="' + esc(lineClass) + '">' + body + "</span>";
     }
 
     var sideHtml = side === "BUY" ? '<span class="side-buy">BUY</span>' : '<span class="side-sell">SELL</span>';
@@ -244,10 +246,10 @@
     lines.push("__SIDE__" + side);
     if (Number.isFinite(currentPrice)) {
       lines.push("Current price: " + f2(currentPrice) + " (" + (latestTs || "latest") + ")");
-      lines.push("Break Of Structure: " + (broken1 ? "YES" : "NO"));
+      lines.push("__BOS__" + (broken1 ? "YES" : "NO"));
     } else {
       lines.push("Current price: -");
-      lines.push("Break Of Structure: unknown");
+      lines.push("__BOS__UNKNOWN");
     }
     lines.push("");
     var aMyt = toMYTParts(aC.time || aC.ts || "");
@@ -262,11 +264,24 @@
     var html = [];
     for (var i = 0; i < lines.length; i++) {
       var line = String(lines[i] || "");
-      if (line.indexOf("__SIDE__") === 0) html.push("Side: " + sideHtml);
-      else html.push(esc(line));
+      if (line.indexOf("__SIDE__") === 0) {
+        html.push("Side: " + sideHtml);
+      } else if (line.indexOf("__BOS__") === 0) {
+        var bos = line.slice("__BOS__".length);
+        if (bos === "YES") {
+          html.push('Break Of Structure: <span class="bos-yes">YES</span>');
+        } else if (bos === "NO") {
+          html.push('Break Of Structure: <span class="bos-no">NO</span>');
+        } else {
+          html.push("Break Of Structure: unknown");
+        }
+      } else {
+        html.push(esc(line));
+      }
     }
 
     var entryKeys = ["1", "0.786", "0.618", "0.5", "0"];
+    var entryBuffer = 0.50; // 50 pips for XAU-style quoting (0.01 per pip)
     html.push("");
     html.push('<span class="zone-title">Entry Zone</span>');
     for (var e = 0; e < entryKeys.length; e++) {
@@ -274,7 +289,19 @@
       var isHalfLevel = ek === "0.5" && !Boolean(invalidMap[ek]);
       var entryPriceClass = isHalfLevel ? "zone-purple" : "";
       var entryStatusClass = isHalfLevel ? "zone-purple" : "";
-      html.push(levelLine("Entry Zone " + String(e + 1), ek, statusMap[ek] || "-", Boolean(invalidMap[ek]), entryPriceClass, entryStatusClass));
+      var entryLineClass = "";
+      if (broken1 && !Boolean(invalidMap[ek])) {
+        var lv = Number(levels[ek]);
+        var zMin = lv - entryBuffer;
+        var zMax = lv + entryBuffer;
+        var enteredByHistory = Number.isFinite(postHigh) && Number.isFinite(postLow) && postHigh >= zMin && postLow <= zMax;
+        var inZoneNow = Number.isFinite(currentPrice) && currentPrice >= zMin && currentPrice <= zMax;
+        var entered = enteredByHistory || inZoneNow;
+        if (entered) {
+          entryLineClass = inZoneNow ? "entry-zone-yellow" : "entry-zone-green";
+        }
+      }
+      html.push(levelLine("Entry Zone " + String(e + 1), ek, statusMap[ek] || "-", Boolean(invalidMap[ek]), entryPriceClass, entryStatusClass, entryLineClass));
     }
 
     html.push("");
@@ -283,7 +310,7 @@
       var xk = extKeys[x];
       var tone = extToneMap[xk] || "";
       var priceCls = tone === "green" ? "zone-green" : (tone === "yellow" ? "zone-yellow" : "");
-      html.push(levelLine("Extension Zone " + String(x + 1), xk, statusMap[xk] || "-", Boolean(invalidMap[xk]), priceCls, priceCls));
+      html.push(levelLine("Extension Zone " + String(x + 1), xk, statusMap[xk] || "-", Boolean(invalidMap[xk]), priceCls, priceCls, ""));
     }
     if (broke4236State) {
       html.push("");

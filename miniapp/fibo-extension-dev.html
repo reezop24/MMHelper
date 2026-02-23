@@ -22,9 +22,19 @@
     }
     .pick-tools {
       margin-top: 8px;
-      display: grid;
+      display: none;
       grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 8px;
+    }
+    .drag-mode-note {
+      margin-top: 8px;
+      border: 1px solid rgba(250, 204, 21, 0.4);
+      background: rgba(122, 59, 6, 0.2);
+      color: #ffd08c;
+      border-radius: 8px;
+      padding: 7px 9px;
+      font-size: 12px;
+      font-weight: 700;
     }
     .pick-btn {
       border: 1px solid #4f6f98;
@@ -228,6 +238,14 @@
       color: #facc15;
       font-weight: 700;
     }
+    .entry-zone-yellow {
+      color: #facc15;
+      font-weight: 800;
+    }
+    .entry-zone-green {
+      color: #86efac;
+      font-weight: 800;
+    }
     .zone-purple {
       color: #c084fc;
       font-weight: 700;
@@ -239,6 +257,14 @@
     .side-sell {
       color: #ff8f8f;
       font-weight: 700;
+    }
+    .bos-yes {
+      color: #86efac;
+      font-weight: 800;
+    }
+    .bos-no {
+      color: #f87171;
+      font-weight: 800;
     }
     .zone-title {
       color: #cfe4ff;
@@ -271,6 +297,8 @@
     #chartBox {
       width: 100%;
       height: 100%;
+      position: relative;
+      z-index: 5;
     }
     #abcOverlay {
       position: absolute;
@@ -279,7 +307,7 @@
       width: 100%;
       height: 100%;
       pointer-events: none;
-      z-index: 12;
+      z-index: 35;
     }
     .abc-label {
       position: absolute;
@@ -304,7 +332,7 @@
       position: absolute;
       left: 8px;
       bottom: 8px;
-      z-index: 20;
+      z-index: 40;
       pointer-events: none;
       opacity: 0.9;
       border-radius: 8px;
@@ -426,6 +454,7 @@
         <button id="pickCBtn" class="pick-btn" type="button">Pick C</button>
         <button id="clearPointsBtn" class="pick-btn clear" type="button">Clear Semua</button>
       </div>
+      <div class="drag-mode-note">Drag Mode aktif: sentuh/drag label A, B, C pada chart untuk ubah point terus.</div>
     </section>
 
     <section class="chart-card">
