@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fibo Extension Dev</title>
+  <link rel="stylesheet" href="global.css" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    .card {
+      margin-top: 12px;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+    .point-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .pick-tools {
+      margin-top: 8px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .pick-btn {
+      border: 1px solid #4f6f98;
+      background: #10294f;
+      color: #e6f0ff;
+      border-radius: 9px;
+      padding: 7px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .pick-btn.active {
+      border-color: #f59e0b;
+      background: #7a3b06;
+      color: #ffd9a6;
+    }
+    .pick-btn.clear {
+      border-color: #b74848;
+      background: #7c1f1f;
+      color: #ffe7e7;
+    }
+    .profile-head {
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .profile-title {
+      font-size: 14px;
+      color: #d7e7ff;
+      font-weight: 700;
+    }
+    .profile-save-btn {
+      border: 1px solid #2f9e5a;
+      background: #136f3e;
+      color: #ecfff3;
+      border-radius: 9px;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .profile-actions {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+      margin-top: 10px;
+    }
+    .profile-reset-btn {
+      border: 1px solid #b74848;
+      background: #7c1f1f;
+      color: #ffe7e7;
+      border-radius: 8px;
+      padding: 5px 8px;
+      font-size: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      width: 50%;
+      min-width: 110px;
+      max-width: 150px;
+      align-self: flex-end;
+      text-align: center;
+    }
+    .save-mode {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .save-mode.lock {
+      display: none;
+    }
+    .save-mode.lock.show {
+      display: inline-flex;
+    }
+    .save-mode.lock img {
+      width: 56px;
+      height: auto;
+      object-fit: contain;
+      vertical-align: middle;
+      filter: drop-shadow(0 3px 8px rgba(0, 0, 0, 0.35));
+    }
+    .profile-tabs {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .profile-tab-btn {
+      border: 1px solid #3a5e95;
+      background: #0a234a;
+      color: #d7e7ff;
+      border-radius: 9px;
+      padding: 8px 0;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .profile-tab-btn.active {
+      border-color: #f6a947;
+      background: #7a3b06;
+      color: #ffd9a6;
+    }
+    .profile-tab-btn.filled::after {
+      content: " •";
+      color: #8cf0bc;
+    }
+    .profile-tab-btn.empty::after {
+      content: " •";
+      color: #ff7f7f;
+    }
+    .profile-back-btn {
+      border: 1px solid #4f6f98;
+      background: #10294f;
+      color: #e6f0ff;
+      border-radius: 9px;
+      padding: 7px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .profile-status {
+      font-size: 12px;
+      color: #9ab8e6;
+      min-height: 16px;
+    }
+    .profile-badge {
+      margin: 2px 0 10px;
+      display: none;
+      justify-content: center;
+    }
+    .profile-badge.show {
+      display: flex;
+    }
+    .profile-badge img {
+      width: 120px;
+      max-width: 46%;
+      height: auto;
+      object-fit: contain;
+      filter: drop-shadow(0 5px 12px rgba(0, 0, 0, 0.35));
+    }
+    .field label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 13px;
+      color: #d7e7ff;
+    }
+    input,
+    select {
+      width: 100%;
+      border: 1px solid var(--border-input);
+      background: #06142f;
+      color: var(--text);
+      border-radius: 10px;
+      padding: 11px;
+      font-size: 14px;
+    }
+    .hint {
+      color: #9ab8e6;
+      font-size: 12px;
+      margin-top: 4px;
+    }
+    .preview {
+      margin-top: 12px;
+      border: 1px solid rgba(95, 145, 215, 0.45);
+      border-radius: 12px;
+      background: rgba(8, 26, 55, 0.78);
+      padding: 12px;
+      white-space: pre-line;
+      color: #d8e6ff;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+    .status-invalid {
+      color: #ff7f7f;
+      font-weight: 700;
+    }
+    .price-green {
+      color: #86efac;
+      font-weight: 700;
+    }
+    .zone-green {
+      color: #86efac;
+      font-weight: 700;
+    }
+    .zone-yellow {
+      color: #facc15;
+      font-weight: 700;
+    }
+    .zone-purple {
+      color: #c084fc;
+      font-weight: 700;
+    }
+    .side-buy {
+      color: #7db7ff;
+      font-weight: 700;
+    }
+    .side-sell {
+      color: #ff8f8f;
+      font-weight: 700;
+    }
+    .zone-title {
+      color: #cfe4ff;
+      font-weight: 700;
+      margin-top: 4px;
+    }
+    .chart-card {
+      margin-top: 12px;
+      border: 1px solid rgba(95, 145, 215, 0.45);
+      border-radius: 12px;
+      background: rgba(8, 26, 55, 0.78);
+      padding: 10px;
+    }
+    .chart-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-size: 12px;
+      color: #cde0ff;
+      margin-bottom: 8px;
+    }
+    #chartWrap {
+      position: relative;
+      height: 360px;
+      border: 1px solid rgba(95, 145, 215, 0.35);
+      border-radius: 10px;
+      overflow: hidden;
+      background: #0b1220;
+    }
+    #chartBox {
+      width: 100%;
+      height: 100%;
+    }
+    .chart-brand {
+      position: absolute;
+      left: 8px;
+      top: 8px;
+      z-index: 20;
+      pointer-events: none;
+      opacity: 0.9;
+      border-radius: 8px;
+      background: rgba(8, 20, 42, 0.65);
+      padding: 3px 6px;
+    }
+    .chart-brand img {
+      width: 60px;
+      height: auto;
+      object-fit: contain;
+      display: block;
+    }
+    .pill {
+      display: inline-block;
+      margin-left: 8px;
+      border-radius: 999px;
+      padding: 3px 8px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+    .pill.ok { background: rgba(46, 203, 123, 0.2); color: #8cf0bc; }
+    .pill.warn { background: rgba(255, 181, 73, 0.2); color: #ffd08c; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    @media (max-width: 640px) {
+      .pick-tools {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="top-nav">
+      <button id="topBackBtn" type="button" class="top-back-btn">← Back</button>
+    </div>
+
+    <header class="hero">
+      <img class="logo" src="logo.png" alt="MM HELPER Logo" />
+      <h1>Fibo Extension Dev</h1>
+      <p>Pilih A/B/C, auto kira FE hingga 4.236.</p>
+    </header>
+
+    <section class="card">
+      <div class="profile-head">
+        <div class="profile-title">Pilih Profile <span id="activeProfileLabel">#1</span></div>
+      </div>
+      <div class="profile-tabs" id="profileTabs">
+        <button class="profile-tab-btn active" type="button" data-profile="1">1</button>
+        <button class="profile-tab-btn" type="button" data-profile="2">2</button>
+        <button class="profile-tab-btn" type="button" data-profile="3">3</button>
+        <button class="profile-tab-btn" type="button" data-profile="4">4</button>
+        <button class="profile-tab-btn" type="button" data-profile="5">5</button>
+        <button class="profile-tab-btn" type="button" data-profile="6">6</button>
+        <button class="profile-tab-btn" type="button" data-profile="7">7</button>
+      </div>
+      <div id="profileBadge" class="profile-badge">
+        <img src="nextexc.png" alt="NEXTexclusive" />
+      </div>
+      <div id="profileStatus" class="profile-status"></div>
+      <div class="field">
+        <label for="trend"><strong>Trend</strong></label>
+        <select id="trend">
+          <option value="">-- Pilih Trend --</option>
+          <option value="BUY">Uptrend</option>
+          <option value="SELL">Downtrend</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="tf"><strong>Timeframe</strong></label>
+        <select id="tf">
+          <option value="m15">M15</option>
+          <option value="m30">M30</option>
+          <option value="h1">H1</option>
+          <option value="h4">H4</option>
+          <option value="d1">Daily</option>
+          <option value="w1">Weekly</option>
+        </select>
+      </div>
+      <p class="hint">M15/M30/H1/H4 guna tarikh + masa candle. Daily/Weekly guna tarikh sahaja.</p>
+      <p class="hint">Rule point: Uptrend => A/C guna Low, B guna High. Downtrend => A/C guna High, B guna Low.</p>
+      <p class="hint">Anda boleh masukkan tarikh/masa dari chart TradingView atau terus pilih point pada preview chart di bawah.</p>
+    </section>
+
+    <section class="card row">
+      <div class="field">
+        <label><strong>Point A</strong></label>
+        <div class="point-grid">
+          <input id="aDate" type="date" />
+          <select id="aTime"></select>
+        </div>
+      </div>
+      <div class="field">
+        <label><strong>Point B</strong></label>
+        <div class="point-grid">
+          <input id="bDate" type="date" />
+          <select id="bTime"></select>
+        </div>
+      </div>
+      <div class="field">
+        <label><strong>Point C</strong></label>
+        <div class="point-grid">
+          <input id="cDate" type="date" />
+          <select id="cTime"></select>
+        </div>
+      </div>
+      <div class="pick-tools">
+        <button id="pickABtn" class="pick-btn" type="button">Pick A</button>
+        <button id="pickBBtn" class="pick-btn" type="button">Pick B</button>
+        <button id="pickCBtn" class="pick-btn" type="button">Pick C</button>
+        <button id="clearPointsBtn" class="pick-btn clear" type="button">Clear Semua</button>
+      </div>
+    </section>
+
+    <section class="chart-card">
+      <div class="chart-meta">
+        <div id="chartInfo">Chart: -</div>
+        <div id="liveInfo">LIVE: -</div>
+        <div id="crosshairInfo">Crosshair: -</div>
+      </div>
+      <div id="chartWrap">
+        <div id="chartBox"></div>
+        <div class="chart-brand">
+          <img src="reezo.png" alt="Reezo" />
+        </div>
+      </div>
+    </section>
+
+    <section class="preview">
+      <div id="previewText">Loading candle data...</div>
+      <div class="profile-actions">
+        <button id="profileResetBtn" type="button" class="profile-reset-btn">Reset Profile</button>
+        <button id="profileSaveBtn" type="button" class="profile-save-btn">
+          <span id="profileSaveDefault" class="save-mode default">Simpan Profile</span>
+          <span id="profileSaveLock" class="save-mode lock">
+            <span>Simpan Profile :</span>
+            <img src="nextexc.png" alt="NEXTexclusive" />
+            <span>member only</span>
+          </span>
+        </button>
+        <button id="bottomBackBtn" type="button" class="profile-back-btn">Back</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://unpkg.com/lightweight-charts@4.2.2/dist/lightweight-charts.standalone.production.js"></script>
+  <script src="fe-engine.js"></script>
+  <script src="fibo-extension-dev.js"></script>
+</body>
+</html>
