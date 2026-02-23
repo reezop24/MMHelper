@@ -98,6 +98,7 @@
   };
   var INTRADAY_TF = { m15: true, m30: true, h1: true, h4: true };
   var TF_LIMITS = { m15: 500, m30: 400, h1: 350, h4: 260, d1: 220, w1: 180 };
+  var TF_SECONDS = { m15: 900, m30: 1800, h1: 3600, h4: 14400, d1: 86400, w1: 604800 };
 
   function f2(v) {
     return Number(v || 0).toFixed(2);
@@ -1096,6 +1097,18 @@
           var devRes = await fetch(devTickUrl + "?t=" + Date.now(), { cache: "no-store" });
           if (!devRes.ok) return;
           payload = await devRes.json();
+          var lastCandle = candles.length ? candles[candles.length - 1] : null;
+          if (lastCandle) {
+            var tickTs = toChartTime(payload.ts || payload.time || "");
+            var lastTs = toChartTime(lastCandle.time || lastCandle.ts || "");
+            var tf = String(tfEl.value || "h4").toLowerCase();
+            var step = Number(TF_SECONDS[tf] || 3600);
+            var tooOld = Number.isFinite(lastTs) && (!Number.isFinite(tickTs) || tickTs < lastTs);
+            var tooFarAhead = Number.isFinite(tickTs) && Number.isFinite(lastTs) && (tickTs - lastTs > (step * 2));
+            if (tooOld || tooFarAhead) {
+              payload = { price: lastCandle.close, ts: lastCandle.time || lastCandle.ts || "" };
+            }
+          }
         } catch (_devTickErr) {
           var tf = String(tfEl.value || "h4").toLowerCase();
           var c = (builtinCandles[tf] || []).slice(-1)[0];

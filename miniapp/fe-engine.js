@@ -103,6 +103,19 @@
     var postC = candles.filter(function (row) {
       return toChartTime(row.time || row.ts || "") >= cTs;
     });
+    var firstBosIdx = -1;
+    for (var bi = 0; bi < postC.length; bi++) {
+      var br = postC[bi];
+      var bh = Number(br.high);
+      var bl = Number(br.low);
+      if (!Number.isFinite(bh) || !Number.isFinite(bl)) continue;
+      var bosHit = side === "BUY" ? (bh >= level1) : (bl <= level1);
+      if (bosHit) {
+        firstBosIdx = bi;
+        break;
+      }
+    }
+    var postBos = firstBosIdx >= 0 ? postC.slice(firstBosIdx) : [];
 
     var postHigh = null;
     var postLow = null;
@@ -269,9 +282,9 @@
       } else if (line.indexOf("__BOS__") === 0) {
         var bos = line.slice("__BOS__".length);
         if (bos === "YES") {
-          html.push('Break Of Structure: <span class="bos-yes">YES</span>');
+          html.push('Break Of Structure: <span class="bos-yes" style="color:#86efac;font-weight:800;">YES</span>');
         } else if (bos === "NO") {
-          html.push('Break Of Structure: <span class="bos-no">NO</span>');
+          html.push('Break Of Structure: <span class="bos-no" style="color:#f87171;font-weight:800;">NO</span>');
         } else {
           html.push("Break Of Structure: unknown");
         }
@@ -290,11 +303,21 @@
       var entryPriceClass = isHalfLevel ? "zone-purple" : "";
       var entryStatusClass = isHalfLevel ? "zone-purple" : "";
       var entryLineClass = "";
-      if (broken1 && !Boolean(invalidMap[ek])) {
+      if (broken1) {
         var lv = Number(levels[ek]);
         var zMin = lv - entryBuffer;
         var zMax = lv + entryBuffer;
-        var enteredByHistory = Number.isFinite(postHigh) && Number.isFinite(postLow) && postHigh >= zMin && postLow <= zMax;
+        var enteredByHistory = false;
+        for (var hi = 0; hi < postBos.length; hi++) {
+          var hr = postBos[hi];
+          var h = Number(hr.high);
+          var l = Number(hr.low);
+          if (!Number.isFinite(h) || !Number.isFinite(l)) continue;
+          if (h >= zMin && l <= zMax) {
+            enteredByHistory = true;
+            break;
+          }
+        }
         var inZoneNow = Number.isFinite(currentPrice) && currentPrice >= zMin && currentPrice <= zMax;
         var entered = enteredByHistory || inZoneNow;
         if (entered) {
