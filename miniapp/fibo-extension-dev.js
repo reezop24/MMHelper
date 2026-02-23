@@ -32,6 +32,7 @@
   var aTimeEl = document.getElementById("aTime");
   var bTimeEl = document.getElementById("bTime");
   var cTimeEl = document.getElementById("cTime");
+  var dragModeBtn = document.getElementById("dragModeBtn");
   var pickABtn = document.getElementById("pickABtn");
   var pickBBtn = document.getElementById("pickBBtn");
   var pickCBtn = document.getElementById("pickCBtn");
@@ -55,7 +56,6 @@
   var tfTimes = [];
   var chart = null;
   var candleSeries = null;
-  var pickPathSeries = null;
   var livePriceLine = null;
   var activePickTarget = "";
   var isTouchDevice = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0);
@@ -65,6 +65,12 @@
   var pickCandidateTime = 0;
   var abcPointsCache = [];
   var pickedRows = { A: null, B: null, C: null };
+  var currentChartData = [];
+  var overlaySyncTimer = null;
+  var isDraggingPoint = false;
+  var dragPointLabel = "";
+  var chartInteractionLocked = false;
+  var dragModeEnabled = false;
   var builtinCandles = {
     h4: [
       { time: "2026-02-18 23:00:00", open: 4961.2, high: 4978.3, low: 4958.9, close: 4970.1 },
@@ -430,24 +436,6 @@
       previewTextEl.textContent = "Chart library tak support candlestick series.";
       return;
     }
-    var pickLineOptions = {
-      color: "#facc15",
-      lineWidth: 2,
-      lineStyle: window.LightweightCharts.LineStyle.Dashed,
-      priceLineVisible: false,
-      lastValueVisible: false,
-      crosshairMarkerVisible: false,
-    };
-    if (typeof chart.addLineSeries === "function") {
-      pickPathSeries = chart.addLineSeries(pickLineOptions);
-    } else if (
-      typeof chart.addSeries === "function" &&
-      window.LightweightCharts &&
-      window.LightweightCharts.LineSeries
-    ) {
-      pickPathSeries = chart.addSeries(window.LightweightCharts.LineSeries, pickLineOptions);
-    }
-
     chart.subscribeCrosshairMove(function (param) {
       if (!param || !param.time || !candleSeries) {
         crosshairInfoEl.textContent = "Crosshair: -";
@@ -480,6 +468,18 @@
       assignPickFromChartTime(param.time, "chart_click");
     });
 
+    var timeScale = chart.timeScale();
+    if (timeScale && typeof timeScale.subscribeVisibleLogicalRangeChange === "function") {
+      timeScale.subscribeVisibleLogicalRangeChange(function () {
+        renderABCOverlay();
+      });
+    }
+    if (timeScale && typeof timeScale.subscribeVisibleTimeRangeChange === "function") {
+      timeScale.subscribeVisibleTimeRangeChange(function () {
+        renderABCOverlay();
+      });
+    }
+
     window.addEventListener("resize", function () {
       if (!chart) return;
       chart.applyOptions({
@@ -488,6 +488,15 @@
       });
       renderABCOverlay();
     });
+
+    if (!overlaySyncTimer) {
+      overlaySyncTimer = setInterval(function () {
+        if (!chart) return;
+        if (!abcPointsCache.length) return;
+        if (isDraggingPoint) return;
+        renderABCOverlay();
+      }, 250);
+    }
   }
 
   function findNearestCandleByChartTime(rawTime) {
@@ -506,6 +515,109 @@
       }
     }
     return nearest;
+  }
+
+  function _handlePositions() {
+    var out = [];
+    if (!chart || !candleSeries) return out;
+    for (var i = 0; i < abcPointsCache.length; i++) {
+      var p = abcPointsCache[i];
+      var x = chart.timeScale().timeToCoordinate(p.time);
+      var y = candleSeries.priceToCoordinate(p.value);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+      out.push({ label: p.label, x: x, y: y });
+    }
+    return out;
+  }
+
+  function _findHandleNear(x, y) {
+    var hs = _handlePositions();
+    var best = null;
+    var bestD = Number.POSITIVE_INFINITY;
+    for (var i = 0; i < hs.length; i++) {
+      var h = hs[i];
+      var dx = Number(h.x) - Number(x);
+      var dy = Number(h.y) - Number(y);
+      var d = Math.sqrt(dx * dx + dy * dy);
+      if (d < bestD) {
+        bestD = d;
+        best = h;
+      }
+    }
+    if (!best || bestD > 26) return null;
+    return best;
+  }
+
+  function _updatePointInputsFromRow(label, row) {
+    if (!row) return;
+    var p = toMYTParts(row.time || row.ts || "");
+    if (!p) return;
+    var tf = String(tfEl.value || "").toLowerCase();
+    var intraday = Boolean(INTRADAY_TF[tf]);
+    if (label === "A") {
+      aDateEl.value = p.date;
+      if (intraday) aTimeEl.value = p.time;
+    } else if (label === "B") {
+      bDateEl.value = p.date;
+      if (intraday) bTimeEl.value = p.time;
+    } else if (label === "C") {
+      cDateEl.value = p.date;
+      if (intraday) cTimeEl.value = p.time;
+    }
+  }
+
+  function _startDragAtClient(clientX, clientY) {
+    if (!abcPointsCache.length || !chartWrapEl) return false;
+    var rect = chartWrapEl.getBoundingClientRect();
+    var x = clientX - rect.left;
+    var y = clientY - rect.top;
+    var near = _findHandleNear(x, y);
+    if (!near) return false;
+    isDraggingPoint = true;
+    dragPointLabel = String(near.label || "");
+    setChartInteractionLocked(true);
+    if (profileStatusEl) profileStatusEl.textContent = "Dragging Point " + dragPointLabel + "...";
+    return true;
+  }
+
+  function _moveDragAtClient(clientX, clientY) {
+    if (!isDraggingPoint || !dragPointLabel || !chartWrapEl || !chart) return;
+    var rect = chartWrapEl.getBoundingClientRect();
+    var x = clientX - rect.left;
+    if (x < 0) x = 0;
+    if (x > rect.width) x = rect.width;
+    var time = chart.timeScale().coordinateToTime(x);
+    if (!time) return;
+    var nearest = findNearestCandleByChartTime(time);
+    if (!nearest) return;
+    pickedRows[dragPointLabel] = nearest;
+    _updatePointInputsFromRow(dragPointLabel, nearest);
+    refreshABCPickVisuals(String(trendEl.value || ""), false);
+  }
+
+  function _endDrag() {
+    if (!isDraggingPoint) return;
+    isDraggingPoint = false;
+    setChartInteractionLocked(false);
+    if (profileStatusEl) profileStatusEl.textContent = "Point " + dragPointLabel + " updated via drag.";
+    dragPointLabel = "";
+    renderPreview();
+    saveFormState(false);
+  }
+
+  function setChartInteractionLocked(locked) {
+    if (!chart || chartInteractionLocked === Boolean(locked)) return;
+    chartInteractionLocked = Boolean(locked);
+    var enabled = !chartInteractionLocked;
+    chart.applyOptions({
+      handleScroll: enabled,
+      handleScale: enabled,
+    });
+    if (chartWrapEl) {
+      chartWrapEl.style.touchAction = chartInteractionLocked ? "none" : "";
+      chartWrapEl.style.userSelect = chartInteractionLocked ? "none" : "";
+      chartWrapEl.style.cursor = chartInteractionLocked ? "grabbing" : "";
+    }
   }
 
   function assignPickFromChartTime(rawTime, source) {
@@ -538,6 +650,7 @@
         ? ("Point " + currentTarget + " set (" + source + "). Seterusnya pilih Point " + nextTarget + ".")
         : ("Point " + currentTarget + " set (" + source + ").");
     }
+    refreshABCPickVisuals(String(trendEl.value || ""), false);
     setPickTarget(nextTarget);
     saveFormState(false);
     renderPreview();
@@ -547,6 +660,7 @@
     initChart();
     if (!chart || !candleSeries) return;
     var data = buildChartData();
+    currentChartData = data;
     candleSeries.setData(data);
     if (resetView) {
       chart.timeScale().fitContent();
@@ -594,27 +708,10 @@
   }
 
   function clearABCMarkers() {
-    applySeriesMarkers([]);
-    if (pickPathSeries && typeof pickPathSeries.setData === "function") {
-      pickPathSeries.setData([]);
-    }
+    setChartInteractionLocked(false);
     abcPointsCache = [];
     pickedRows = { A: null, B: null, C: null };
     renderABCOverlay();
-  }
-
-  function applySeriesMarkers(markers) {
-    if (!candleSeries) return;
-    if (typeof candleSeries.setMarkers === "function") {
-      candleSeries.setMarkers(markers);
-      return;
-    }
-    if (
-      window.LightweightCharts &&
-      typeof window.LightweightCharts.createSeriesMarkers === "function"
-    ) {
-      window.LightweightCharts.createSeriesMarkers(candleSeries, markers);
-    }
   }
 
   function _pointValueBySide(side, label, row) {
@@ -631,7 +728,7 @@
   }
 
   function refreshABCPickVisuals(sideHint, focusWhenFull) {
-    if (!chart || !candleSeries || typeof candleSeries.setMarkers !== "function") return;
+    if (!chart || !candleSeries) return;
     var side = String(sideHint || "").toUpperCase();
     var aRow = pickedRows.A || fetchPointCandle(aDateEl.value, aTimeEl.value);
     var bRow = pickedRows.B || fetchPointCandle(bDateEl.value, bTimeEl.value);
@@ -642,9 +739,6 @@
       { label: "B", row: bRow, color: "#f59e0b" },
       { label: "C", row: cRow, color: "#c084fc" },
     ];
-    var isBuy = side === "BUY";
-    var markers = [];
-    var lineData = [];
     var overlayPoints = [];
     for (var i = 0; i < seq.length; i++) {
       var item = seq[i];
@@ -653,14 +747,6 @@
       if (!(t > 0)) continue;
       var v = _pointValueBySide(side, item.label, item.row);
       if (!Number.isFinite(v)) continue;
-      markers.push({
-        time: t,
-        position: isBuy ? (item.label === "B" ? "aboveBar" : "belowBar") : (item.label === "B" ? "belowBar" : "aboveBar"),
-        color: item.color,
-        shape: "circle",
-        text: item.label,
-      });
-      lineData.push({ time: t, value: v });
       overlayPoints.push({
         time: t,
         value: v,
@@ -668,17 +754,12 @@
         color: item.color,
       });
     }
-    applySeriesMarkers(markers);
-    lineData.sort(function (a, b) { return Number(a.time) - Number(b.time); });
     overlayPoints.sort(function (a, b) { return Number(a.time) - Number(b.time); });
-    if (pickPathSeries && typeof pickPathSeries.setData === "function") {
-      pickPathSeries.setData(lineData);
-    }
     abcPointsCache = overlayPoints;
     renderABCOverlay();
 
-    if (focusWhenFull && lineData.length === 3) {
-      var times = lineData.map(function (x) { return x.time; });
+    if (focusWhenFull && overlayPoints.length === 3) {
+      var times = overlayPoints.map(function (x) { return x.time; });
       var minT = Math.min.apply(null, times);
       var maxT = Math.max.apply(null, times);
       var span = Math.max(maxT - minT, 1);
@@ -693,11 +774,27 @@
   function renderABCOverlay() {
     if (!abcOverlayEl) return;
     abcOverlayEl.innerHTML = "";
-    if (!chart || !candleSeries || !abcPointsCache.length) return;
+    if (!chart || !candleSeries) return;
 
     var width = chartWrapEl ? chartWrapEl.clientWidth : 0;
     var height = chartWrapEl ? chartWrapEl.clientHeight : 0;
     if (!(width > 0 && height > 0)) return;
+
+    var debug = document.createElement("div");
+    debug.style.position = "absolute";
+    debug.style.right = "8px";
+    debug.style.top = "8px";
+    debug.style.fontSize = "10px";
+    debug.style.fontWeight = "700";
+    debug.style.color = "#ffd08c";
+    debug.style.background = "rgba(8, 20, 42, 0.75)";
+    debug.style.border = "1px solid rgba(250, 204, 21, 0.7)";
+    debug.style.borderRadius = "6px";
+    debug.style.padding = "2px 6px";
+    debug.textContent = "ABC overlay alive | pts=" + String(abcPointsCache.length);
+    abcOverlayEl.appendChild(debug);
+
+    if (!abcPointsCache.length) return;
 
     var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("width", String(width));
@@ -709,12 +806,43 @@
     svg.style.width = "100%";
     svg.style.height = "100%";
 
+    function xFallbackByTime(ts) {
+      if (!currentChartData.length) return null;
+      var idx = -1;
+      for (var ii = 0; ii < currentChartData.length; ii++) {
+        if (Number(currentChartData[ii].time) === Number(ts)) {
+          idx = ii;
+          break;
+        }
+      }
+      if (idx < 0) return null;
+      if (currentChartData.length === 1) return width / 2;
+      return (idx / (currentChartData.length - 1)) * width;
+    }
+
+    function yFallbackByValue(v) {
+      if (!currentChartData.length) return null;
+      var lows = currentChartData.map(function (r) { return Number(r.low); }).filter(Number.isFinite);
+      var highs = currentChartData.map(function (r) { return Number(r.high); }).filter(Number.isFinite);
+      if (!lows.length || !highs.length) return null;
+      var minV = Math.min.apply(null, lows);
+      var maxV = Math.max.apply(null, highs);
+      var span = maxV - minV;
+      if (!(span > 0)) return height / 2;
+      var n = (Number(v) - minV) / span;
+      return height - (n * height);
+    }
+
     var pathD = "";
+    var visiblePoints = 0;
     for (var i = 0; i < abcPointsCache.length; i++) {
       var p = abcPointsCache[i];
       var x = chart.timeScale().timeToCoordinate(p.time);
       var y = candleSeries.priceToCoordinate(p.value);
+      if (!Number.isFinite(x)) x = xFallbackByTime(p.time);
+      if (!Number.isFinite(y)) y = yFallbackByValue(p.value);
       if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+      visiblePoints += 1;
       pathD += (pathD ? " L " : "M ") + String(x.toFixed(2)) + " " + String(y.toFixed(2));
     }
     if (pathD) {
@@ -733,6 +861,8 @@
       var p2 = abcPointsCache[j];
       var x2 = chart.timeScale().timeToCoordinate(p2.time);
       var y2 = candleSeries.priceToCoordinate(p2.value);
+      if (!Number.isFinite(x2)) x2 = xFallbackByTime(p2.time);
+      if (!Number.isFinite(y2)) y2 = yFallbackByValue(p2.value);
       if (!Number.isFinite(x2) || !Number.isFinite(y2)) continue;
       var tag = document.createElement("div");
       tag.className = "abc-label " + String(p2.label || "").toLowerCase();
@@ -741,6 +871,7 @@
       tag.style.top = y2 + "px";
       abcOverlayEl.appendChild(tag);
     }
+    debug.textContent = "ABC overlay: " + String(abcPointsCache.length) + "/" + String(visiblePoints);
   }
 
   function updateABCMarkersAndFocus(side, aC, bC, cC) { // eslint-disable-line no-unused-vars
@@ -990,6 +1121,44 @@
     if (pickCBtn) pickCBtn.classList.toggle("active", activePickTarget === "C");
   }
 
+  function updateDragModeUI() {
+    if (!dragModeBtn) return;
+    dragModeBtn.classList.toggle("active", dragModeEnabled);
+    dragModeBtn.textContent = dragModeEnabled ? "Drag Mode: ON" : "Drag Mode: OFF";
+  }
+
+  function hydratePickedRowsFromInputsOrFallback() {
+    var aRow = fetchPointCandle(aDateEl.value, aTimeEl.value);
+    var bRow = fetchPointCandle(bDateEl.value, bTimeEl.value);
+    var cRow = fetchPointCandle(cDateEl.value, cTimeEl.value);
+    if (!(aRow && bRow && cRow) && candles.length >= 3) {
+      aRow = candles[candles.length - 3];
+      bRow = candles[candles.length - 2];
+      cRow = candles[candles.length - 1];
+      _updatePointInputsFromRow("A", aRow);
+      _updatePointInputsFromRow("B", bRow);
+      _updatePointInputsFromRow("C", cRow);
+    }
+    pickedRows.A = aRow || null;
+    pickedRows.B = bRow || null;
+    pickedRows.C = cRow || null;
+  }
+
+  function setDragMode(enabled) {
+    dragModeEnabled = Boolean(enabled);
+    setPickTarget("");
+    if (dragModeEnabled) {
+      hydratePickedRowsFromInputsOrFallback();
+      refreshABCPickVisuals(String(trendEl.value || ""), false);
+      if (profileStatusEl) {
+        profileStatusEl.textContent = "Drag Mode aktif. Tarik label A/B/C pada chart.";
+      }
+    } else if (profileStatusEl) {
+      profileStatusEl.textContent = "Drag Mode dimatikan.";
+    }
+    updateDragModeUI();
+  }
+
   function clearAllPoints() {
     aDateEl.value = "";
     bDateEl.value = "";
@@ -998,6 +1167,7 @@
     bTimeEl.value = "";
     cTimeEl.value = "";
     setPickTarget("");
+    setDragMode(false);
     pickTouchStartMs = 0;
     pickTouchStartX = 0;
     pickTouchMoved = false;
@@ -1005,7 +1175,7 @@
     clearABCMarkers();
     saveFormState(false);
     if (profileStatusEl) {
-      profileStatusEl.textContent = "Point A/B/C dikosongkan. Pilih Pick A/B/C untuk tandakan semula.";
+      profileStatusEl.textContent = "Point A/B/C dikosongkan.";
     }
     renderPreview();
   }
@@ -1088,6 +1258,12 @@
       clearAllPoints();
     });
   }
+  if (dragModeBtn) {
+    dragModeBtn.addEventListener("click", function () {
+      setDragMode(!dragModeEnabled);
+      saveFormState(false);
+    });
+  }
 
   if (chartWrapEl) {
     chartWrapEl.addEventListener("click", function (ev) {
@@ -1098,8 +1274,31 @@
       if (!time) return;
       assignPickFromChartTime(time, "wrap_click");
     });
+    chartWrapEl.addEventListener("mousedown", function (ev) {
+      if (!dragModeEnabled || activePickTarget || !chart || isTouchDevice) return;
+      _startDragAtClient(ev.clientX, ev.clientY);
+    });
+    chartWrapEl.addEventListener("mousemove", function (ev) {
+      if (!isDraggingPoint) return;
+      _moveDragAtClient(ev.clientX, ev.clientY);
+    });
+    chartWrapEl.addEventListener("mouseup", function () {
+      _endDrag();
+    });
+    chartWrapEl.addEventListener("mouseleave", function () {
+      _endDrag();
+    });
     chartWrapEl.addEventListener("touchstart", function (ev) {
-      if (!activePickTarget || !chart) return;
+      if (!chart) return;
+      if (dragModeEnabled && !activePickTarget) {
+        if (!ev.touches || !ev.touches.length) return;
+        var dragStarted = _startDragAtClient(ev.touches[0].clientX, ev.touches[0].clientY);
+        if (dragStarted) {
+          ev.preventDefault();
+          return;
+        }
+      }
+      if (!activePickTarget) return;
       if (!ev.touches || !ev.touches.length) return;
       var t = ev.touches[0];
       var rect = chartWrapEl.getBoundingClientRect();
@@ -1114,7 +1313,14 @@
       }
     });
     chartWrapEl.addEventListener("touchmove", function (ev) {
-      if (!activePickTarget || !chart) return;
+      if (!chart) return;
+      if (isDraggingPoint) {
+        if (!ev.touches || !ev.touches.length) return;
+        _moveDragAtClient(ev.touches[0].clientX, ev.touches[0].clientY);
+        ev.preventDefault();
+        return;
+      }
+      if (!activePickTarget) return;
       if (!ev.touches || !ev.touches.length) return;
       var t = ev.touches[0];
       var rect = chartWrapEl.getBoundingClientRect();
@@ -1129,7 +1335,13 @@
       }
     });
     chartWrapEl.addEventListener("touchend", function (ev) {
-      if (!activePickTarget || !chart) return;
+      if (!chart) return;
+      if (isDraggingPoint) {
+        _endDrag();
+        ev.preventDefault();
+        return;
+      }
+      if (!activePickTarget) return;
       if (!ev.changedTouches || !ev.changedTouches.length) return;
       var t = ev.changedTouches[0];
       var rect = chartWrapEl.getBoundingClientRect();
@@ -1171,6 +1383,7 @@
 
   loadFormState();
   updateTimeInputs();
+  updateDragModeUI();
 
   var serverState = parseServerState(serverProfilesStateRaw);
   if (serverState) {

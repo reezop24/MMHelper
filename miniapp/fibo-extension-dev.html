@@ -22,8 +22,8 @@
     }
     .pick-tools {
       margin-top: 8px;
-      display: none;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 8px;
     }
     .drag-mode-note {
@@ -449,12 +449,10 @@
         </div>
       </div>
       <div class="pick-tools">
-        <button id="pickABtn" class="pick-btn" type="button">Pick A</button>
-        <button id="pickBBtn" class="pick-btn" type="button">Pick B</button>
-        <button id="pickCBtn" class="pick-btn" type="button">Pick C</button>
-        <button id="clearPointsBtn" class="pick-btn clear" type="button">Clear Semua</button>
+        <button id="dragModeBtn" class="pick-btn" type="button">Drag Mode: OFF</button>
+        <button id="clearPointsBtn" class="pick-btn clear" type="button">Clear</button>
       </div>
-      <div class="drag-mode-note">Drag Mode aktif: sentuh/drag label A, B, C pada chart untuk ubah point terus.</div>
+      <div class="drag-mode-note">Aktifkan Drag Mode, kemudian sentuh/drag label A, B, C pada chart untuk ubah point terus.</div>
     </section>
 
     <section class="chart-card">
