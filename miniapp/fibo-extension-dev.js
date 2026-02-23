@@ -45,6 +45,7 @@
   var chartWrapEl = document.getElementById("chartWrap");
   var chartBoxEl = document.getElementById("chartBox");
   var abcOverlayEl = document.getElementById("abcOverlay");
+  var dragHudEl = document.getElementById("dragHud");
 
   var candles = [];
   var latestPrice = null;
@@ -566,6 +567,21 @@
     }
   }
 
+  function setDragHud(show, text) {
+    if (!dragHudEl) return;
+    dragHudEl.textContent = String(text || "");
+    dragHudEl.classList.toggle("show", Boolean(show));
+  }
+
+  function hudTextForRow(label, row) {
+    if (!row) return "Dragging Point " + String(label || "");
+    var side = String(trendEl.value || "").toUpperCase();
+    var price = _pointValueBySide(side, label, row);
+    var p = toMYTParts(row.time || row.ts || "");
+    var t = p ? (p.full + " MYT") : normalizeTs(row.time || row.ts || "");
+    return "Dragging " + String(label || "") + " | " + t + " | " + f2(price);
+  }
+
   function _startDragAtClient(clientX, clientY) {
     if (!abcPointsCache.length || !chartWrapEl) return false;
     var rect = chartWrapEl.getBoundingClientRect();
@@ -576,6 +592,8 @@
     isDraggingPoint = true;
     dragPointLabel = String(near.label || "");
     setChartInteractionLocked(true);
+    var startRow = pickedRows[dragPointLabel] || null;
+    setDragHud(true, hudTextForRow(dragPointLabel, startRow));
     if (profileStatusEl) profileStatusEl.textContent = "Dragging Point " + dragPointLabel + "...";
     return true;
   }
@@ -593,12 +611,14 @@
     pickedRows[dragPointLabel] = nearest;
     _updatePointInputsFromRow(dragPointLabel, nearest);
     refreshABCPickVisuals(String(trendEl.value || ""), false);
+    setDragHud(true, hudTextForRow(dragPointLabel, nearest));
   }
 
   function _endDrag() {
     if (!isDraggingPoint) return;
     isDraggingPoint = false;
     setChartInteractionLocked(false);
+    setDragHud(false, "");
     if (profileStatusEl) profileStatusEl.textContent = "Point " + dragPointLabel + " updated via drag.";
     dragPointLabel = "";
     renderPreview();
@@ -1132,9 +1152,29 @@
     var bRow = fetchPointCandle(bDateEl.value, bTimeEl.value);
     var cRow = fetchPointCandle(cDateEl.value, cTimeEl.value);
     if (!(aRow && bRow && cRow) && candles.length >= 3) {
-      aRow = candles[candles.length - 3];
-      bRow = candles[candles.length - 2];
-      cRow = candles[candles.length - 1];
+      var midIdx = Math.floor(candles.length / 2);
+      if (chart && chart.timeScale && typeof chart.timeScale().getVisibleRange === "function") {
+        var vr = chart.timeScale().getVisibleRange();
+        if (vr && Number.isFinite(Number(vr.from)) && Number.isFinite(Number(vr.to))) {
+          var centerTs = (Number(vr.from) + Number(vr.to)) / 2;
+          var nearestIdx = 0;
+          var nearestDiff = Number.POSITIVE_INFINITY;
+          for (var i = 0; i < candles.length; i++) {
+            var ts = toChartTime(candles[i].time || candles[i].ts || "");
+            var diff = Math.abs(ts - centerTs);
+            if (diff < nearestDiff) {
+              nearestDiff = diff;
+              nearestIdx = i;
+            }
+          }
+          midIdx = nearestIdx;
+        }
+      }
+      if (midIdx <= 0) midIdx = 1;
+      if (midIdx >= candles.length - 1) midIdx = candles.length - 2;
+      aRow = candles[midIdx - 1];
+      bRow = candles[midIdx];
+      cRow = candles[midIdx + 1];
       _updatePointInputsFromRow("A", aRow);
       _updatePointInputsFromRow("B", bRow);
       _updatePointInputsFromRow("C", cRow);
@@ -1150,11 +1190,13 @@
     if (dragModeEnabled) {
       hydratePickedRowsFromInputsOrFallback();
       refreshABCPickVisuals(String(trendEl.value || ""), false);
+      setDragHud(false, "");
       if (profileStatusEl) {
         profileStatusEl.textContent = "Drag Mode aktif. Tarik label A/B/C pada chart.";
       }
-    } else if (profileStatusEl) {
-      profileStatusEl.textContent = "Drag Mode dimatikan.";
+    } else {
+      setDragHud(false, "");
+      if (profileStatusEl) profileStatusEl.textContent = "Drag Mode dimatikan.";
     }
     updateDragModeUI();
   }
@@ -1173,6 +1215,7 @@
     pickTouchMoved = false;
     pickCandidateTime = 0;
     clearABCMarkers();
+    setDragHud(false, "");
     saveFormState(false);
     if (profileStatusEl) {
       profileStatusEl.textContent = "Point A/B/C dikosongkan.";
