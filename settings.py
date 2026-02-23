@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from urllib.parse import urlencode
 
 from storage import has_fibo_next_profile_access, load_fibo_extension_profiles
@@ -78,6 +79,7 @@ def get_fibo_extension_dev_webapp_url(user_id: int | None = None, is_superuser: 
     fe_webapp_version = (os.getenv("MMHELPER_FE_DEV_WEBAPP_VERSION") or "").strip() or "fe_dev_v20260223_abc_overlay_1"
     query_data: dict[str, str] = {}
     query_data["v"] = fe_webapp_version
+    query_data["ts"] = str(int(time.time()))
     if live_tick_url:
         query_data["live_tick_url"] = live_tick_url
     if dbo_preview_url:
