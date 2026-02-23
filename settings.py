@@ -75,7 +75,7 @@ def get_fibo_extension_dev_webapp_url(user_id: int | None = None, is_superuser: 
     page = f"{_miniapp_base_url()}/fibo-extension-dev.html"
     live_tick_url = (os.getenv("MMHELPER_LIVE_TICK_URL") or "").strip()
     dbo_preview_url = (os.getenv("MMHELPER_DBO_PREVIEW_URL") or "").strip()
-    fe_webapp_version = (os.getenv("MMHELPER_FE_WEBAPP_VERSION") or "").strip() or "fe_v20260223_dev1"
+    fe_webapp_version = (os.getenv("MMHELPER_FE_DEV_WEBAPP_VERSION") or "").strip() or "fe_dev_v20260223_abc_overlay_1"
     query_data: dict[str, str] = {}
     query_data["v"] = fe_webapp_version
     if live_tick_url:
