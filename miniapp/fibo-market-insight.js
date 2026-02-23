@@ -63,7 +63,7 @@
   }
 
   function computeLevels(side, a, b, c) {
-    var ratios = [0.5, 1, 1.382, 1.618];
+    var ratios = [0, 0.5, 0.618, 0.786, 1, 1.382, 1.618, 2.618, 3.618, 4.236];
     var ab = Math.abs(b - a);
     var levels = {};
     ratios.forEach(function (r) {
@@ -159,6 +159,7 @@
       '<div class="pill ' + info.side.toLowerCase() + '">' + info.side + "</div>" +
       "</div>" +
       '<div class="sub">Priority weight: ' + info.weight + " | Stage: " + info.stage.text + "</div>" +
+      '<div class="sub">Structure size (A-B): ' + info.swingPips.toFixed(1) + " pips</div>" +
       '<div class="sub">Level 1 distance: ' + (Number.isFinite(dist1) ? (dist1.toFixed(1) + " pips") : "-") + "</div>" +
       '<div class="levels">' + lvRows + "</div>" +
       "</article>"
@@ -168,6 +169,56 @@
   function setBias(biasText, cls) {
     biasPillEl.textContent = biasText;
     biasPillEl.className = "pill " + (cls || "");
+  }
+
+  function stageScore(stageKey) {
+    if (stageKey === "post_break") return 2;
+    if (stageKey === "checkpoint") return 3;
+    if (stageKey === "extended") return 4;
+    return 1;
+  }
+
+  function primaryNarrative(item) {
+    var cp = Number(item.currentPrice);
+    var lv = item.levels;
+    var l05 = Number(lv["0.5"]);
+    var l10 = Number(lv["1"]);
+    var l138 = Number(lv["1.382"]);
+    var l161 = Number(lv["1.618"]);
+    if (![cp, l05, l10, l138, l161].every(Number.isFinite)) {
+      return "Data harga semasa belum lengkap pada TF utama.";
+    }
+
+    if (item.side === "BUY") {
+      if (cp < l05) return "TF utama BUY: harga masih di bawah 0.5, struktur belum pulih penuh dan retrace masih dominan.";
+      if (cp < l10) return "TF utama BUY: harga sudah lepasi 0.5 tetapi belum break 1.0, jangkaan asas ialah uji 1.0 dahulu.";
+      if (cp < l138) return "TF utama BUY: level 1.0 sudah break, peluang sambung ke 1.382 masih terbuka sebelum nilai 1.618.";
+      if (cp <= l161) return "TF utama BUY: harga berada di zon 1.382-1.618, ini kawasan continuation atau mula rejection.";
+      return "TF utama BUY: harga sudah melepasi 1.618, extension kuat; monitor potensi reversal/new structure.";
+    }
+
+    if (cp > l05) return "TF utama SELL: harga masih di atas 0.5, struktur belum bearish penuh dan retrace masih dominan.";
+    if (cp > l10) return "TF utama SELL: harga sudah lepasi 0.5 tetapi belum break 1.0, jangkaan asas ialah uji 1.0 dahulu.";
+    if (cp > l138) return "TF utama SELL: level 1.0 sudah break, peluang sambung ke 1.382 masih terbuka sebelum nilai 1.618.";
+    if (cp >= l161) return "TF utama SELL: harga berada di zon 1.382-1.618, ini kawasan continuation atau mula rejection.";
+    return "TF utama SELL: harga sudah melepasi 1.618, extension kuat; monitor potensi reversal/new structure.";
+  }
+
+  function ltfAlignmentNarrative(primary, analysed) {
+    var ltf = analysed.filter(function (x) { return x.profile !== primary.profile && x.weight < primary.weight; });
+    if (!ltf.length) return "Tiada profile timeframe lebih kecil untuk cross-check alignment.";
+    var same = ltf.filter(function (x) { return x.side === primary.side; });
+    var opp = ltf.filter(function (x) { return x.side !== primary.side; });
+    if (same.length === ltf.length) {
+      return "LTF seiring dengan HTF (" + primary.side + "), momentum berlapis menyokong arah utama.";
+    }
+    if (opp.length === ltf.length) {
+      return "Semua LTF berlawanan dengan HTF. Anggap sebagai fasa counter-trend selagi HTF belum invalid.";
+    }
+    if (opp.length > same.length) {
+      return "LTF lebih cenderung berlawanan HTF. Risiko pullback tinggi; tunggu re-align sebelum agresif.";
+    }
+    return "LTF bercampur tetapi masih condong seiring HTF. Fokus konfirmasi di level HTF utama.";
   }
 
   async function main() {
@@ -227,11 +278,13 @@
         levels: lv,
         stage: stage,
         currentPrice: currentPrice,
+        swingPips: pipDiff(aPrice, bPrice),
       });
     }
 
     analysed.sort(function (a, b) {
       if (b.weight !== a.weight) return b.weight - a.weight;
+      if (b.swingPips !== a.swingPips) return b.swingPips - a.swingPips;
       return a.profile - b.profile;
     });
 
@@ -242,30 +295,33 @@
       return;
     }
 
+    var primary = analysed[0];
     var scoreBuy = 0;
     var scoreSell = 0;
     for (var k = 0; k < analysed.length; k++) {
       var it = analysed[k];
-      var delta = 1;
-      if (it.stage.key === "post_break") delta = 2;
-      if (it.stage.key === "checkpoint") delta = 3;
-      if (it.stage.key === "extended") delta = 4;
+      var delta = stageScore(it.stage.key);
       if (it.side === "BUY") scoreBuy += it.weight * delta;
       else scoreSell += it.weight * delta;
     }
-    if (scoreBuy > scoreSell) setBias("BUY BIAS", "buy");
-    else if (scoreSell > scoreBuy) setBias("SELL BIAS", "sell");
-    else setBias("MIXED", "");
+    var biasText = primary.side + " BIAS (HTF Anchor)";
+    var biasClass = primary.side === "BUY" ? "buy" : "sell";
+    if (scoreBuy === scoreSell) {
+      biasText = "MIXED (HTF " + primary.side + ")";
+      biasClass = "";
+    }
+    setBias(biasText, biasClass);
 
     metaEl.textContent =
       "Current price: " + (Number.isFinite(currentPrice) ? f2(currentPrice) : "-") +
-      " | Profiles analysed: " + analysed.length;
+      " | Profiles analysed: " + analysed.length +
+      " | Anchor: P#" + primary.profile + " " + primary.tf.toUpperCase();
 
-    var primary = analysed[0];
     var summary = [];
-    summary.push("Primary reference: Profile #" + primary.profile + " (" + primary.tf.toUpperCase() + ", " + primary.side + ").");
-    summary.push("Focus level: 1.0 (breakout), kemudian 1.382 dan 1.618 untuk continuation.");
-    summary.push("Level 0.5 dipantau sebagai zon risk tinggi untuk retrace.");
+    summary.push("Rujukan utama: Profile #" + primary.profile + " (" + primary.tf.toUpperCase() + ", " + primary.side + ", swing " + primary.swingPips.toFixed(1) + " pips).");
+    summary.push(primaryNarrative(primary));
+    summary.push(ltfAlignmentNarrative(primary, analysed));
+    summary.push("Level fokus FE: 0.5, 1.0, 1.382, 1.618. Level lain (0/0.618/0.786/2.618+) kekal dipantau sebagai konteks lanjutan.");
     summaryListEl.innerHTML = summary.map(function (s) { return "<li>" + s + "</li>"; }).join("");
 
     profilesEl.innerHTML = analysed.map(cardHtml).join("");
