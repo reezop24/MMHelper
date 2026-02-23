@@ -20,9 +20,71 @@
   var TF_WEIGHT = { w1: 60, d1: 50, h4: 40, h1: 30, m30: 20, m15: 10 };
   var KEY_LEVELS = ["0.5", "1", "1.382", "1.618"];
   var PIP_SIZE = 0.10;
+  var CONFLUENCE_BAND_PIPS = 50;
 
   function f2(v) { return Number(v || 0).toFixed(2); }
   function pipDiff(a, b) { return Math.abs(Number(a) - Number(b)) / PIP_SIZE; }
+  function levelLabel(k) { return k === "1" ? "1.0" : String(k); }
+  function levelText(k, price, pips, mode) {
+    var cls = "price-hl";
+    if (mode === "warn") cls = "price-warn";
+    if (mode === "bad") cls = "price-bad";
+    return "L" + levelLabel(k) + " @ <span class=\"" + cls + "\">" + f2(price) + "</span> (" + (Number.isFinite(pips) ? pips.toFixed(1) : "-") + " pips)";
+  }
+
+  function computeBosAndCollected(side, levels, rowsFromSetup) {
+    var out = { bosBroken: false, collected: {} };
+    KEY_LEVELS.forEach(function (k) { out.collected[k] = 0; });
+    var rows = Array.isArray(rowsFromSetup) ? rowsFromSetup : [];
+    if (!rows.length) return out;
+
+    var l1 = Number(levels["1"]);
+    if (!Number.isFinite(l1)) return out;
+
+    var bosIdx = -1;
+    for (var i = 0; i < rows.length; i++) {
+      var h = Number(rows[i].high);
+      var l = Number(rows[i].low);
+      if (!Number.isFinite(h) || !Number.isFinite(l)) continue;
+      if ((side === "BUY" && h >= l1) || (side === "SELL" && l <= l1)) {
+        bosIdx = i;
+        break;
+      }
+    }
+    if (bosIdx < 0) return out;
+
+    out.bosBroken = true;
+    var postBos = rows.slice(bosIdx);
+    var touchBand = 5.0; // 50 pips
+    var moveBand = 10.0; // 100 pips
+
+    KEY_LEVELS.forEach(function (k) {
+      var lv = Number(levels[k]);
+      if (!Number.isFinite(lv)) return;
+      var state = "seek_touch";
+      var count = 0;
+      for (var r = 0; r < postBos.length; r++) {
+        var row = postBos[r];
+        var high = Number(row.high);
+        var low = Number(row.low);
+        var close = Number(row.close);
+        if (!Number.isFinite(high) || !Number.isFinite(low) || !Number.isFinite(close)) continue;
+        var touched = high >= (lv - touchBand) && low <= (lv + touchBand);
+        if (state === "seek_touch") {
+          if (touched) state = "seek_move";
+          continue;
+        }
+        if (state === "seek_move") {
+          if (Math.abs(close - lv) >= moveBand) {
+            count += 1;
+            state = "seek_touch";
+          }
+        }
+      }
+      out.collected[k] = count;
+    });
+    return out;
+  }
 
   function normalizeTs(raw) {
     var s = String(raw || "").trim();
@@ -191,11 +253,14 @@
     var dist1 = Number.isFinite(info.currentPrice) ? pipDiff(info.currentPrice, lvl["1"]) : NaN;
     var lvRows = KEY_LEVELS.map(function (k) {
       var d = Number.isFinite(info.currentPrice) ? pipDiff(info.currentPrice, lvl[k]) : NaN;
+      var collected = (info.collectedByLevel && Number(info.collectedByLevel[k])) || 0;
+      var collectedClass = collected > 0 ? " collected" : "";
       return (
-        '<div class="level">' +
+        '<div class="level' + collectedClass + '">' +
         '<div class="lv-name">Level ' + k + "</div>" +
         '<div class="lv-price">' + f2(lvl[k]) + "</div>" +
         '<div class="lv-dist">Jarak: ' + (Number.isFinite(d) ? (d.toFixed(1) + " pips") : "-") + "</div>" +
+        '<div class="lv-collect">ZON COLLECTED : ' + (info.bosBroken ? String(collected) : "-") + "</div>" +
         "</div>"
       );
     }).join("");
@@ -203,11 +268,15 @@
       '<article class="profile-card">' +
       '<div class="row">' +
       '<div class="title">Profile #' + info.profile + " - " + info.tf.toUpperCase() + "</div>" +
+      '<div class="row">' +
       '<div class="pill ' + info.side.toLowerCase() + '">' + info.side + "</div>" +
+      '<div class="pill ' + (info.bosBroken ? "buy" : "") + '">' + "BOS: " + (info.bosBroken ? "YES" : "NO") + "</div>" +
+      "</div>" +
       "</div>" +
       '<div class="sub">Priority weight: ' + info.weight + " | Stage: " + info.stage.text + "</div>" +
-      '<div class="sub">Structure size (A-B): ' + info.swingPips.toFixed(1) + " pips</div>" +
       '<div class="sub">Level 1 distance: ' + (Number.isFinite(dist1) ? (dist1.toFixed(1) + " pips") : "-") + "</div>" +
+      '<div class="sub">Entry terdekat: ' + info.nearestEntryText + " | Target seterusnya: " + info.nextCheckpointText + "</div>" +
+      '<div class="sub">Breakout zone: ' + info.breakoutText + " | Invalid: " + info.invalidStatus.text + "</div>" +
       '<div class="levels">' + lvRows + "</div>" +
       "</article>"
     );
@@ -238,14 +307,14 @@
 
     if (item.side === "BUY") {
       if (cp < l05) return "TF utama BUY: harga masih di bawah 0.5, struktur belum pulih penuh dan retrace masih dominan.";
-      if (cp < l10) return "TF utama BUY: harga sudah lepasi 0.5 tetapi belum break 1.0, jangkaan asas ialah uji 1.0 dahulu.";
+      if (cp < l10) return "TF utama BUY: harga masih di bawah 1.0, fokus utama ialah re-test breakout zone 1.0 (kawasan rejection/confirmation) sebelum checkpoint 1.382-1.618.";
       if (cp < l138) return "TF utama BUY: level 1.0 sudah break, peluang sambung ke 1.382 masih terbuka sebelum nilai 1.618.";
       if (cp <= l161) return "TF utama BUY: harga berada di zon 1.382-1.618, ini kawasan continuation atau mula rejection.";
       return "TF utama BUY: harga sudah melepasi 1.618, extension kuat; monitor potensi reversal/new structure.";
     }
 
     if (cp > l05) return "TF utama SELL: harga masih di atas 0.5, struktur belum bearish penuh dan retrace masih dominan.";
-    if (cp > l10) return "TF utama SELL: harga sudah lepasi 0.5 tetapi belum break 1.0, jangkaan asas ialah uji 1.0 dahulu.";
+    if (cp > l10) return "TF utama SELL: harga masih di atas 1.0, fokus utama ialah re-test breakout zone 1.0 (kawasan rejection/confirmation) sebelum checkpoint 1.382-1.618.";
     if (cp > l138) return "TF utama SELL: level 1.0 sudah break, peluang sambung ke 1.382 masih terbuka sebelum nilai 1.618.";
     if (cp >= l161) return "TF utama SELL: harga berada di zon 1.382-1.618, ini kawasan continuation atau mula rejection.";
     return "TF utama SELL: harga sudah melepasi 1.618, extension kuat; monitor potensi reversal/new structure.";
@@ -266,6 +335,147 @@
       return "LTF lebih cenderung berlawanan HTF. Risiko pullback tinggi; tunggu re-align sebelum agresif.";
     }
     return "LTF bercampur tetapi masih condong seiring HTF. Fokus konfirmasi di level HTF utama.";
+  }
+
+  function invalidByExtension(side, cp, lv) {
+    var l2618 = Number(lv["2.618"]);
+    var l3618 = Number(lv["3.618"]);
+    var l4236 = Number(lv["4.236"]);
+    if (![l2618, l3618, l4236, cp].every(Number.isFinite)) {
+      return { key: "unknown", text: "unknown" };
+    }
+    if (side === "BUY") {
+      if (cp >= l4236) return { key: "ext_done", text: "EXT done (>=4.236)" };
+      if (cp >= l3618) return { key: "ext_high", text: "High extension (>=3.618)" };
+      if (cp >= l2618) return { key: "entry_invalid", text: "Entry zone invalid (>=2.618)" };
+      return { key: "valid", text: "Valid" };
+    }
+    if (cp <= l4236) return { key: "ext_done", text: "EXT done (<=4.236)" };
+    if (cp <= l3618) return { key: "ext_high", text: "High extension (<=3.618)" };
+    if (cp <= l2618) return { key: "entry_invalid", text: "Entry zone invalid (<=2.618)" };
+    return { key: "valid", text: "Valid" };
+  }
+
+  function ltfHtfConfluence(ltf, htf) {
+    var ext = ["2.618", "3.618", "4.236"];
+    var htfZones = ["0.5", "1", "1.382", "1.618"];
+    var best = null;
+    for (var i = 0; i < ext.length; i++) {
+      var ek = ext[i];
+      var ev = Number(ltf.levels[ek]);
+      if (!Number.isFinite(ev)) continue;
+      for (var j = 0; j < htfZones.length; j++) {
+        var hk = htfZones[j];
+        var hv = Number(htf.levels[hk]);
+        if (!Number.isFinite(hv)) continue;
+        var d = pipDiff(ev, hv);
+        if (d <= CONFLUENCE_BAND_PIPS && (!best || d < best.pips)) {
+          best = { extKey: ek, extPrice: ev, htfKey: hk, htfPrice: hv, pips: d };
+        }
+      }
+    }
+    return best;
+  }
+
+  function nearestEntryAndCheckpoint(side, cp, lv) {
+    var entries = ["0.5", "0.618", "0.786", "1"];
+    var checkpoints = ["1.382", "1.618", "2.618"];
+    var nearestEntry = entries[0];
+    var nearestEntryPips = Number.POSITIVE_INFINITY;
+    for (var i = 0; i < entries.length; i++) {
+      var ek = entries[i];
+      var ev = Number(lv[ek]);
+      if (!Number.isFinite(ev) || !Number.isFinite(cp)) continue;
+      var d = pipDiff(cp, ev);
+      if (d < nearestEntryPips) {
+        nearestEntryPips = d;
+        nearestEntry = ek;
+      }
+    }
+
+    var l1 = Number(lv["1"]);
+    var l05 = Number(lv["0.5"]);
+    var l0786 = Number(lv["0.786"]);
+    var level1Broken = Number.isFinite(cp) && Number.isFinite(l1) ? (side === "BUY" ? (cp >= l1) : (cp <= l1)) : false;
+    var atBandPips = 5.0;
+
+    // Friendly nearest-entry text: if currently at level, mark as "sedang berada".
+    var nearestEntryVal = Number(lv[nearestEntry]);
+    var nearestEntryLabel = levelText(nearestEntry, nearestEntryVal, nearestEntryPips, "");
+    if (Number.isFinite(nearestEntryPips) && nearestEntryPips <= atBandPips) {
+      nearestEntryLabel = "Sedang di " + levelText(nearestEntry, nearestEntryVal, nearestEntryPips, "warn");
+    }
+
+    if (!level1Broken) {
+      var nextNoBosKey = "1";
+      if (side === "BUY") {
+        if (Number.isFinite(l05) && cp < l05) nextNoBosKey = "0.5";
+        else if (Number.isFinite(l0786) && cp < l0786) nextNoBosKey = "0.786";
+        else nextNoBosKey = "1";
+      } else {
+        if (Number.isFinite(l05) && cp > l05) nextNoBosKey = "0.5";
+        else if (Number.isFinite(l0786) && cp > l0786) nextNoBosKey = "0.786";
+        else nextNoBosKey = "1";
+      }
+      var nextNoBosVal = Number(lv[nextNoBosKey]);
+      var nextNoBosPips = Number.isFinite(cp) && Number.isFinite(nextNoBosVal) ? pipDiff(cp, nextNoBosVal) : NaN;
+      if (nextNoBosKey === nearestEntry && nextNoBosKey === "0.786") {
+        nextNoBosKey = "1";
+        nextNoBosVal = Number(lv[nextNoBosKey]);
+        nextNoBosPips = Number.isFinite(cp) && Number.isFinite(nextNoBosVal) ? pipDiff(cp, nextNoBosVal) : NaN;
+      }
+      var nextNoBosText = nextNoBosKey === "1"
+        ? "Breakout zone " + levelText("1", Number(lv["1"]), nextNoBosPips, "warn")
+        : levelText(nextNoBosKey, nextNoBosVal, nextNoBosPips, "");
+      var l1p = Number.isFinite(cp) && Number.isFinite(l1) ? pipDiff(cp, l1) : NaN;
+      return {
+        nearestEntryText: nearestEntryLabel,
+        nextCheckpointText: nextNoBosText,
+        nearestEntryKey: nearestEntry,
+        nearestEntryPips: nearestEntryPips,
+        nextCheckpointKey: nextNoBosKey,
+        nextCheckpointPips: Number.isFinite(nextNoBosPips) ? nextNoBosPips : l1p,
+        bosBroken: false,
+      };
+    }
+
+    var nextCp = checkpoints[0];
+    var nextCpPips = Number.POSITIVE_INFINITY;
+    for (var j = 0; j < checkpoints.length; j++) {
+      var ck = checkpoints[j];
+      var cv = Number(lv[ck]);
+      if (!Number.isFinite(cv) || !Number.isFinite(cp)) continue;
+      if (side === "BUY") {
+        if (cv >= cp) {
+          var dBuy = pipDiff(cp, cv);
+          if (dBuy < nextCpPips) {
+            nextCpPips = dBuy;
+            nextCp = ck;
+          }
+        }
+      } else if (cv <= cp) {
+        var dSell = pipDiff(cp, cv);
+        if (dSell < nextCpPips) {
+          nextCpPips = dSell;
+          nextCp = ck;
+        }
+      }
+    }
+
+    if (!Number.isFinite(nextCpPips)) {
+      var fallback = Number(lv[nextCp]);
+      nextCpPips = Number.isFinite(fallback) && Number.isFinite(cp) ? pipDiff(cp, fallback) : NaN;
+    }
+
+    return {
+      nearestEntryText: nearestEntryLabel,
+      nextCheckpointText: levelText(nextCp, Number(lv[nextCp]), nextCpPips, ""),
+      nearestEntryKey: nearestEntry,
+      nearestEntryPips: nearestEntryPips,
+      nextCheckpointKey: nextCp,
+      nextCheckpointPips: nextCpPips,
+      bosBroken: true,
+    };
   }
 
   async function main() {
@@ -317,6 +527,14 @@
 
       var lv = computeLevels(v.side, aPrice, bPrice, cPrice);
       var stage = stageForProfile(v.side, currentPrice, lv);
+      var target = nearestEntryAndCheckpoint(v.side, currentPrice, lv);
+      var invalidStatus = invalidByExtension(v.side, currentPrice, lv);
+      var cTs = parseUtcDate(c.time || c.ts || "").getTime();
+      var rowsFromSetup = cset.filter(function (row) {
+        var t = parseUtcDate(row.time || row.ts || "").getTime();
+        return Number.isFinite(t) && Number.isFinite(cTs) && t >= cTs;
+      });
+      var bosCollected = computeBosAndCollected(v.side, lv, rowsFromSetup);
       analysed.push({
         profile: v.profile,
         tf: v.tf,
@@ -325,13 +543,22 @@
         levels: lv,
         stage: stage,
         currentPrice: currentPrice,
-        swingPips: pipDiff(aPrice, bPrice),
+        nearestEntryText: target.nearestEntryText,
+        nextCheckpointText: target.nextCheckpointText,
+        nearestEntryKey: target.nearestEntryKey,
+        nearestEntryPips: target.nearestEntryPips,
+        nextCheckpointKey: target.nextCheckpointKey,
+        nextCheckpointPips: target.nextCheckpointPips,
+        bosBroken: Boolean(bosCollected.bosBroken),
+        breakoutText: levelText("1", Number(lv["1"]), pipDiff(currentPrice, Number(lv["1"])), bosCollected.bosBroken ? "" : "warn"),
+        invalidStatus: invalidStatus,
+        collectedByLevel: bosCollected.collected,
       });
     }
 
     analysed.sort(function (a, b) {
       if (b.weight !== a.weight) return b.weight - a.weight;
-      if (b.swingPips !== a.swingPips) return b.swingPips - a.swingPips;
+      if (a.nextCheckpointPips !== b.nextCheckpointPips) return a.nextCheckpointPips - b.nextCheckpointPips;
       return a.profile - b.profile;
     });
 
@@ -365,9 +592,34 @@
       " | Anchor: P#" + primary.profile + " " + primary.tf.toUpperCase();
 
     var summary = [];
-    summary.push("Rujukan utama: Profile #" + primary.profile + " (" + primary.tf.toUpperCase() + ", " + primary.side + ", swing " + primary.swingPips.toFixed(1) + " pips).");
+    summary.push("Rujukan utama: Profile #" + primary.profile + " (" + primary.tf.toUpperCase() + ", " + primary.side + ").");
     summary.push(primaryNarrative(primary));
     summary.push(ltfAlignmentNarrative(primary, analysed));
+    summary.push("Jarak semasa (HTF utama): breakout zone " + primary.breakoutText + " | checkpoint seterusnya " + primary.nextCheckpointText + " | entry terdekat " + primary.nearestEntryText + ".");
+    var ltf = analysed.filter(function (x) { return x.profile !== primary.profile && x.weight < primary.weight; });
+    if (ltf.length) {
+      var ltfInvalid = ltf.filter(function (x) { return x.invalidStatus && x.invalidStatus.key !== "valid"; });
+      if (ltfInvalid.length) {
+        summary.push("LTF invalid check: " + ltfInvalid.map(function (x) {
+          return "P#" + x.profile + " " + x.tf.toUpperCase() + " (" + x.side + ") = " + x.invalidStatus.text;
+        }).join(" | "));
+      } else {
+        summary.push("LTF invalid check: tiada invalid extension kritikal setakat ini.");
+      }
+      var confluenceMsgs = [];
+      for (var ci = 0; ci < ltf.length; ci++) {
+        var conf = ltfHtfConfluence(ltf[ci], primary);
+        if (!conf) continue;
+        confluenceMsgs.push(
+          "P#" + ltf[ci].profile + " L" + conf.extKey + " @" + f2(conf.extPrice) +
+          " cross HTF L" + levelLabel(conf.htfKey) + " @" + f2(conf.htfPrice) +
+          " (" + conf.pips.toFixed(1) + " pips)"
+        );
+      }
+      summary.push(confluenceMsgs.length
+        ? ("Cross-zone (LTF ext vs HTF zone): " + confluenceMsgs.join(" | "))
+        : "Cross-zone (LTF ext vs HTF zone): tiada confluence rapat dalam 50 pips.");
+    }
     summary.push("Level fokus FE: 0.5, 1.0, 1.382, 1.618. Level lain (0/0.618/0.786/2.618+) kekal dipantau sebagai konteks lanjutan.");
     summaryListEl.innerHTML = summary.map(function (s) { return "<li>" + s + "</li>"; }).join("");
 
