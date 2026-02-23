@@ -730,9 +730,10 @@
     }
   }
 
-  function computeBreakoutVisual(side, level1, currentPrice) {
+  function computeBreakoutVisual(side, level1, currentPrice, rowsFromSetup) {
     var lv = Number(level1);
     var cp = Number(currentPrice);
+    var rows = Array.isArray(rowsFromSetup) ? rowsFromSetup : [];
     if (!Number.isFinite(lv)) {
       return null;
     }
@@ -750,10 +751,10 @@
 
     var everBrokenByCandles = false;
     var latestClose = null;
-    if (candles.length) {
-      latestClose = Number(candles[candles.length - 1].close);
-      for (var i = 0; i < candles.length; i++) {
-        var r = candles[i];
+    if (rows.length) {
+      latestClose = Number(rows[rows.length - 1].close);
+      for (var i = 0; i < rows.length; i++) {
+        var r = rows[i];
         var h = Number(r.high);
         var l = Number(r.low);
         if (!Number.isFinite(h) || !Number.isFinite(l)) continue;
@@ -773,6 +774,7 @@
       return {
         lineColor: "#ffffff",
         labelColor: "#ffffff",
+        broken: false,
       };
     }
 
@@ -794,10 +796,11 @@
     return {
       lineColor: lineColor,
       labelColor: labelColor,
+      broken: true,
     };
   }
 
-  function updateBreakoutLine(level1, side, currentPrice) {
+  function updateBreakoutLine(level1, side, currentPrice, rowsFromSetup) {
     if (!candleSeries) return;
     var lv = Number(level1);
     if (!Number.isFinite(lv)) {
@@ -811,7 +814,7 @@
       }
       return;
     }
-    var visual = computeBreakoutVisual(side, lv, currentPrice) || { lineColor: "#ffffff", labelColor: "#ffffff" };
+    var visual = computeBreakoutVisual(side, lv, currentPrice, rowsFromSetup) || { lineColor: "#ffffff", labelColor: "#ffffff", broken: false };
     if (!breakoutLevelLine) {
       breakoutLevelLine = candleSeries.createPriceLine({
         price: lv,
@@ -852,7 +855,7 @@
     extensionLevelLines = [];
   }
 
-  function updateExtensionLines(levels, side, currentPrice) {
+  function updateExtensionLines(levels, side, currentPrice, rowsFromSetup, breakoutBroken) {
     clearExtensionLines();
     if (!candleSeries || !levels) return;
 
@@ -863,11 +866,16 @@
       { key: "3.618", label: "Decision 1" },
       { key: "4.236", label: "Decision 2" },
     ];
+    var rows = Array.isArray(rowsFromSetup) ? rowsFromSetup : [];
+    var isBosBroken = Boolean(breakoutBroken);
     for (var i = 0; i < defs.length; i++) {
       var d = defs[i];
+      if (!isBosBroken && i >= 2) {
+        continue;
+      }
       var lv = Number(levels[d.key]);
       if (!Number.isFinite(lv)) continue;
-      var visual = computeBreakoutVisual(side, lv, currentPrice) || { lineColor: "#ffffff", labelColor: "#ffffff" };
+      var visual = computeBreakoutVisual(side, lv, currentPrice, rows) || { lineColor: "#ffffff", labelColor: "#ffffff", broken: false };
       var pl = candleSeries.createPriceLine({
         price: lv,
         color: visual.lineColor,
@@ -1199,8 +1207,13 @@
     var cPrice = side === "BUY" ? Number(cC.low) : Number(cC.high);
     var levelsForLine = computeLevels(side, aPrice, bPrice, cPrice);
     var cp = getCurrentPriceFallback();
-    updateBreakoutLine(levelsForLine["1"], side, cp);
-    updateExtensionLines(levelsForLine, side, cp);
+    var cTs = toChartTime(cC.time || cC.ts || "");
+    var rowsFromSetup = candles.filter(function (row) {
+      return toChartTime(row.time || row.ts || "") >= cTs;
+    });
+    var bosVisual = computeBreakoutVisual(side, levelsForLine["1"], cp, rowsFromSetup) || { broken: false };
+    updateBreakoutLine(levelsForLine["1"], side, cp, rowsFromSetup);
+    updateExtensionLines(levelsForLine, side, cp, rowsFromSetup, Boolean(bosVisual.broken));
     if (!window.FEEngine || typeof window.FEEngine.calculate !== "function") {
       previewTextEl.textContent = "FE engine belum tersedia.";
       return;
