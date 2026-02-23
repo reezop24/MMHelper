@@ -59,6 +59,7 @@
   var candleSeries = null;
   var livePriceLine = null;
   var breakoutLevelLine = null;
+  var extensionLevelLines = [];
   var activePickTarget = "";
   var isTouchDevice = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0);
   var pickTouchStartMs = 0;
@@ -834,6 +835,53 @@
     });
   }
 
+  function clearExtensionLines() {
+    if (!candleSeries) {
+      extensionLevelLines = [];
+      return;
+    }
+    for (var i = 0; i < extensionLevelLines.length; i++) {
+      var ln = extensionLevelLines[i];
+      if (!ln) continue;
+      try {
+        candleSeries.removePriceLine(ln);
+      } catch (_) {
+        // ignore
+      }
+    }
+    extensionLevelLines = [];
+  }
+
+  function updateExtensionLines(levels, side, currentPrice) {
+    clearExtensionLines();
+    if (!candleSeries || !levels) return;
+
+    var defs = [
+      { key: "1.382", label: "Checkpoint 1" },
+      { key: "1.618", label: "Checkpoint 2" },
+      { key: "2.618", label: "Checkpoint 3" },
+      { key: "3.618", label: "Decision 1" },
+      { key: "4.236", label: "Decision 2" },
+    ];
+    for (var i = 0; i < defs.length; i++) {
+      var d = defs[i];
+      var lv = Number(levels[d.key]);
+      if (!Number.isFinite(lv)) continue;
+      var visual = computeBreakoutVisual(side, lv, currentPrice) || { lineColor: "#ffffff", labelColor: "#ffffff" };
+      var pl = candleSeries.createPriceLine({
+        price: lv,
+        color: visual.lineColor,
+        lineWidth: 1,
+        lineStyle: window.LightweightCharts.LineStyle.Dashed,
+        axisLabelVisible: true,
+        axisLabelColor: visual.labelColor,
+        axisLabelTextColor: "#ffffff",
+        title: d.label,
+      });
+      extensionLevelLines.push(pl);
+    }
+  }
+
   function clearABCMarkers() {
     setChartInteractionLocked(false);
     abcPointsCache = [];
@@ -1128,6 +1176,7 @@
     if (side !== "BUY" && side !== "SELL") {
       refreshABCPickVisuals("", false);
       updateBreakoutLine(NaN, "", NaN);
+      clearExtensionLines();
       previewTextEl.textContent = "Sila pilih trend dulu (Uptrend / Downtrend).";
       return;
     }
@@ -1139,6 +1188,7 @@
     if (!aC || !bC || !cC) {
       refreshABCPickVisuals(side, false);
       updateBreakoutLine(NaN, "", NaN);
+      clearExtensionLines();
       previewTextEl.textContent = "Sila isi Point A/B/C dulu.\nPastikan tarikh/masa wujud dalam candle timeframe dipilih.";
       return;
     }
@@ -1148,7 +1198,9 @@
     var bPrice = side === "BUY" ? Number(bC.high) : Number(bC.low);
     var cPrice = side === "BUY" ? Number(cC.low) : Number(cC.high);
     var levelsForLine = computeLevels(side, aPrice, bPrice, cPrice);
-    updateBreakoutLine(levelsForLine["1"], side, getCurrentPriceFallback());
+    var cp = getCurrentPriceFallback();
+    updateBreakoutLine(levelsForLine["1"], side, cp);
+    updateExtensionLines(levelsForLine, side, cp);
     if (!window.FEEngine || typeof window.FEEngine.calculate !== "function") {
       previewTextEl.textContent = "FE engine belum tersedia.";
       return;
