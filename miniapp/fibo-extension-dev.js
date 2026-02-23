@@ -365,8 +365,8 @@
     chart = window.LightweightCharts.createChart(chartBoxEl, {
       width: chartWrapEl.clientWidth,
       height: chartWrapEl.clientHeight,
-      attributionLogo: false,
       layout: {
+        attributionLogo: false,
         background: { color: "#0b1220" },
         textColor: "#9ca3af",
       },
