@@ -32,6 +32,7 @@
   var aTimeEl = document.getElementById("aTime");
   var bTimeEl = document.getElementById("bTime");
   var cTimeEl = document.getElementById("cTime");
+  var dragModeBtn = document.getElementById("dragModeBtn");
   var pickABtn = document.getElementById("pickABtn");
   var pickBBtn = document.getElementById("pickBBtn");
   var pickCBtn = document.getElementById("pickCBtn");
@@ -43,6 +44,8 @@
   var crosshairInfoEl = document.getElementById("crosshairInfo");
   var chartWrapEl = document.getElementById("chartWrap");
   var chartBoxEl = document.getElementById("chartBox");
+  var abcOverlayEl = document.getElementById("abcOverlay");
+  var dragHudEl = document.getElementById("dragHud");
 
   var candles = [];
   var latestPrice = null;
@@ -55,12 +58,22 @@
   var chart = null;
   var candleSeries = null;
   var livePriceLine = null;
+  var breakoutLevelLine = null;
+  var extensionLevelLines = [];
   var activePickTarget = "";
   var isTouchDevice = ("ontouchstart" in window) || (navigator.maxTouchPoints > 0);
   var pickTouchStartMs = 0;
   var pickTouchStartX = 0;
   var pickTouchMoved = false;
   var pickCandidateTime = 0;
+  var abcPointsCache = [];
+  var pickedRows = { A: null, B: null, C: null };
+  var currentChartData = [];
+  var overlaySyncTimer = null;
+  var isDraggingPoint = false;
+  var dragPointLabel = "";
+  var chartInteractionLocked = false;
+  var dragModeEnabled = false;
   var builtinCandles = {
     h4: [
       { time: "2026-02-18 23:00:00", open: 4961.2, high: 4978.3, low: 4958.9, close: 4970.1 },
@@ -87,6 +100,7 @@
   };
   var INTRADAY_TF = { m15: true, m30: true, h1: true, h4: true };
   var TF_LIMITS = { m15: 500, m30: 400, h1: 350, h4: 260, d1: 220, w1: 180 };
+  var TF_SECONDS = { m15: 900, m30: 1800, h1: 3600, h4: 14400, d1: 86400, w1: 604800 };
 
   function f2(v) {
     return Number(v || 0).toFixed(2);
@@ -365,8 +379,8 @@
     chart = window.LightweightCharts.createChart(chartBoxEl, {
       width: chartWrapEl.clientWidth,
       height: chartWrapEl.clientHeight,
-      attributionLogo: false,
       layout: {
+        attributionLogo: false,
         background: { color: "#0b1220" },
         textColor: "#9ca3af",
       },
@@ -405,7 +419,7 @@
         mode: window.LightweightCharts.CrosshairMode.Normal,
       },
     });
-    candleSeries = chart.addCandlestickSeries({
+    var candleOptions = {
       upColor: "#16a34a",
       downColor: "#dc2626",
       borderVisible: false,
@@ -413,8 +427,19 @@
       wickDownColor: "#dc2626",
       priceLineVisible: true,
       lastValueVisible: true,
-    });
-
+    };
+    if (typeof chart.addCandlestickSeries === "function") {
+      candleSeries = chart.addCandlestickSeries(candleOptions);
+    } else if (
+      typeof chart.addSeries === "function" &&
+      window.LightweightCharts &&
+      window.LightweightCharts.CandlestickSeries
+    ) {
+      candleSeries = chart.addSeries(window.LightweightCharts.CandlestickSeries, candleOptions);
+    } else {
+      previewTextEl.textContent = "Chart library tak support candlestick series.";
+      return;
+    }
     chart.subscribeCrosshairMove(function (param) {
       if (!param || !param.time || !candleSeries) {
         crosshairInfoEl.textContent = "Crosshair: -";
@@ -447,13 +472,35 @@
       assignPickFromChartTime(param.time, "chart_click");
     });
 
+    var timeScale = chart.timeScale();
+    if (timeScale && typeof timeScale.subscribeVisibleLogicalRangeChange === "function") {
+      timeScale.subscribeVisibleLogicalRangeChange(function () {
+        renderABCOverlay();
+      });
+    }
+    if (timeScale && typeof timeScale.subscribeVisibleTimeRangeChange === "function") {
+      timeScale.subscribeVisibleTimeRangeChange(function () {
+        renderABCOverlay();
+      });
+    }
+
     window.addEventListener("resize", function () {
       if (!chart) return;
       chart.applyOptions({
         width: chartWrapEl.clientWidth,
         height: chartWrapEl.clientHeight,
       });
+      renderABCOverlay();
     });
+
+    if (!overlaySyncTimer) {
+      overlaySyncTimer = setInterval(function () {
+        if (!chart) return;
+        if (!abcPointsCache.length) return;
+        if (isDraggingPoint) return;
+        renderABCOverlay();
+      }, 250);
+    }
   }
 
   function findNearestCandleByChartTime(rawTime) {
@@ -474,28 +521,160 @@
     return nearest;
   }
 
+  function _handlePositions() {
+    var out = [];
+    if (!chart || !candleSeries) return out;
+    for (var i = 0; i < abcPointsCache.length; i++) {
+      var p = abcPointsCache[i];
+      var x = chart.timeScale().timeToCoordinate(p.time);
+      var y = candleSeries.priceToCoordinate(p.value);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+      out.push({ label: p.label, x: x, y: y });
+    }
+    return out;
+  }
+
+  function _findHandleNear(x, y) {
+    var hs = _handlePositions();
+    var best = null;
+    var bestD = Number.POSITIVE_INFINITY;
+    for (var i = 0; i < hs.length; i++) {
+      var h = hs[i];
+      var dx = Number(h.x) - Number(x);
+      var dy = Number(h.y) - Number(y);
+      var d = Math.sqrt(dx * dx + dy * dy);
+      if (d < bestD) {
+        bestD = d;
+        best = h;
+      }
+    }
+    if (!best || bestD > 26) return null;
+    return best;
+  }
+
+  function _updatePointInputsFromRow(label, row) {
+    if (!row) return;
+    var p = toMYTParts(row.time || row.ts || "");
+    if (!p) return;
+    var tf = String(tfEl.value || "").toLowerCase();
+    var intraday = Boolean(INTRADAY_TF[tf]);
+    if (label === "A") {
+      aDateEl.value = p.date;
+      if (intraday) aTimeEl.value = p.time;
+    } else if (label === "B") {
+      bDateEl.value = p.date;
+      if (intraday) bTimeEl.value = p.time;
+    } else if (label === "C") {
+      cDateEl.value = p.date;
+      if (intraday) cTimeEl.value = p.time;
+    }
+  }
+
+  function setDragHud(show, text) {
+    if (!dragHudEl) return;
+    dragHudEl.textContent = String(text || "");
+    dragHudEl.classList.toggle("show", Boolean(show));
+  }
+
+  function hudTextForRow(label, row) {
+    if (!row) return "Dragging Point " + String(label || "");
+    var side = String(trendEl.value || "").toUpperCase();
+    var price = _pointValueBySide(side, label, row);
+    var p = toMYTParts(row.time || row.ts || "");
+    var t = p ? (p.full + " MYT") : normalizeTs(row.time || row.ts || "");
+    return "Dragging " + String(label || "") + " | " + t + " | " + f2(price);
+  }
+
+  function _startDragAtClient(clientX, clientY) {
+    if (!abcPointsCache.length || !chartWrapEl) return false;
+    var rect = chartWrapEl.getBoundingClientRect();
+    var x = clientX - rect.left;
+    var y = clientY - rect.top;
+    var near = _findHandleNear(x, y);
+    if (!near) return false;
+    isDraggingPoint = true;
+    dragPointLabel = String(near.label || "");
+    setChartInteractionLocked(true);
+    var startRow = pickedRows[dragPointLabel] || null;
+    setDragHud(true, hudTextForRow(dragPointLabel, startRow));
+    if (profileStatusEl) profileStatusEl.textContent = "Dragging Point " + dragPointLabel + "...";
+    return true;
+  }
+
+  function _moveDragAtClient(clientX, clientY) {
+    if (!isDraggingPoint || !dragPointLabel || !chartWrapEl || !chart) return;
+    var rect = chartWrapEl.getBoundingClientRect();
+    var x = clientX - rect.left;
+    if (x < 0) x = 0;
+    if (x > rect.width) x = rect.width;
+    var time = chart.timeScale().coordinateToTime(x);
+    if (!time) return;
+    var nearest = findNearestCandleByChartTime(time);
+    if (!nearest) return;
+    pickedRows[dragPointLabel] = nearest;
+    _updatePointInputsFromRow(dragPointLabel, nearest);
+    refreshABCPickVisuals(String(trendEl.value || ""), false);
+    setDragHud(true, hudTextForRow(dragPointLabel, nearest));
+  }
+
+  function _endDrag() {
+    if (!isDraggingPoint) return;
+    isDraggingPoint = false;
+    setChartInteractionLocked(false);
+    setDragHud(false, "");
+    if (profileStatusEl) profileStatusEl.textContent = "Point " + dragPointLabel + " updated via drag.";
+    dragPointLabel = "";
+    renderPreview();
+    saveFormState(false);
+  }
+
+  function setChartInteractionLocked(locked) {
+    if (!chart || chartInteractionLocked === Boolean(locked)) return;
+    chartInteractionLocked = Boolean(locked);
+    var enabled = !chartInteractionLocked;
+    chart.applyOptions({
+      handleScroll: enabled,
+      handleScale: enabled,
+    });
+    if (chartWrapEl) {
+      chartWrapEl.style.touchAction = chartInteractionLocked ? "none" : "";
+      chartWrapEl.style.userSelect = chartInteractionLocked ? "none" : "";
+      chartWrapEl.style.cursor = chartInteractionLocked ? "grabbing" : "";
+    }
+  }
+
   function assignPickFromChartTime(rawTime, source) {
     if (!activePickTarget) return;
+    var currentTarget = activePickTarget;
     var nearest = findNearestCandleByChartTime(rawTime);
     if (!nearest) return;
     var p = toMYTParts(nearest.time || nearest.ts || "");
     if (!p) return;
     var tf = String(tfEl.value || "").toLowerCase();
     var intraday = Boolean(INTRADAY_TF[tf]);
-    if (activePickTarget === "A") {
+    if (currentTarget === "A") {
       aDateEl.value = p.date;
       if (intraday) aTimeEl.value = p.time;
-    } else if (activePickTarget === "B") {
+      pickedRows.A = nearest;
+    } else if (currentTarget === "B") {
       bDateEl.value = p.date;
       if (intraday) bTimeEl.value = p.time;
-    } else if (activePickTarget === "C") {
+      pickedRows.B = nearest;
+    } else if (currentTarget === "C") {
       cDateEl.value = p.date;
       if (intraday) cTimeEl.value = p.time;
+      pickedRows.C = nearest;
     }
+    var nextTarget = "";
+    if (currentTarget === "A") nextTarget = "B";
+    else if (currentTarget === "B") nextTarget = "C";
     if (profileStatusEl) {
-      profileStatusEl.textContent = "Point " + activePickTarget + " set dari chart (" + source + ").";
+      profileStatusEl.textContent = nextTarget
+        ? ("Point " + currentTarget + " set (" + source + "). Seterusnya pilih Point " + nextTarget + ".")
+        : ("Point " + currentTarget + " set (" + source + ").");
     }
-    setPickTarget("");
+    refreshABCPickVisuals(String(trendEl.value || ""), false);
+    setPickTarget(nextTarget);
     saveFormState(false);
     renderPreview();
   }
@@ -504,16 +683,20 @@
     initChart();
     if (!chart || !candleSeries) return;
     var data = buildChartData();
+    currentChartData = data;
     candleSeries.setData(data);
     if (resetView) {
       chart.timeScale().fitContent();
     }
-    if (data.length) {
-      chartInfoEl.textContent = "Chart " + String(tfEl.value || "").toUpperCase() + " | Candles: " + data.length + " | Source: " + dataSource;
-    } else {
-      chartInfoEl.textContent = "Chart " + String(tfEl.value || "").toUpperCase() + " | Candles: 0 | Source: " + dataSource;
-    }
+    var tfLabel = String(tfEl.value || "").toUpperCase();
+    var candleCount = data.length ? data.length : 0;
+    chartInfoEl.innerHTML =
+      "Chart " + tfLabel +
+      " | Candles: " + String(candleCount) +
+      " | " +
+      '<img class="chart-source-logo" src="reezo.png" alt="Reezo" />Chart Engine';
     updateLiveLine();
+    renderABCOverlay();
   }
 
   function updateLiveLine() {
@@ -547,37 +730,335 @@
     }
   }
 
-  function clearABCMarkers() {
-    if (!candleSeries || typeof candleSeries.setMarkers !== "function") return;
-    candleSeries.setMarkers([]);
-  }
-
-  function updateABCMarkersAndFocus(side, aC, bC, cC) {
-    if (!chart || !candleSeries || typeof candleSeries.setMarkers !== "function") return;
-    var aTime = toChartTime(aC.time || aC.ts || "");
-    var bTime = toChartTime(bC.time || bC.ts || "");
-    var cTime = toChartTime(cC.time || cC.ts || "");
-    if (!(aTime > 0 && bTime > 0 && cTime > 0)) {
-      clearABCMarkers();
-      return;
+  function computeBreakoutVisual(side, level1, currentPrice, rowsFromSetup) {
+    var lv = Number(level1);
+    var cp = Number(currentPrice);
+    var rows = Array.isArray(rowsFromSetup) ? rowsFromSetup : [];
+    if (!Number.isFinite(lv)) {
+      return null;
+    }
+    var isBuy = String(side || "").toUpperCase() === "BUY";
+    var isSell = String(side || "").toUpperCase() === "SELL";
+    if (!isBuy && !isSell) {
+      return {
+        lineColor: "#ffffff",
+        labelColor: "#ffffff",
+      };
     }
 
-    var isBuy = side === "BUY";
-    var markers = [
-      { time: aTime, position: isBuy ? "belowBar" : "aboveBar", color: "#60a5fa", shape: "circle", text: "A" },
-      { time: bTime, position: isBuy ? "aboveBar" : "belowBar", color: "#f59e0b", shape: "circle", text: "B" },
-      { time: cTime, position: isBuy ? "belowBar" : "aboveBar", color: "#c084fc", shape: "circle", text: "C" },
-    ];
-    candleSeries.setMarkers(markers);
+    // XAU pip convention used here: 1 pip = 0.10 => 50 pips = 5.00
+    var nearBand = 5.00;
 
-    var minT = Math.min(aTime, bTime, cTime);
-    var maxT = Math.max(aTime, bTime, cTime);
-    var span = Math.max(maxT - minT, 1);
-    var pad = Math.max(Math.floor(span * 0.4), 3600 * 4);
-    chart.timeScale().setVisibleRange({
-      from: minT - pad,
-      to: maxT + pad,
+    var everBrokenByCandles = false;
+    var latestClose = null;
+    if (rows.length) {
+      latestClose = Number(rows[rows.length - 1].close);
+      for (var i = 0; i < rows.length; i++) {
+        var r = rows[i];
+        var h = Number(r.high);
+        var l = Number(r.low);
+        if (!Number.isFinite(h) || !Number.isFinite(l)) continue;
+        if (isBuy && h >= lv) {
+          everBrokenByCandles = true;
+          break;
+        }
+        if (isSell && l <= lv) {
+          everBrokenByCandles = true;
+          break;
+        }
+      }
+    }
+    var brokenNow = Number.isFinite(cp) && (isBuy ? (cp >= lv) : (cp <= lv));
+    var everBroken = everBrokenByCandles || brokenNow;
+    if (!everBroken) {
+      return {
+        lineColor: "#ffffff",
+        labelColor: "#ffffff",
+        broken: false,
+      };
+    }
+
+    var lineColor = "#22c55e";
+    var labelColor = "#22c55e";
+    var nearBreak = Number.isFinite(cp) && Math.abs(cp - lv) <= nearBand;
+    if (nearBreak) {
+      labelColor = "#facc15";
+    }
+
+    // After breakout, if latest candle closes back through level, flag red label.
+    var failedRetest = Number.isFinite(latestClose) && (
+      isBuy ? (latestClose < lv) : (latestClose > lv)
+    );
+    if (failedRetest) {
+      labelColor = "#ef4444";
+    }
+
+    return {
+      lineColor: lineColor,
+      labelColor: labelColor,
+      broken: true,
+    };
+  }
+
+  function updateBreakoutLine(level1, side, currentPrice, rowsFromSetup) {
+    if (!candleSeries) return;
+    var lv = Number(level1);
+    if (!Number.isFinite(lv)) {
+      if (breakoutLevelLine) {
+        try {
+          candleSeries.removePriceLine(breakoutLevelLine);
+        } catch (_) {
+          // ignore
+        }
+        breakoutLevelLine = null;
+      }
+      return;
+    }
+    var visual = computeBreakoutVisual(side, lv, currentPrice, rowsFromSetup) || { lineColor: "#ffffff", labelColor: "#ffffff", broken: false };
+    if (!breakoutLevelLine) {
+      breakoutLevelLine = candleSeries.createPriceLine({
+        price: lv,
+        color: visual.lineColor,
+        lineWidth: 2,
+        lineStyle: window.LightweightCharts.LineStyle.Dashed,
+        axisLabelVisible: true,
+        axisLabelColor: visual.labelColor,
+        axisLabelTextColor: "#0b1220",
+        title: "Breakout Level",
+      });
+      return;
+    }
+    breakoutLevelLine.applyOptions({
+      price: lv,
+      title: "Breakout Level",
+      color: visual.lineColor,
+      axisLabelColor: visual.labelColor,
+      axisLabelTextColor: "#0b1220",
+      lineStyle: window.LightweightCharts.LineStyle.Dashed,
     });
+  }
+
+  function clearExtensionLines() {
+    if (!candleSeries) {
+      extensionLevelLines = [];
+      return;
+    }
+    for (var i = 0; i < extensionLevelLines.length; i++) {
+      var ln = extensionLevelLines[i];
+      if (!ln) continue;
+      try {
+        candleSeries.removePriceLine(ln);
+      } catch (_) {
+        // ignore
+      }
+    }
+    extensionLevelLines = [];
+  }
+
+  function updateExtensionLines(levels, side, currentPrice, rowsFromSetup, breakoutBroken) {
+    clearExtensionLines();
+    if (!candleSeries || !levels) return;
+
+    var defs = [
+      { key: "1.382", label: "Checkpoint 1" },
+      { key: "1.618", label: "Checkpoint 2" },
+      { key: "2.618", label: "Checkpoint 3" },
+      { key: "3.618", label: "Decision 1" },
+      { key: "4.236", label: "Decision 2" },
+    ];
+    var rows = Array.isArray(rowsFromSetup) ? rowsFromSetup : [];
+    var isBosBroken = Boolean(breakoutBroken);
+    for (var i = 0; i < defs.length; i++) {
+      var d = defs[i];
+      if (!isBosBroken && i >= 2) {
+        continue;
+      }
+      var lv = Number(levels[d.key]);
+      if (!Number.isFinite(lv)) continue;
+      var visual = computeBreakoutVisual(side, lv, currentPrice, rows) || { lineColor: "#ffffff", labelColor: "#ffffff", broken: false };
+      var pl = candleSeries.createPriceLine({
+        price: lv,
+        color: visual.lineColor,
+        lineWidth: 1,
+        lineStyle: window.LightweightCharts.LineStyle.Dashed,
+        axisLabelVisible: true,
+        axisLabelColor: visual.labelColor,
+        axisLabelTextColor: "#0b1220",
+        title: d.label,
+      });
+      extensionLevelLines.push(pl);
+    }
+  }
+
+  function clearABCMarkers() {
+    setChartInteractionLocked(false);
+    abcPointsCache = [];
+    pickedRows = { A: null, B: null, C: null };
+    renderABCOverlay();
+  }
+
+  function _pointValueBySide(side, label, row) {
+    if (!row) return null;
+    if (side === "BUY") {
+      if (label === "B") return Number(row.high);
+      return Number(row.low);
+    }
+    if (side === "SELL") {
+      if (label === "B") return Number(row.low);
+      return Number(row.high);
+    }
+    return Number(row.close);
+  }
+
+  function refreshABCPickVisuals(sideHint, focusWhenFull) {
+    if (!chart || !candleSeries) return;
+    var side = String(sideHint || "").toUpperCase();
+    var aRow = pickedRows.A || fetchPointCandle(aDateEl.value, aTimeEl.value);
+    var bRow = pickedRows.B || fetchPointCandle(bDateEl.value, bTimeEl.value);
+    var cRow = pickedRows.C || fetchPointCandle(cDateEl.value, cTimeEl.value);
+
+    var seq = [
+      { label: "A", row: aRow, color: "#60a5fa" },
+      { label: "B", row: bRow, color: "#f59e0b" },
+      { label: "C", row: cRow, color: "#c084fc" },
+    ];
+    var overlayPoints = [];
+    for (var i = 0; i < seq.length; i++) {
+      var item = seq[i];
+      if (!item.row) continue;
+      var t = toChartTime(item.row.time || item.row.ts || "");
+      if (!(t > 0)) continue;
+      var v = _pointValueBySide(side, item.label, item.row);
+      if (!Number.isFinite(v)) continue;
+      overlayPoints.push({
+        time: t,
+        value: v,
+        label: item.label,
+        color: item.color,
+      });
+    }
+    overlayPoints.sort(function (a, b) { return Number(a.time) - Number(b.time); });
+    abcPointsCache = overlayPoints;
+    renderABCOverlay();
+
+    if (focusWhenFull && overlayPoints.length === 3) {
+      var times = overlayPoints.map(function (x) { return x.time; });
+      var minT = Math.min.apply(null, times);
+      var maxT = Math.max.apply(null, times);
+      var span = Math.max(maxT - minT, 1);
+      var pad = Math.max(Math.floor(span * 0.4), 3600 * 4);
+      chart.timeScale().setVisibleRange({
+        from: minT - pad,
+        to: maxT + pad,
+      });
+    }
+  }
+
+  function renderABCOverlay() {
+    if (!abcOverlayEl) return;
+    abcOverlayEl.innerHTML = "";
+    if (!chart || !candleSeries) return;
+
+    var width = chartWrapEl ? chartWrapEl.clientWidth : 0;
+    var height = chartWrapEl ? chartWrapEl.clientHeight : 0;
+    if (!(width > 0 && height > 0)) return;
+
+    var debug = document.createElement("div");
+    debug.style.position = "absolute";
+    debug.style.right = "8px";
+    debug.style.top = "8px";
+    debug.style.fontSize = "10px";
+    debug.style.fontWeight = "700";
+    debug.style.color = "#ffd08c";
+    debug.style.background = "rgba(8, 20, 42, 0.75)";
+    debug.style.border = "1px solid rgba(250, 204, 21, 0.7)";
+    debug.style.borderRadius = "6px";
+    debug.style.padding = "2px 6px";
+    debug.textContent = "ABC overlay alive | pts=" + String(abcPointsCache.length);
+    abcOverlayEl.appendChild(debug);
+
+    if (!abcPointsCache.length) return;
+
+    var svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("width", String(width));
+    svg.setAttribute("height", String(height));
+    svg.setAttribute("viewBox", "0 0 " + String(width) + " " + String(height));
+    svg.style.position = "absolute";
+    svg.style.left = "0";
+    svg.style.top = "0";
+    svg.style.width = "100%";
+    svg.style.height = "100%";
+
+    function xFallbackByTime(ts) {
+      if (!currentChartData.length) return null;
+      var idx = -1;
+      for (var ii = 0; ii < currentChartData.length; ii++) {
+        if (Number(currentChartData[ii].time) === Number(ts)) {
+          idx = ii;
+          break;
+        }
+      }
+      if (idx < 0) return null;
+      if (currentChartData.length === 1) return width / 2;
+      return (idx / (currentChartData.length - 1)) * width;
+    }
+
+    function yFallbackByValue(v) {
+      if (!currentChartData.length) return null;
+      var lows = currentChartData.map(function (r) { return Number(r.low); }).filter(Number.isFinite);
+      var highs = currentChartData.map(function (r) { return Number(r.high); }).filter(Number.isFinite);
+      if (!lows.length || !highs.length) return null;
+      var minV = Math.min.apply(null, lows);
+      var maxV = Math.max.apply(null, highs);
+      var span = maxV - minV;
+      if (!(span > 0)) return height / 2;
+      var n = (Number(v) - minV) / span;
+      return height - (n * height);
+    }
+
+    var pathD = "";
+    var visiblePoints = 0;
+    for (var i = 0; i < abcPointsCache.length; i++) {
+      var p = abcPointsCache[i];
+      var x = chart.timeScale().timeToCoordinate(p.time);
+      var y = candleSeries.priceToCoordinate(p.value);
+      if (!Number.isFinite(x)) x = xFallbackByTime(p.time);
+      if (!Number.isFinite(y)) y = yFallbackByValue(p.value);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+      visiblePoints += 1;
+      pathD += (pathD ? " L " : "M ") + String(x.toFixed(2)) + " " + String(y.toFixed(2));
+    }
+    if (pathD) {
+      var path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", pathD);
+      path.setAttribute("fill", "none");
+      path.setAttribute("stroke", "#facc15");
+      path.setAttribute("stroke-width", "2");
+      path.setAttribute("stroke-dasharray", "6 5");
+      path.setAttribute("opacity", "0.95");
+      svg.appendChild(path);
+    }
+    abcOverlayEl.appendChild(svg);
+
+    for (var j = 0; j < abcPointsCache.length; j++) {
+      var p2 = abcPointsCache[j];
+      var x2 = chart.timeScale().timeToCoordinate(p2.time);
+      var y2 = candleSeries.priceToCoordinate(p2.value);
+      if (!Number.isFinite(x2)) x2 = xFallbackByTime(p2.time);
+      if (!Number.isFinite(y2)) y2 = yFallbackByValue(p2.value);
+      if (!Number.isFinite(x2) || !Number.isFinite(y2)) continue;
+      var tag = document.createElement("div");
+      tag.className = "abc-label " + String(p2.label || "").toLowerCase();
+      tag.textContent = String(p2.label || "");
+      tag.style.left = x2 + "px";
+      tag.style.top = y2 + "px";
+      abcOverlayEl.appendChild(tag);
+    }
+    debug.textContent = "ABC overlay: " + String(abcPointsCache.length) + "/" + String(visiblePoints);
+  }
+
+  function updateABCMarkersAndFocus(side, aC, bC, cC) { // eslint-disable-line no-unused-vars
+    refreshABCPickVisuals(side, true);
   }
 
   function parseUtcDate(raw) {
@@ -699,27 +1180,11 @@
   }
 
   function renderPreview() {
-    function esc(text) {
-      return String(text || "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
-    }
-    function wrapByClass(text, cls) {
-      if (!cls) return esc(text);
-      return '<span class="' + esc(cls) + '">' + esc(text) + "</span>";
-    }
-    function levelLine(zoneName, levelKey, statusText, isInvalid, priceClass, statusClass) {
-      var status = isInvalid
-        ? '<span class="status-invalid">' + esc(statusText) + "</span>"
-        : wrapByClass(statusText, statusClass);
-      var priceText = wrapByClass(f2(levels[levelKey]), priceClass);
-      return "- " + esc(zoneName) + " : " + priceText + " [" + status + "]";
-    }
-
     var side = String(trendEl.value || "").toUpperCase();
     if (side !== "BUY" && side !== "SELL") {
-      clearABCMarkers();
+      refreshABCPickVisuals("", false);
+      updateBreakoutLine(NaN, "", NaN);
+      clearExtensionLines();
       previewTextEl.textContent = "Sila pilih trend dulu (Uptrend / Downtrend).";
       return;
     }
@@ -729,235 +1194,45 @@
     var cC = fetchPointCandle(cDateEl.value, cTimeEl.value);
 
     if (!aC || !bC || !cC) {
-      clearABCMarkers();
+      refreshABCPickVisuals(side, false);
+      updateBreakoutLine(NaN, "", NaN);
+      clearExtensionLines();
       previewTextEl.textContent = "Sila isi Point A/B/C dulu.\nPastikan tarikh/masa wujud dalam candle timeframe dipilih.";
       return;
     }
 
+    updateABCMarkersAndFocus(side, aC, bC, cC);
     var aPrice = side === "BUY" ? Number(aC.low) : Number(aC.high);
     var bPrice = side === "BUY" ? Number(bC.high) : Number(bC.low);
     var cPrice = side === "BUY" ? Number(cC.low) : Number(cC.high);
-    if (!Number.isFinite(aPrice) || !Number.isFinite(bPrice) || !Number.isFinite(cPrice)) {
-      clearABCMarkers();
-      previewTextEl.textContent = "Data candle point tak lengkap untuk kira FE.";
-      return;
-    }
-    updateABCMarkersAndFocus(side, aC, bC, cC);
-
-    var levels = computeLevels(side, aPrice, bPrice, cPrice);
-    var currentPrice = getCurrentPriceFallback();
-    var level1 = Number(levels["1"]);
-    var broken1 = false;
-    if (Number.isFinite(currentPrice)) {
-      broken1 = side === "BUY" ? currentPrice >= level1 : currentPrice <= level1;
-    }
-    var level1382 = Number(levels["1.382"]);
-    var level1618 = Number(levels["1.618"]);
-    var level2618 = Number(levels["2.618"]);
-    var level4236 = Number(levels["4.236"]);
-    var mid1618To2618 = (level1618 + level2618) / 2;
+    var levelsForLine = computeLevels(side, aPrice, bPrice, cPrice);
+    var cp = getCurrentPriceFallback();
     var cTs = toChartTime(cC.time || cC.ts || "");
-    var postC = candles.filter(function (row) {
+    var rowsFromSetup = candles.filter(function (row) {
       return toChartTime(row.time || row.ts || "") >= cTs;
     });
-    var postHigh = null;
-    var postLow = null;
-    if (postC.length) {
-      postHigh = Math.max.apply(null, postC.map(function (r) { return Number(r.high); }).filter(Number.isFinite));
-      postLow = Math.min.apply(null, postC.map(function (r) { return Number(r.low); }).filter(Number.isFinite));
+    var bosVisual = computeBreakoutVisual(side, levelsForLine["1"], cp, rowsFromSetup) || { broken: false };
+    updateBreakoutLine(levelsForLine["1"], side, cp, rowsFromSetup);
+    updateExtensionLines(levelsForLine, side, cp, rowsFromSetup, Boolean(bosVisual.broken));
+    if (!window.FEEngine || typeof window.FEEngine.calculate !== "function") {
+      previewTextEl.textContent = "FE engine belum tersedia.";
+      return;
     }
-    var reached1382 = false;
-    var reached1618 = false;
-    if (Number.isFinite(postHigh) && Number.isFinite(postLow)) {
-      if (side === "BUY") {
-        reached1382 = postHigh >= level1382;
-        reached1618 = postHigh >= level1618;
-      } else {
-        reached1382 = postLow <= level1382;
-        reached1618 = postLow <= level1618;
-      }
+    var result = window.FEEngine.calculate({
+      side: side,
+      tf: String(tfEl.value || ""),
+      candles: candles,
+      aC: aC,
+      bC: bC,
+      cC: cC,
+      currentPrice: getCurrentPriceFallback(),
+      latestTs: latestTs,
+    });
+    if (!result || !result.ok) {
+      previewTextEl.textContent = (result && result.error) ? String(result.error) : "Gagal kira FE.";
+      return;
     }
-    var liveReached1382 = false;
-    var liveReached1618 = false;
-    if (Number.isFinite(currentPrice)) {
-      if (side === "BUY") {
-        liveReached1382 = currentPrice >= level1382;
-        liveReached1618 = currentPrice >= level1618;
-      } else {
-        liveReached1382 = currentPrice <= level1382;
-        liveReached1618 = currentPrice <= level1618;
-      }
-    }
-    var superHighRiskActive = reached1382 || reached1618 || liveReached1382 || liveReached1618;
-    var reachedMidByHistory = false;
-    var broke2618ByHistory = false;
-    if (Number.isFinite(postHigh) && Number.isFinite(postLow)) {
-      if (side === "BUY") {
-        reachedMidByHistory = postHigh >= mid1618To2618;
-        broke2618ByHistory = postHigh >= level2618;
-      } else {
-        reachedMidByHistory = postLow <= mid1618To2618;
-        broke2618ByHistory = postLow <= level2618;
-      }
-    }
-    var reachedMidByLive = false;
-    var broke2618ByLive = false;
-    var broke4236ByLive = false;
-    if (Number.isFinite(currentPrice)) {
-      if (side === "BUY") {
-        reachedMidByLive = currentPrice >= mid1618To2618;
-        broke2618ByLive = currentPrice >= level2618;
-        broke4236ByLive = currentPrice >= level4236;
-      } else {
-        reachedMidByLive = currentPrice <= mid1618To2618;
-        broke2618ByLive = currentPrice <= level2618;
-        broke4236ByLive = currentPrice <= level4236;
-      }
-    }
-    var reachedMidState = reachedMidByHistory || reachedMidByLive;
-    var broke2618State = broke2618ByHistory || broke2618ByLive;
-    var broke4236ByHistory = false;
-    if (Number.isFinite(postHigh) && Number.isFinite(postLow)) {
-      if (side === "BUY") {
-        broke4236ByHistory = postHigh >= level4236;
-      } else {
-        broke4236ByHistory = postLow <= level4236;
-      }
-    }
-    var broke4236State = broke4236ByHistory || broke4236ByLive;
-
-    var sideHtml = side === "BUY"
-      ? '<span class="side-buy">BUY</span>'
-      : '<span class="side-sell">SELL</span>';
-    var lines = [];
-    lines.push("Fibo Extension Preview");
-    lines.push("TF: " + String(tfEl.value).toUpperCase());
-    lines.push("__SIDE__" + side);
-    if (Number.isFinite(currentPrice)) {
-      lines.push("Current price: " + f2(currentPrice) + " (" + (latestTs || "latest") + ")");
-      lines.push("Break Of Structure: " + (broken1 ? "YES" : "NO"));
-    } else {
-      lines.push("Current price: -");
-      lines.push("Break Of Structure: unknown");
-    }
-    lines.push("");
-    var aMyt = toMYTParts(aC.time || aC.ts || "");
-    var bMyt = toMYTParts(bC.time || bC.ts || "");
-    var cMyt = toMYTParts(cC.time || cC.ts || "");
-    lines.push("Point A: " + (aMyt ? (aMyt.full + " MYT") : normalizeTs(aC.time || aC.ts || "")) + " @ " + f2(aPrice));
-    lines.push("Point B: " + (bMyt ? (bMyt.full + " MYT") : normalizeTs(bC.time || bC.ts || "")) + " @ " + f2(bPrice));
-    lines.push("Point C: " + (cMyt ? (cMyt.full + " MYT") : normalizeTs(cC.time || cC.ts || "")) + " @ " + f2(cPrice));
-    lines.push("");
-    if (!broken1) {
-      lines.push("Belum pecah level 1.");
-    }
-
-    var statusMap = {
-      "0": "Anchor",
-      "0.5": "Low Risk",
-      "0.618": "Medium Risk",
-      "0.786": superHighRiskActive ? "Super High Risk" : "High Risk",
-      "1": superHighRiskActive ? "Super High Risk" : "Breakout Risk",
-      "1.382": "Checkpoint",
-      "1.618": "Checkpoint",
-      "2.618": "Checkpoint",
-      "3.618": "Possible Reverse/New Structure",
-      "4.236": "Possible Reverse/New Structure",
-    };
-    var invalidMap = {};
-    var retraceOnlyKeys = ["0.618", "0.786", "1"];
-    if (reachedMidState && !broke2618State) {
-      statusMap["0.5"] = "Super High Risk";
-      statusMap["0"] = "High Risk / Possible Reversal";
-      retraceOnlyKeys.forEach(function (k) {
-        invalidMap[k] = true;
-        statusMap[k] = "INVALID";
-      });
-    }
-    if (broke2618State) {
-      statusMap["0"] = "High Risk / Possible Reversal";
-      statusMap["0.5"] = "Super High Risk";
-      ["0.5", "0.618", "0.786", "1"].forEach(function (k) {
-        invalidMap[k] = true;
-        statusMap[k] = "INVALID";
-      });
-    }
-    if (broke4236State) {
-      ["0", "0.5", "0.618", "0.786", "1", "1.382", "1.618", "2.618", "3.618", "4.236"].forEach(function (k) {
-        invalidMap[k] = true;
-        statusMap[k] = "INVALID";
-      });
-    }
-
-    var extToneMap = {};
-    var extKeys = ["1.382", "1.618", "2.618", "3.618", "4.236"];
-    var postCloseHigh = null;
-    var postCloseLow = null;
-    if (postC.length) {
-      postCloseHigh = Math.max.apply(null, postC.map(function (r) { return Number(r.close); }).filter(Number.isFinite));
-      postCloseLow = Math.min.apply(null, postC.map(function (r) { return Number(r.close); }).filter(Number.isFinite));
-    }
-    for (var t = 0; t < extKeys.length; t++) {
-      var keyTone = extKeys[t];
-      if (Boolean(invalidMap[keyTone])) {
-        extToneMap[keyTone] = "invalid";
-        continue;
-      }
-      var lv = Number(levels[keyTone]);
-      var reachedLive = Number.isFinite(currentPrice) && (
-        side === "BUY" ? currentPrice >= lv : currentPrice <= lv
-      );
-      var reachedBefore = Number.isFinite(postHigh) && Number.isFinite(postLow) && (
-        side === "BUY" ? postHigh >= lv : postLow <= lv
-      );
-      var brokeByClose = Number.isFinite(postCloseHigh) && Number.isFinite(postCloseLow) && (
-        side === "BUY" ? postCloseHigh >= lv : postCloseLow <= lv
-      );
-      if (brokeByClose) {
-        extToneMap[keyTone] = "green";
-      } else if (reachedLive || reachedBefore) {
-        extToneMap[keyTone] = "yellow";
-      } else {
-        extToneMap[keyTone] = "";
-      }
-    }
-
-    var html = [];
-    for (var i = 0; i < lines.length; i++) {
-      var line = String(lines[i] || "");
-      if (line.indexOf("__SIDE__") === 0) {
-        html.push("Side: " + sideHtml);
-      } else {
-        html.push(esc(line));
-      }
-    }
-
-    var entryKeys = ["1", "0.786", "0.618", "0.5", "0"];
-    html.push("");
-    html.push('<span class="zone-title">Entry Zone</span>');
-    for (var e = 0; e < entryKeys.length; e++) {
-      var ek = entryKeys[e];
-      var isHalfLevel = ek === "0.5" && !Boolean(invalidMap[ek]);
-      var entryPriceClass = isHalfLevel ? "zone-purple" : "";
-      var entryStatusClass = isHalfLevel ? "zone-purple" : "";
-      html.push(levelLine("Entry Zone " + String(e + 1), ek, statusMap[ek] || "-", Boolean(invalidMap[ek]), entryPriceClass, entryStatusClass));
-    }
-
-    html.push("");
-    html.push('<span class="zone-title">Extension Zone</span>');
-    for (var x = 0; x < extKeys.length; x++) {
-      var xk = extKeys[x];
-      var tone = extToneMap[xk] || "";
-      var priceCls = tone === "green" ? "zone-green" : (tone === "yellow" ? "zone-yellow" : "");
-      var statusCls = priceCls;
-      html.push(levelLine("Extension Zone " + String(x + 1), xk, statusMap[xk] || "-", Boolean(invalidMap[xk]), priceCls, statusCls));
-    }
-    if (broke4236State) {
-      html.push("");
-      html.push('<span class="status-invalid">Extension Completed. Sila buat penandaan baru pada structure semasa.</span>');
-    }
-
-    previewTextEl.innerHTML = html.join("<br>");
+    previewTextEl.innerHTML = String(result.html || "");
     return;
   }
 
@@ -1000,6 +1275,18 @@
           var devRes = await fetch(devTickUrl + "?t=" + Date.now(), { cache: "no-store" });
           if (!devRes.ok) return;
           payload = await devRes.json();
+          var lastCandle = candles.length ? candles[candles.length - 1] : null;
+          if (lastCandle) {
+            var tickTs = toChartTime(payload.ts || payload.time || "");
+            var lastTs = toChartTime(lastCandle.time || lastCandle.ts || "");
+            var tf = String(tfEl.value || "h4").toLowerCase();
+            var step = Number(TF_SECONDS[tf] || 3600);
+            var tooOld = Number.isFinite(lastTs) && (!Number.isFinite(tickTs) || tickTs < lastTs);
+            var tooFarAhead = Number.isFinite(tickTs) && Number.isFinite(lastTs) && (tickTs - lastTs > (step * 2));
+            if (tooOld || tooFarAhead) {
+              payload = { price: lastCandle.close, ts: lastCandle.time || lastCandle.ts || "" };
+            }
+          }
         } catch (_devTickErr) {
           var tf = String(tfEl.value || "h4").toLowerCase();
           var c = (builtinCandles[tf] || []).slice(-1)[0];
@@ -1045,6 +1332,66 @@
     if (pickCBtn) pickCBtn.classList.toggle("active", activePickTarget === "C");
   }
 
+  function updateDragModeUI() {
+    if (!dragModeBtn) return;
+    dragModeBtn.classList.toggle("active", dragModeEnabled);
+    dragModeBtn.textContent = dragModeEnabled ? "Drag Mode: ON" : "Drag Mode: OFF";
+  }
+
+  function hydratePickedRowsFromInputsOrFallback() {
+    var aRow = fetchPointCandle(aDateEl.value, aTimeEl.value);
+    var bRow = fetchPointCandle(bDateEl.value, bTimeEl.value);
+    var cRow = fetchPointCandle(cDateEl.value, cTimeEl.value);
+    if (!(aRow && bRow && cRow) && candles.length >= 3) {
+      var midIdx = Math.floor(candles.length / 2);
+      if (chart && chart.timeScale && typeof chart.timeScale().getVisibleRange === "function") {
+        var vr = chart.timeScale().getVisibleRange();
+        if (vr && Number.isFinite(Number(vr.from)) && Number.isFinite(Number(vr.to))) {
+          var centerTs = (Number(vr.from) + Number(vr.to)) / 2;
+          var nearestIdx = 0;
+          var nearestDiff = Number.POSITIVE_INFINITY;
+          for (var i = 0; i < candles.length; i++) {
+            var ts = toChartTime(candles[i].time || candles[i].ts || "");
+            var diff = Math.abs(ts - centerTs);
+            if (diff < nearestDiff) {
+              nearestDiff = diff;
+              nearestIdx = i;
+            }
+          }
+          midIdx = nearestIdx;
+        }
+      }
+      if (midIdx <= 0) midIdx = 1;
+      if (midIdx >= candles.length - 1) midIdx = candles.length - 2;
+      aRow = candles[midIdx - 1];
+      bRow = candles[midIdx];
+      cRow = candles[midIdx + 1];
+      _updatePointInputsFromRow("A", aRow);
+      _updatePointInputsFromRow("B", bRow);
+      _updatePointInputsFromRow("C", cRow);
+    }
+    pickedRows.A = aRow || null;
+    pickedRows.B = bRow || null;
+    pickedRows.C = cRow || null;
+  }
+
+  function setDragMode(enabled) {
+    dragModeEnabled = Boolean(enabled);
+    setPickTarget("");
+    if (dragModeEnabled) {
+      hydratePickedRowsFromInputsOrFallback();
+      refreshABCPickVisuals(String(trendEl.value || ""), false);
+      setDragHud(false, "");
+      if (profileStatusEl) {
+        profileStatusEl.textContent = "Drag Mode aktif. Tarik label A/B/C pada chart.";
+      }
+    } else {
+      setDragHud(false, "");
+      if (profileStatusEl) profileStatusEl.textContent = "Drag Mode dimatikan.";
+    }
+    updateDragModeUI();
+  }
+
   function clearAllPoints() {
     aDateEl.value = "";
     bDateEl.value = "";
@@ -1053,14 +1400,16 @@
     bTimeEl.value = "";
     cTimeEl.value = "";
     setPickTarget("");
+    setDragMode(false);
     pickTouchStartMs = 0;
     pickTouchStartX = 0;
     pickTouchMoved = false;
     pickCandidateTime = 0;
     clearABCMarkers();
+    setDragHud(false, "");
     saveFormState(false);
     if (profileStatusEl) {
-      profileStatusEl.textContent = "Point A/B/C dikosongkan. Pilih Pick A/B/C untuk tandakan semula.";
+      profileStatusEl.textContent = "Point A/B/C dikosongkan.";
     }
     renderPreview();
   }
@@ -1092,6 +1441,9 @@
 
   tfEl.addEventListener("change", function () {
     if (profileStatusEl) profileStatusEl.textContent = "";
+    pickedRows = { A: null, B: null, C: null };
+    abcPointsCache = [];
+    renderABCOverlay();
     saveFormState(false);
     updateTimeInputs();
     reloadAll().then(initDefaultDates).then(renderPreview);
@@ -1140,6 +1492,12 @@
       clearAllPoints();
     });
   }
+  if (dragModeBtn) {
+    dragModeBtn.addEventListener("click", function () {
+      setDragMode(!dragModeEnabled);
+      saveFormState(false);
+    });
+  }
 
   if (chartWrapEl) {
     chartWrapEl.addEventListener("click", function (ev) {
@@ -1150,8 +1508,31 @@
       if (!time) return;
       assignPickFromChartTime(time, "wrap_click");
     });
+    chartWrapEl.addEventListener("mousedown", function (ev) {
+      if (!dragModeEnabled || activePickTarget || !chart || isTouchDevice) return;
+      _startDragAtClient(ev.clientX, ev.clientY);
+    });
+    chartWrapEl.addEventListener("mousemove", function (ev) {
+      if (!isDraggingPoint) return;
+      _moveDragAtClient(ev.clientX, ev.clientY);
+    });
+    chartWrapEl.addEventListener("mouseup", function () {
+      _endDrag();
+    });
+    chartWrapEl.addEventListener("mouseleave", function () {
+      _endDrag();
+    });
     chartWrapEl.addEventListener("touchstart", function (ev) {
-      if (!activePickTarget || !chart) return;
+      if (!chart) return;
+      if (dragModeEnabled && !activePickTarget) {
+        if (!ev.touches || !ev.touches.length) return;
+        var dragStarted = _startDragAtClient(ev.touches[0].clientX, ev.touches[0].clientY);
+        if (dragStarted) {
+          ev.preventDefault();
+          return;
+        }
+      }
+      if (!activePickTarget) return;
       if (!ev.touches || !ev.touches.length) return;
       var t = ev.touches[0];
       var rect = chartWrapEl.getBoundingClientRect();
@@ -1166,7 +1547,14 @@
       }
     });
     chartWrapEl.addEventListener("touchmove", function (ev) {
-      if (!activePickTarget || !chart) return;
+      if (!chart) return;
+      if (isDraggingPoint) {
+        if (!ev.touches || !ev.touches.length) return;
+        _moveDragAtClient(ev.touches[0].clientX, ev.touches[0].clientY);
+        ev.preventDefault();
+        return;
+      }
+      if (!activePickTarget) return;
       if (!ev.touches || !ev.touches.length) return;
       var t = ev.touches[0];
       var rect = chartWrapEl.getBoundingClientRect();
@@ -1181,7 +1569,13 @@
       }
     });
     chartWrapEl.addEventListener("touchend", function (ev) {
-      if (!activePickTarget || !chart) return;
+      if (!chart) return;
+      if (isDraggingPoint) {
+        _endDrag();
+        ev.preventDefault();
+        return;
+      }
+      if (!activePickTarget) return;
       if (!ev.changedTouches || !ev.changedTouches.length) return;
       var t = ev.changedTouches[0];
       var rect = chartWrapEl.getBoundingClientRect();
@@ -1223,6 +1617,7 @@
 
   loadFormState();
   updateTimeInputs();
+  updateDragModeUI();
 
   var serverState = parseServerState(serverProfilesStateRaw);
   if (serverState) {
