@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sqlite3
 from pathlib import Path
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -21,6 +22,7 @@ from telegram import (
     Update,
     WebAppInfo,
 )
+from telegram.error import BadRequest
 from telegram.ext import ApplicationBuilder, CallbackQueryHandler, CommandHandler, ContextTypes, MessageHandler, filters
 
 from texts import (
@@ -52,9 +54,14 @@ CB_USER_IB_CANCEL = "USER_IB_CANCEL"
 ADMIN_USER_IDS = {627116869}
 STATE_PATH = Path(__file__).with_name("sidebot_state.json")
 VIP_WHITELIST_PATH = Path(__file__).with_name("sidebot_vip_whitelist.json")
+DEFAULT_SHARED_DB_PATH = Path(__file__).resolve().parent.parent / "db" / "mmhelper_shared.db"
+KV_STATE_LEGACY_KEY = "sidebot_state"
+KV_STATE_SNAPSHOT_KEY = "sidebot_state_snapshot"
 
 MENU_DAFTAR_NEXT_MEMBER = "🚀 Daftar NEXTexclusive"
 MENU_BELI_EVIDEO26 = "🎬 One Time Purchase NEXT eVideo26"
+MENU_OPEN_MMHELPER_BOT = "🤖 Buka MM Helper Bot"
+MENU_OPEN_EVIDEO_BOT = "🎥 Buka NEXT eVideo Bot"
 MENU_ALL_PRODUCT_PREVIEW = "🛍️ All Product Preview (coming soon)"
 MENU_ADMIN_PANEL = "🛡️ Admin Panel"
 MENU_BETA_RESET = "🧪 BETA RESET"
@@ -76,6 +83,545 @@ def load_local_env() -> None:
         value = value.strip().strip("'").strip('"')
         if key and key not in os.environ:
             os.environ[key] = value
+
+
+def get_shared_db_path() -> Path:
+    raw = (os.getenv("SIDEBOT_SHARED_DB_PATH") or os.getenv("MMHELPER_SHARED_DB_PATH") or "").strip()
+    if raw:
+        return Path(raw).expanduser()
+    return DEFAULT_SHARED_DB_PATH
+
+
+def _connect_shared_db() -> sqlite3.Connection:
+    db_path = get_shared_db_path()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def _ensure_whitelist_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS vip_whitelist (
+            tier TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            telegram_username TEXT NOT NULL DEFAULT '',
+            full_name TEXT NOT NULL DEFAULT '',
+            wallet_id TEXT NOT NULL DEFAULT '',
+            source_submission_id TEXT NOT NULL DEFAULT '',
+            added_at TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'active',
+            PRIMARY KEY (tier, user_id)
+        )
+        """
+    )
+
+
+def _json_whitelist_fallback() -> dict:
+    if not VIP_WHITELIST_PATH.exists():
+        return {"vip1": {"users": {}}}
+    try:
+        data = json.loads(VIP_WHITELIST_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"vip1": {"users": {}}}
+    if not isinstance(data, dict):
+        return {"vip1": {"users": {}}}
+    return data
+
+
+def _migrate_json_whitelist_if_needed(conn: sqlite3.Connection) -> None:
+    count = conn.execute("SELECT COUNT(*) AS c FROM vip_whitelist").fetchone()["c"]
+    if count:
+        return
+    data = _json_whitelist_fallback()
+    for tier, tier_obj in data.items():
+        if not isinstance(tier_obj, dict):
+            continue
+        users = tier_obj.get("users")
+        if not isinstance(users, dict):
+            continue
+        for user_id, row in users.items():
+            if not isinstance(row, dict):
+                continue
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO vip_whitelist
+                (tier, user_id, telegram_username, full_name, wallet_id, source_submission_id, added_at, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    str(tier),
+                    str(row.get("user_id") or user_id),
+                    str(row.get("telegram_username") or ""),
+                    str(row.get("full_name") or ""),
+                    str(row.get("wallet_id") or ""),
+                    str(row.get("source_submission_id") or ""),
+                    str(row.get("added_at") or ""),
+                    str(row.get("status") or "active"),
+                ),
+            )
+
+
+def _read_whitelist_from_db(conn: sqlite3.Connection) -> dict:
+    out: dict = {"vip1": {"users": {}}, "vip2": {"users": {}}, "vip3": {"users": {}}}
+    rows = conn.execute(
+        """
+        SELECT tier, user_id, telegram_username, full_name, wallet_id, source_submission_id, added_at, status
+        FROM vip_whitelist
+        ORDER BY tier, user_id
+        """
+    ).fetchall()
+    for row in rows:
+        tier = str(row["tier"] or "vip1")
+        out.setdefault(tier, {"users": {}})
+        users = out[tier].setdefault("users", {})
+        user_id = str(row["user_id"])
+        users[user_id] = {
+            "user_id": int(user_id) if user_id.isdigit() else user_id,
+            "telegram_username": str(row["telegram_username"] or ""),
+            "full_name": str(row["full_name"] or ""),
+            "wallet_id": str(row["wallet_id"] or ""),
+            "source_submission_id": str(row["source_submission_id"] or ""),
+            "added_at": str(row["added_at"] or ""),
+            "status": str(row["status"] or "active"),
+        }
+    return out
+
+
+def _write_json_mirror(data: dict) -> None:
+    try:
+        VIP_WHITELIST_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    except OSError:
+        logger.warning("Failed to write whitelist JSON mirror", exc_info=True)
+
+
+def _ensure_state_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS sidebot_kv_state (
+            key TEXT PRIMARY KEY,
+            value_json TEXT NOT NULL
+        )
+        """
+    )
+
+
+def _ensure_users_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS sidebot_users (
+            user_id TEXT PRIMARY KEY,
+            telegram_username TEXT NOT NULL DEFAULT '',
+            full_name TEXT NOT NULL DEFAULT '',
+            phone_number TEXT NOT NULL DEFAULT '',
+            wallet_id TEXT NOT NULL DEFAULT '',
+            tnc_accepted INTEGER NOT NULL DEFAULT 0,
+            latest_submission_id TEXT NOT NULL DEFAULT '',
+            updated_at TEXT NOT NULL DEFAULT ''
+        )
+        """
+    )
+
+
+def _ensure_submissions_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS sidebot_submissions (
+            submission_id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'pending',
+            registration_flow TEXT NOT NULL DEFAULT 'new_registration',
+            wallet_id TEXT NOT NULL DEFAULT '',
+            full_name TEXT NOT NULL DEFAULT '',
+            telegram_username TEXT NOT NULL DEFAULT '',
+            phone_number TEXT NOT NULL DEFAULT '',
+            has_deposit_100 INTEGER NOT NULL DEFAULT 0,
+            ib_request_submitted INTEGER,
+            deposit_required_usd INTEGER NOT NULL DEFAULT 100,
+            api_is_client_under_ib INTEGER,
+            api_check_message TEXT NOT NULL DEFAULT '',
+            admin_group_message_id INTEGER,
+            user_deposit_prompt_message_id INTEGER,
+            user_ib_prompt_message_id INTEGER,
+            reviewed_by TEXT NOT NULL DEFAULT '',
+            reviewed_at TEXT NOT NULL DEFAULT '',
+            submitted_at TEXT NOT NULL DEFAULT '',
+            payload_json TEXT NOT NULL DEFAULT '{}'
+        )
+        """
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_sidebot_submissions_user_id ON sidebot_submissions(user_id)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_sidebot_submissions_submitted_at ON sidebot_submissions(submitted_at)"
+    )
+
+
+def _to_optional_int(value: object) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return int(value)
+    if isinstance(value, int):
+        return value
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        return int(text)
+    except ValueError:
+        return None
+
+
+def _to_optional_bool(value: object) -> bool | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return bool(value)
+    text = str(value).strip().lower()
+    if text in {"1", "true", "yes"}:
+        return True
+    if text in {"0", "false", "no"}:
+        return False
+    return None
+
+
+def _upsert_user_row(
+    conn: sqlite3.Connection,
+    user_id: int | str,
+    *,
+    telegram_username: str = "",
+    full_name: str = "",
+    phone_number: str = "",
+    wallet_id: str = "",
+    tnc_accepted: bool = False,
+    latest_submission_id: str = "",
+) -> None:
+    now_iso = datetime.now(timezone.utc).isoformat()
+    conn.execute(
+        """
+        INSERT INTO sidebot_users
+        (user_id, telegram_username, full_name, phone_number, wallet_id, tnc_accepted, latest_submission_id, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET
+            telegram_username=excluded.telegram_username,
+            full_name=excluded.full_name,
+            phone_number=excluded.phone_number,
+            wallet_id=excluded.wallet_id,
+            tnc_accepted=excluded.tnc_accepted,
+            latest_submission_id=CASE
+                WHEN excluded.latest_submission_id <> '' THEN excluded.latest_submission_id
+                ELSE sidebot_users.latest_submission_id
+            END,
+            updated_at=excluded.updated_at
+        """,
+        (
+            str(user_id),
+            telegram_username,
+            full_name,
+            phone_number,
+            wallet_id,
+            1 if tnc_accepted else 0,
+            latest_submission_id,
+            now_iso,
+        ),
+    )
+
+
+def _submission_payload_to_row(payload: dict) -> tuple:
+    reviewed_by = payload.get("reviewed_by")
+    reviewed_by_text = "" if reviewed_by is None else str(reviewed_by)
+    return (
+        str(payload.get("submission_id") or ""),
+        str(payload.get("user_id") or ""),
+        str(payload.get("status") or "pending"),
+        str(payload.get("registration_flow") or "new_registration"),
+        str(payload.get("wallet_id") or ""),
+        str(payload.get("full_name") or ""),
+        str(payload.get("telegram_username") or ""),
+        str(payload.get("phone_number") or ""),
+        1 if bool(payload.get("has_deposit_100")) else 0,
+        _to_optional_int(payload.get("ib_request_submitted")),
+        int(payload.get("deposit_required_usd") or get_required_deposit_amount(str(payload.get("registration_flow") or ""))),
+        _to_optional_int(payload.get("api_is_client_under_ib")),
+        str(payload.get("api_check_message") or ""),
+        _to_optional_int(payload.get("admin_group_message_id")),
+        _to_optional_int(payload.get("user_deposit_prompt_message_id")),
+        _to_optional_int(payload.get("user_ib_prompt_message_id")),
+        reviewed_by_text,
+        str(payload.get("reviewed_at") or ""),
+        str(payload.get("submitted_at") or datetime.now(timezone.utc).isoformat()),
+        json.dumps(payload, ensure_ascii=False),
+    )
+
+
+def _insert_or_replace_submission(conn: sqlite3.Connection, payload: dict) -> None:
+    conn.execute(
+        """
+        INSERT OR REPLACE INTO sidebot_submissions
+        (submission_id, user_id, status, registration_flow, wallet_id, full_name, telegram_username, phone_number,
+         has_deposit_100, ib_request_submitted, deposit_required_usd, api_is_client_under_ib, api_check_message,
+         admin_group_message_id, user_deposit_prompt_message_id, user_ib_prompt_message_id, reviewed_by, reviewed_at,
+         submitted_at, payload_json)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        _submission_payload_to_row(payload),
+    )
+
+
+def _decode_submission_payload(row: sqlite3.Row) -> dict | None:
+    raw = str(row["payload_json"] or "").strip()
+    try:
+        payload = json.loads(raw) if raw else {}
+    except json.JSONDecodeError:
+        payload = {}
+    if not isinstance(payload, dict):
+        payload = {}
+    payload["submission_id"] = str(row["submission_id"] or payload.get("submission_id") or "")
+    user_id_text = str(row["user_id"] or payload.get("user_id") or "")
+    payload["user_id"] = int(user_id_text) if user_id_text.isdigit() else payload.get("user_id")
+    payload["status"] = str(row["status"] or payload.get("status") or "pending")
+    payload["registration_flow"] = str(row["registration_flow"] or payload.get("registration_flow") or "new_registration")
+    payload["wallet_id"] = str(row["wallet_id"] or payload.get("wallet_id") or "")
+    payload["full_name"] = str(row["full_name"] or payload.get("full_name") or "")
+    payload["telegram_username"] = str(row["telegram_username"] or payload.get("telegram_username") or "")
+    payload["phone_number"] = str(row["phone_number"] or payload.get("phone_number") or "")
+    payload["has_deposit_100"] = bool(int(row["has_deposit_100"] or 0))
+    payload["ib_request_submitted"] = _to_optional_bool(row["ib_request_submitted"])
+    payload["deposit_required_usd"] = int(row["deposit_required_usd"] or payload.get("deposit_required_usd") or 0)
+    payload["api_is_client_under_ib"] = _to_optional_bool(row["api_is_client_under_ib"])
+    payload["api_check_message"] = str(row["api_check_message"] or payload.get("api_check_message") or "")
+    payload["admin_group_message_id"] = _to_optional_int(row["admin_group_message_id"])
+    payload["user_deposit_prompt_message_id"] = _to_optional_int(row["user_deposit_prompt_message_id"])
+    payload["user_ib_prompt_message_id"] = _to_optional_int(row["user_ib_prompt_message_id"])
+    payload["reviewed_by"] = _to_optional_int(row["reviewed_by"])
+    payload["reviewed_at"] = str(row["reviewed_at"] or payload.get("reviewed_at") or "")
+    payload["submitted_at"] = str(row["submitted_at"] or payload.get("submitted_at") or "")
+    return payload
+
+
+def _migrate_state_to_structured_tables_if_needed(conn: sqlite3.Connection) -> None:
+    users_count = conn.execute("SELECT COUNT(*) AS c FROM sidebot_users").fetchone()["c"]
+    submissions_count = conn.execute("SELECT COUNT(*) AS c FROM sidebot_submissions").fetchone()["c"]
+    if users_count and submissions_count:
+        return
+
+    data: dict
+    try:
+        _ensure_state_table(conn)
+        _migrate_json_state_if_needed(conn)
+        data = _read_state_from_db(conn)
+    except sqlite3.Error:
+        data = _json_state_fallback()
+
+    users = data.get("users", {})
+    if not isinstance(users, dict):
+        users = {}
+    submissions = data.get("verification_submissions", {})
+    if not isinstance(submissions, dict):
+        submissions = {}
+
+    for user_id, user_obj in users.items():
+        if not isinstance(user_obj, dict):
+            continue
+        _upsert_user_row(
+            conn,
+            user_id,
+            telegram_username=str(user_obj.get("telegram_username") or ""),
+            tnc_accepted=bool(user_obj.get("tnc_accepted")),
+        )
+
+    for payload in submissions.values():
+        if not isinstance(payload, dict):
+            continue
+        _insert_or_replace_submission(conn, payload)
+        uid = payload.get("user_id")
+        if uid is None:
+            continue
+        _upsert_user_row(
+            conn,
+            uid,
+            telegram_username=str(payload.get("telegram_username") or ""),
+            full_name=str(payload.get("full_name") or ""),
+            phone_number=str(payload.get("phone_number") or ""),
+            wallet_id=str(payload.get("wallet_id") or ""),
+            latest_submission_id=str(payload.get("submission_id") or ""),
+            tnc_accepted=bool(users.get(str(uid), {}).get("tnc_accepted")),
+        )
+
+
+def _build_state_mirror_from_db(conn: sqlite3.Connection) -> dict:
+    data: dict = {"users": {}, "verification_submissions": {}}
+    users: dict = data["users"]
+
+    user_rows = conn.execute(
+        """
+        SELECT user_id, telegram_username, full_name, phone_number, wallet_id, tnc_accepted, latest_submission_id
+        FROM sidebot_users
+        ORDER BY user_id
+        """
+    ).fetchall()
+    for row in user_rows:
+        user_id = str(row["user_id"] or "")
+        if not user_id:
+            continue
+        users[user_id] = {
+            "user_id": int(user_id) if user_id.isdigit() else user_id,
+            "telegram_username": str(row["telegram_username"] or ""),
+            "full_name": str(row["full_name"] or ""),
+            "phone_number": str(row["phone_number"] or ""),
+            "wallet_id": str(row["wallet_id"] or ""),
+            "tnc_accepted": bool(int(row["tnc_accepted"] or 0)),
+            "latest_verification": None,
+            "verification_history": [],
+            "_latest_submission_id": str(row["latest_submission_id"] or ""),
+        }
+
+    submission_rows = conn.execute(
+        "SELECT * FROM sidebot_submissions ORDER BY submitted_at ASC, submission_id ASC"
+    ).fetchall()
+    for row in submission_rows:
+        payload = _decode_submission_payload(row)
+        if not isinstance(payload, dict):
+            continue
+        submission_id = str(payload.get("submission_id") or "")
+        if not submission_id:
+            continue
+        data["verification_submissions"][submission_id] = payload
+
+        user_id = payload.get("user_id")
+        user_key = str(user_id)
+        user_obj = users.setdefault(
+            user_key,
+            {
+                "user_id": user_id,
+                "telegram_username": str(payload.get("telegram_username") or ""),
+                "full_name": str(payload.get("full_name") or ""),
+                "phone_number": str(payload.get("phone_number") or ""),
+                "wallet_id": str(payload.get("wallet_id") or ""),
+                "tnc_accepted": False,
+                "latest_verification": None,
+                "verification_history": [],
+                "_latest_submission_id": submission_id,
+            },
+        )
+        history = user_obj.setdefault("verification_history", [])
+        if isinstance(history, list):
+            history.append(payload)
+        if str(user_obj.get("_latest_submission_id") or "") == submission_id:
+            user_obj["latest_verification"] = payload
+
+    for user_obj in users.values():
+        if not isinstance(user_obj, dict):
+            continue
+        if user_obj.get("latest_verification") is None:
+            history = user_obj.get("verification_history")
+            if isinstance(history, list) and history:
+                user_obj["latest_verification"] = history[-1]
+        user_obj.pop("_latest_submission_id", None)
+
+    return data
+
+
+def _sync_state_json_mirror_from_db(conn: sqlite3.Connection) -> None:
+    try:
+        snapshot = _build_state_mirror_from_db(conn)
+        _write_state_json_mirror(snapshot)
+        _write_state_snapshot_kv(conn, snapshot)
+    except Exception:
+        logger.warning("Failed to refresh sidebot JSON mirror from SQLite tables", exc_info=True)
+
+
+def init_sidebot_storage() -> None:
+    with _connect_shared_db() as conn:
+        _ensure_state_table(conn)
+        _ensure_users_table(conn)
+        _ensure_submissions_table(conn)
+        _migrate_json_state_if_needed(conn)
+        _migrate_state_to_structured_tables_if_needed(conn)
+        _sync_state_json_mirror_from_db(conn)
+
+
+def _json_state_fallback() -> dict:
+    if not STATE_PATH.exists():
+        return {"users": {}}
+    try:
+        data = json.loads(STATE_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"users": {}}
+    if not isinstance(data, dict):
+        return {"users": {}}
+    if not isinstance(data.get("users"), dict):
+        data["users"] = {}
+    return data
+
+
+def _write_state_json_mirror(data: dict) -> None:
+    try:
+        STATE_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    except OSError:
+        logger.warning("Failed to write sidebot state JSON mirror", exc_info=True)
+
+
+def _migrate_json_state_if_needed(conn: sqlite3.Connection) -> None:
+    row = conn.execute("SELECT value_json FROM sidebot_kv_state WHERE key = ?", (KV_STATE_LEGACY_KEY,)).fetchone()
+    if row is not None:
+        return
+    data = _json_state_fallback()
+    conn.execute(
+        "INSERT OR REPLACE INTO sidebot_kv_state (key, value_json) VALUES (?, ?)",
+        (KV_STATE_LEGACY_KEY, json.dumps(data, ensure_ascii=False)),
+    )
+    conn.execute(
+        "INSERT OR REPLACE INTO sidebot_kv_state (key, value_json) VALUES (?, ?)",
+        (KV_STATE_SNAPSHOT_KEY, json.dumps(data, ensure_ascii=False)),
+    )
+
+
+def _read_state_kv(conn: sqlite3.Connection, key: str) -> dict | None:
+    row = conn.execute("SELECT value_json FROM sidebot_kv_state WHERE key = ?", (key,)).fetchone()
+    if row is None:
+        return None
+    raw = str(row["value_json"] or "").strip()
+    if not raw:
+        return {"users": {}}
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return {"users": {}}
+    if not isinstance(data, dict):
+        return {"users": {}}
+    if not isinstance(data.get("users"), dict):
+        data["users"] = {}
+    return data
+
+
+def _read_state_from_db(conn: sqlite3.Connection) -> dict:
+    snapshot = _read_state_kv(conn, KV_STATE_SNAPSHOT_KEY)
+    if snapshot is not None:
+        return snapshot
+    legacy = _read_state_kv(conn, KV_STATE_LEGACY_KEY)
+    if legacy is not None:
+        return legacy
+    return {"users": {}}
+
+
+def _write_state_snapshot_kv(conn: sqlite3.Connection, data: dict) -> None:
+    conn.execute(
+        "INSERT OR REPLACE INTO sidebot_kv_state (key, value_json) VALUES (?, ?)",
+        (KV_STATE_SNAPSHOT_KEY, json.dumps(data, ensure_ascii=False)),
+    )
+
+
+def _write_state_legacy_kv(conn: sqlite3.Connection, data: dict) -> None:
+    conn.execute(
+        "INSERT OR REPLACE INTO sidebot_kv_state (key, value_json) VALUES (?, ?)",
+        (KV_STATE_LEGACY_KEY, json.dumps(data, ensure_ascii=False)),
+    )
 
 
 def get_token() -> str:
@@ -118,6 +664,20 @@ def get_onetime_evideo_webapp_url() -> str:
         if base.endswith(".html"):
             return f"{base.rsplit('/', 1)[0]}/one-time-purchase.html"
         return f"{base}/one-time-purchase.html"
+
+
+def get_mmhelper_bot_url() -> str:
+    url = (os.getenv("SIDEBOT_MMHELPER_BOT_URL") or "").strip()
+    if url.startswith("https://t.me/"):
+        return url
+    return ""
+
+
+def get_evideo_bot_url() -> str:
+    url = (os.getenv("SIDEBOT_EVIDEO_BOT_URL") or "").strip()
+    if url.startswith("https://t.me/"):
+        return url
+    return ""
 
 
 def get_admin_group_id() -> int | None:
@@ -353,44 +913,91 @@ def amarkets_check_is_client(wallet_id: str) -> tuple[bool | None, str]:
 
 
 def load_state() -> dict:
-    if not STATE_PATH.exists():
-        return {"users": {}}
     try:
-        data = json.loads(STATE_PATH.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {"users": {}}
-    if not isinstance(data, dict):
-        return {"users": {}}
-    users = data.get("users")
-    if not isinstance(users, dict):
-        data["users"] = {}
-    return data
+        with _connect_shared_db() as conn:
+            _ensure_state_table(conn)
+            _migrate_json_state_if_needed(conn)
+            data = _read_state_from_db(conn)
+            _write_state_json_mirror(data)
+            _write_state_snapshot_kv(conn, data)
+            return data
+    except sqlite3.Error:
+        logger.warning("Shared DB state unavailable, fallback to JSON", exc_info=True)
+        return _json_state_fallback()
 
 
 def save_state(data: dict) -> None:
-    STATE_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    if not isinstance(data, dict):
+        data = {"users": {}}
+    if not isinstance(data.get("users"), dict):
+        data["users"] = {}
+    try:
+        with _connect_shared_db() as conn:
+            _ensure_state_table(conn)
+            _write_state_legacy_kv(conn, data)
+            _write_state_snapshot_kv(conn, data)
+            _write_state_json_mirror(data)
+            return
+    except sqlite3.Error:
+        logger.warning("Failed to persist sidebot state into shared DB; writing JSON fallback", exc_info=True)
+    _write_state_json_mirror(data)
 
 
 def load_vip_whitelist() -> dict:
-    if not VIP_WHITELIST_PATH.exists():
-        return {"vip1": {"users": {}}}
     try:
-        data = json.loads(VIP_WHITELIST_PATH.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {"vip1": {"users": {}}}
-    if not isinstance(data, dict):
-        return {"vip1": {"users": {}}}
-    vip1 = data.get("vip1")
-    if not isinstance(vip1, dict):
-        data["vip1"] = {"users": {}}
-    users = data["vip1"].get("users")
-    if not isinstance(users, dict):
-        data["vip1"]["users"] = {}
-    return data
+        with _connect_shared_db() as conn:
+            _ensure_whitelist_table(conn)
+            _migrate_json_whitelist_if_needed(conn)
+            data = _read_whitelist_from_db(conn)
+            _write_json_mirror(data)
+            return data
+    except sqlite3.Error:
+        logger.warning("Shared DB whitelist unavailable, fallback to JSON", exc_info=True)
+        data = _json_whitelist_fallback()
+        if not isinstance(data.get("vip1"), dict):
+            data["vip1"] = {"users": {}}
+        if not isinstance(data["vip1"].get("users"), dict):
+            data["vip1"]["users"] = {}
+        return data
 
 
 def save_vip_whitelist(data: dict) -> None:
-    VIP_WHITELIST_PATH.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    try:
+        with _connect_shared_db() as conn:
+            _ensure_whitelist_table(conn)
+            conn.execute("DELETE FROM vip_whitelist")
+            for tier, tier_obj in data.items():
+                if not isinstance(tier_obj, dict):
+                    continue
+                users = tier_obj.get("users")
+                if not isinstance(users, dict):
+                    continue
+                for user_id, row in users.items():
+                    if not isinstance(row, dict):
+                        continue
+                    uid = str(row.get("user_id") or user_id)
+                    conn.execute(
+                        """
+                        INSERT OR REPLACE INTO vip_whitelist
+                        (tier, user_id, telegram_username, full_name, wallet_id, source_submission_id, added_at, status)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            str(tier),
+                            uid,
+                            str(row.get("telegram_username") or ""),
+                            str(row.get("full_name") or ""),
+                            str(row.get("wallet_id") or ""),
+                            str(row.get("source_submission_id") or ""),
+                            str(row.get("added_at") or ""),
+                            str(row.get("status") or "active"),
+                        ),
+                    )
+            _write_json_mirror(_read_whitelist_from_db(conn))
+            return
+    except sqlite3.Error:
+        logger.warning("Failed to persist whitelist into shared DB; writing JSON fallback", exc_info=True)
+    _write_json_mirror(data)
 
 
 def add_user_to_vip1(item: dict) -> None:
@@ -428,15 +1035,51 @@ def is_valid_wallet_id(wallet_id: str) -> bool:
 
 
 def has_tnc_accepted(user_id: int) -> bool:
-    state = load_state()
-    users = state.get("users", {})
-    user_obj = users.get(str(user_id), {})
-    if not isinstance(user_obj, dict):
-        return False
-    return bool(user_obj.get("tnc_accepted"))
+    try:
+        with _connect_shared_db() as conn:
+            _ensure_users_table(conn)
+            _ensure_submissions_table(conn)
+            _migrate_state_to_structured_tables_if_needed(conn)
+            row = conn.execute(
+                "SELECT tnc_accepted FROM sidebot_users WHERE user_id = ?",
+                (str(user_id),),
+            ).fetchone()
+            return bool(int(row["tnc_accepted"])) if row is not None else False
+    except sqlite3.Error:
+        logger.warning("Failed reading tnc_accepted from shared DB, fallback to JSON state", exc_info=True)
+        state = load_state()
+        users = state.get("users", {})
+        user_obj = users.get(str(user_id), {})
+        if not isinstance(user_obj, dict):
+            return False
+        return bool(user_obj.get("tnc_accepted"))
 
 
 def mark_tnc_accepted(user_id: int, accepted: bool) -> None:
+    try:
+        with _connect_shared_db() as conn:
+            _ensure_users_table(conn)
+            _ensure_submissions_table(conn)
+            _migrate_state_to_structured_tables_if_needed(conn)
+            existing = conn.execute(
+                "SELECT telegram_username, full_name, phone_number, wallet_id, latest_submission_id FROM sidebot_users WHERE user_id = ?",
+                (str(user_id),),
+            ).fetchone()
+            _upsert_user_row(
+                conn,
+                user_id=user_id,
+                telegram_username=str(existing["telegram_username"] or "") if existing is not None else "",
+                full_name=str(existing["full_name"] or "") if existing is not None else "",
+                phone_number=str(existing["phone_number"] or "") if existing is not None else "",
+                wallet_id=str(existing["wallet_id"] or "") if existing is not None else "",
+                tnc_accepted=bool(accepted),
+                latest_submission_id=str(existing["latest_submission_id"] or "") if existing is not None else "",
+            )
+            _sync_state_json_mirror_from_db(conn)
+            return
+    except sqlite3.Error:
+        logger.warning("Failed writing tnc_accepted into shared DB, fallback to JSON state", exc_info=True)
+
     state = load_state()
     users = state.setdefault("users", {})
     user_obj = users.setdefault(str(user_id), {})
@@ -454,16 +1097,8 @@ def store_verification_submission(
     registration_flow: str = "new_registration",
     ib_request_submitted: bool | None = None,
 ) -> dict:
-    state = load_state()
-    users = state.setdefault("users", {})
-    user_obj = users.setdefault(str(user_id), {})
-    submissions = state.setdefault("verification_submissions", {})
-    if not isinstance(submissions, dict):
-        submissions = {}
-        state["verification_submissions"] = submissions
-
-    # Use UUID to avoid collisions when multiple submissions happen in the same second.
-    submission_id = f"{user_id}-{uuid4().hex}"
+    # Keep it short so callback_data stays under Telegram 64-byte limit.
+    submission_id = f"{user_id}-{uuid4().hex[:12]}"
 
     deposit_required_usd = get_required_deposit_amount(registration_flow)
 
@@ -485,6 +1120,39 @@ def store_verification_submission(
         "user_ib_prompt_message_id": None,
     }
 
+    try:
+        with _connect_shared_db() as conn:
+            _ensure_users_table(conn)
+            _ensure_submissions_table(conn)
+            _migrate_state_to_structured_tables_if_needed(conn)
+            row = conn.execute(
+                "SELECT tnc_accepted FROM sidebot_users WHERE user_id = ?",
+                (str(user_id),),
+            ).fetchone()
+            tnc_accepted = bool(int(row["tnc_accepted"])) if row is not None else False
+            _upsert_user_row(
+                conn,
+                user_id=user_id,
+                telegram_username=telegram_username or "",
+                full_name=full_name,
+                phone_number=phone_number,
+                wallet_id=wallet_id,
+                tnc_accepted=tnc_accepted,
+                latest_submission_id=submission_id,
+            )
+            _insert_or_replace_submission(conn, payload)
+            _sync_state_json_mirror_from_db(conn)
+            return payload
+    except sqlite3.Error:
+        logger.warning("Failed writing submission into shared DB, fallback to JSON state", exc_info=True)
+
+    state = load_state()
+    users = state.setdefault("users", {})
+    user_obj = users.setdefault(str(user_id), {})
+    submissions = state.setdefault("verification_submissions", {})
+    if not isinstance(submissions, dict):
+        submissions = {}
+        state["verification_submissions"] = submissions
     user_obj["telegram_username"] = telegram_username or ""
     user_obj["latest_verification"] = payload
     history = user_obj.setdefault("verification_history", [])
@@ -544,42 +1212,33 @@ def user_ib_request_keyboard(submission_id: str) -> InlineKeyboardMarkup:
 
 
 def update_submission_status(submission_id: str, status: str, reviewer_id: int) -> dict | None:
-    state = load_state()
-    submissions = state.setdefault("verification_submissions", {})
-    if not isinstance(submissions, dict):
-        return None
-
-    item = submissions.get(submission_id)
-    if not isinstance(item, dict):
-        return None
-
-    item["status"] = status
-    item["reviewed_at"] = datetime.now(timezone.utc).isoformat()
-    item["reviewed_by"] = reviewer_id
-
-    user_id = item.get("user_id")
-    users = state.setdefault("users", {})
-    user_obj = users.get(str(user_id), {})
-    if isinstance(user_obj, dict):
-        latest = user_obj.get("latest_verification")
-        if isinstance(latest, dict) and latest.get("submission_id") == submission_id:
-            latest["status"] = status
-            latest["reviewed_at"] = item["reviewed_at"]
-            latest["reviewed_by"] = reviewer_id
-        history = user_obj.get("verification_history", [])
-        if isinstance(history, list):
-            for row in history:
-                if isinstance(row, dict) and row.get("submission_id") == submission_id:
-                    row["status"] = status
-                    row["reviewed_at"] = item["reviewed_at"]
-                    row["reviewed_by"] = reviewer_id
-                    break
-
-    save_state(state)
+    reviewed_at = datetime.now(timezone.utc).isoformat()
+    item = update_submission_fields(
+        submission_id=submission_id,
+        fields={
+            "status": status,
+            "reviewed_at": reviewed_at,
+            "reviewed_by": reviewer_id,
+        },
+    )
     return item
 
 
 def get_submission(submission_id: str) -> dict | None:
+    try:
+        with _connect_shared_db() as conn:
+            _ensure_users_table(conn)
+            _ensure_submissions_table(conn)
+            _migrate_state_to_structured_tables_if_needed(conn)
+            row = conn.execute(
+                "SELECT * FROM sidebot_submissions WHERE submission_id = ?",
+                (submission_id,),
+            ).fetchone()
+            if row is not None:
+                return _decode_submission_payload(row)
+    except sqlite3.Error:
+        logger.warning("Failed reading submission from shared DB, fallback to JSON state", exc_info=True)
+
     state = load_state()
     submissions = state.get("verification_submissions", {})
     if not isinstance(submissions, dict):
@@ -591,33 +1250,90 @@ def get_submission(submission_id: str) -> dict | None:
 
 
 def update_submission_fields(submission_id: str, fields: dict) -> dict | None:
+    if not isinstance(fields, dict):
+        return None
+
+    db_item: dict | None = None
+    try:
+        with _connect_shared_db() as conn:
+            _ensure_users_table(conn)
+            _ensure_submissions_table(conn)
+            _migrate_state_to_structured_tables_if_needed(conn)
+            row = conn.execute(
+                "SELECT * FROM sidebot_submissions WHERE submission_id = ?",
+                (submission_id,),
+            ).fetchone()
+            if row is not None:
+                item = _decode_submission_payload(row)
+                if item is not None:
+                    item.update(fields)
+                    _insert_or_replace_submission(conn, item)
+                    user_id = item.get("user_id")
+                    if user_id is not None:
+                        user_row = conn.execute(
+                            "SELECT tnc_accepted FROM sidebot_users WHERE user_id = ?",
+                            (str(user_id),),
+                        ).fetchone()
+                        tnc_accepted = bool(int(user_row["tnc_accepted"])) if user_row is not None else False
+                        _upsert_user_row(
+                            conn,
+                            user_id=user_id,
+                            telegram_username=str(item.get("telegram_username") or ""),
+                            full_name=str(item.get("full_name") or ""),
+                            phone_number=str(item.get("phone_number") or ""),
+                            wallet_id=str(item.get("wallet_id") or ""),
+                            tnc_accepted=tnc_accepted,
+                            latest_submission_id=str(item.get("submission_id") or ""),
+                        )
+                    db_item = item
+                    _sync_state_json_mirror_from_db(conn)
+                    return db_item
+    except sqlite3.Error:
+        logger.warning("Failed updating submission in shared DB, fallback to JSON state", exc_info=True)
+
     state = load_state()
     submissions = state.setdefault("verification_submissions", {})
     if not isinstance(submissions, dict):
-        return None
-
+        return db_item
     item = submissions.get(submission_id)
-    if not isinstance(item, dict):
-        return None
+    if isinstance(item, dict):
+        item.update(fields)
+        user_id = item.get("user_id")
+        users = state.setdefault("users", {})
+        user_obj = users.get(str(user_id), {})
+        if isinstance(user_obj, dict):
+            latest = user_obj.get("latest_verification")
+            if isinstance(latest, dict) and latest.get("submission_id") == submission_id:
+                latest.update(fields)
+            history = user_obj.get("verification_history", [])
+            if isinstance(history, list):
+                for row in history:
+                    if isinstance(row, dict) and row.get("submission_id") == submission_id:
+                        row.update(fields)
+                        break
+        save_state(state)
+        return item
 
-    item.update(fields)
-
-    user_id = item.get("user_id")
-    users = state.setdefault("users", {})
-    user_obj = users.get(str(user_id), {})
-    if isinstance(user_obj, dict):
-        latest = user_obj.get("latest_verification")
-        if isinstance(latest, dict) and latest.get("submission_id") == submission_id:
-            latest.update(fields)
-        history = user_obj.get("verification_history", [])
+    if db_item is not None:
+        # Keep JSON state mirror aligned if DB row exists but JSON mapping missing.
+        submissions[submission_id] = db_item
+        user_id = db_item.get("user_id")
+        users = state.setdefault("users", {})
+        user_obj = users.setdefault(str(user_id), {})
+        user_obj["telegram_username"] = db_item.get("telegram_username") or ""
+        user_obj["latest_verification"] = db_item
+        history = user_obj.setdefault("verification_history", [])
         if isinstance(history, list):
+            found = False
             for row in history:
                 if isinstance(row, dict) and row.get("submission_id") == submission_id:
-                    row.update(fields)
+                    row.update(db_item)
+                    found = True
                     break
-
-    save_state(state)
-    return item
+            if not found:
+                history.append(db_item)
+        save_state(state)
+    return db_item
 
 
 def render_admin_submission_text(item: dict) -> str:
@@ -667,16 +1383,24 @@ def render_admin_submission_text(item: dict) -> str:
     )
 
 
-async def send_submission_to_admin_group(context: ContextTypes.DEFAULT_TYPE, item: dict) -> None:
+async def send_submission_to_admin_group(context: ContextTypes.DEFAULT_TYPE, item: dict) -> bool:
     admin_group_id = get_admin_group_id()
     if not admin_group_id:
-        return
-    sent = await context.bot.send_message(
-        chat_id=admin_group_id,
-        text=render_admin_submission_text(item),
-        reply_markup=verification_action_keyboard(str(item.get("submission_id")), str(item.get("registration_flow") or "")),
-    )
+        return False
+    text = render_admin_submission_text(item)
+    try:
+        sent = await context.bot.send_message(
+            chat_id=admin_group_id,
+            text=text,
+            reply_markup=verification_action_keyboard(str(item.get("submission_id")), str(item.get("registration_flow") or "")),
+        )
+    except BadRequest as exc:
+        if "button_data_invalid" not in str(exc).lower():
+            raise
+        logger.warning("Admin submission buttons invalid; sending without inline keyboard submission_id=%s", item.get("submission_id"))
+        sent = await context.bot.send_message(chat_id=admin_group_id, text=text)
     update_submission_fields(str(item.get("submission_id")), {"admin_group_message_id": sent.message_id})
+    return True
 
 
 async def clear_user_deposit_prompt(context: ContextTypes.DEFAULT_TYPE, item: dict) -> None:
@@ -782,6 +1506,20 @@ def is_admin_user(user_id: int | None) -> bool:
 
 
 def reset_all_data() -> None:
+    try:
+        with _connect_shared_db() as conn:
+            _ensure_users_table(conn)
+            _ensure_submissions_table(conn)
+            conn.execute("DELETE FROM sidebot_submissions")
+            conn.execute("DELETE FROM sidebot_users")
+            _ensure_state_table(conn)
+            empty_state = {"users": {}, "verification_submissions": {}}
+            _write_state_legacy_kv(conn, empty_state)
+            _write_state_snapshot_kv(conn, empty_state)
+            _write_state_json_mirror(empty_state)
+            return
+    except sqlite3.Error:
+        logger.warning("Failed resetting structured sidebot state tables", exc_info=True)
     save_state({"users": {}})
 
 
@@ -810,6 +1548,7 @@ def main_menu_keyboard(user_id: int | None) -> ReplyKeyboardMarkup:
     rows = [
         [register_button],
         [onetime_button],
+        [KeyboardButton(MENU_OPEN_MMHELPER_BOT), KeyboardButton(MENU_OPEN_EVIDEO_BOT)],
         [KeyboardButton(MENU_ALL_PRODUCT_PREVIEW)],
     ]
     if is_admin_user(user_id):
@@ -835,6 +1574,32 @@ def beta_reset_keyboard() -> InlineKeyboardMarkup:
             [InlineKeyboardButton("❌ Batal", callback_data=CB_BETA_RESET_CANCEL)],
         ]
     )
+
+
+async def _reply_to_query_message(query, text: str, **kwargs) -> None:
+    if not query:
+        return
+    if query.message is None:
+        try:
+            await query.get_bot().send_message(chat_id=query.from_user.id, text=text, **kwargs)
+        except Exception:
+            logger.exception("Failed to send callback response without source message")
+        return
+    try:
+        await query.message.reply_text(text, **kwargs)
+        return
+    except BadRequest as exc:
+        if "message to be replied not found" not in str(exc).lower():
+            raise
+    except Exception:
+        logger.exception("Failed replying to callback message")
+        return
+
+    # Source message was removed; send direct message to same chat as fallback.
+    try:
+        await query.get_bot().send_message(chat_id=query.message.chat_id, text=text, **kwargs)
+    except Exception:
+        logger.exception("Failed sending fallback callback response")
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -864,11 +1629,11 @@ async def handle_tnc_callback(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if query.data == TNC_ACCEPT:
         mark_tnc_accepted(query.from_user.id, True)
-        await query.message.reply_text(MAIN_MENU_TEXT, reply_markup=main_menu_keyboard(query.from_user.id))
+        await _reply_to_query_message(query, MAIN_MENU_TEXT, reply_markup=main_menu_keyboard(query.from_user.id))
         return
 
     mark_tnc_accepted(query.from_user.id, False)
-    await query.message.reply_text(DECLINED_TEXT)
+    await _reply_to_query_message(query, DECLINED_TEXT)
 
 
 async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -878,7 +1643,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
 
     await query.answer()
     if not is_admin_user(query.from_user.id):
-        await query.message.reply_text("❌ Akses ditolak.")
+        await _reply_to_query_message(query, "❌ Akses ditolak.")
         return
 
     if query.data == CB_BETA_RESET_CANCEL:
@@ -886,7 +1651,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
             await query.edit_message_reply_markup(reply_markup=None)
         except Exception:
             pass
-        await query.message.reply_text("BETA RESET dibatalkan.", reply_markup=admin_panel_keyboard())
+        await _reply_to_query_message(query, "BETA RESET dibatalkan.", reply_markup=admin_panel_keyboard())
         return
 
     if query.data == CB_BETA_RESET_CONFIRM:
@@ -895,9 +1660,9 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
         except Exception:
             pass
         reset_all_data()
-        await query.message.reply_text(BETA_RESET_DONE_TEXT)
-        await query.message.reply_text("Sila baca dan setuju TnC dulu.", reply_markup=ReplyKeyboardRemove())
-        await query.message.reply_text(TNC_TEXT, reply_markup=tnc_keyboard())
+        await _reply_to_query_message(query, BETA_RESET_DONE_TEXT)
+        await _reply_to_query_message(query, "Sila baca dan setuju TnC dulu.", reply_markup=ReplyKeyboardRemove())
+        await _reply_to_query_message(query, TNC_TEXT, reply_markup=tnc_keyboard())
         return
 
     if ":" in str(query.data):
@@ -918,7 +1683,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 },
             )
             if not item:
-                await query.message.reply_text("❌ Rekod submission tak jumpa atau dah dipadam.")
+                await _reply_to_query_message(query, "❌ Rekod submission tak jumpa atau dah dipadam.")
                 return
             user_id = item.get("user_id")
             if isinstance(user_id, int):
@@ -927,7 +1692,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 except Exception:
                     logger.exception("Failed to notify user for deposit request")
             await refresh_admin_submission_message(context, submission_id)
-            await query.message.reply_text(f"✅ Request deposit dihantar kepada user untuk submission {submission_id}.")
+            await _reply_to_query_message(query, f"✅ Request deposit dihantar kepada user untuk submission {submission_id}.")
             return
 
         if action == CB_VERIF_REQUEST_CHANGE_IB:
@@ -941,7 +1706,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 },
             )
             if not item:
-                await query.message.reply_text("❌ Rekod submission tak jumpa atau dah dipadam.")
+                await _reply_to_query_message(query, "❌ Rekod submission tak jumpa atau dah dipadam.")
                 return
             user_id = item.get("user_id")
             if isinstance(user_id, int):
@@ -950,17 +1715,17 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 except Exception:
                     logger.exception("Failed to notify user for change-IB request")
             await refresh_admin_submission_message(context, submission_id)
-            await query.message.reply_text(f"✅ Request change IB dihantar kepada user untuk submission {submission_id}.")
+            await _reply_to_query_message(query, f"✅ Request change IB dihantar kepada user untuk submission {submission_id}.")
             return
 
         if action == CB_VERIF_REVOKE_VIP:
             item = get_submission(submission_id)
             if not item:
-                await query.message.reply_text("❌ Rekod submission tak jumpa atau dah dipadam.")
+                await _reply_to_query_message(query, "❌ Rekod submission tak jumpa atau dah dipadam.")
                 return
             user_id = item.get("user_id")
             if not isinstance(user_id, int):
-                await query.message.reply_text("❌ User ID tak sah.")
+                await _reply_to_query_message(query, "❌ User ID tak sah.")
                 return
             remove_user_from_vip1(user_id)
             update_submission_fields(
@@ -994,7 +1759,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
 
         updated = update_submission_status(submission_id=submission_id, status=status, reviewer_id=query.from_user.id)
         if not updated:
-            await query.message.reply_text("❌ Rekod submission tak jumpa atau dah dipadam.")
+            await _reply_to_query_message(query, "❌ Rekod submission tak jumpa atau dah dipadam.")
             return
 
         target_user_id = updated.get("user_id")
@@ -1050,7 +1815,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
             return
 
         await refresh_admin_submission_message(context, submission_id)
-        await query.message.reply_text(f"✅ Status submission {submission_id} ditetapkan kepada {status_label}.")
+        await _reply_to_query_message(query, f"✅ Status submission {submission_id} ditetapkan kepada {status_label}.")
         return
 
 
@@ -1066,12 +1831,12 @@ async def handle_user_deposit_callback(update: Update, context: ContextTypes.DEF
     action, submission_id = str(query.data).split(":", 1)
     item = get_submission(submission_id)
     if not item:
-        await query.message.reply_text("❌ Rekod submission tak jumpa.")
+        await _reply_to_query_message(query, "❌ Rekod submission tak jumpa.")
         return
 
     user_id = item.get("user_id")
     if query.from_user.id != user_id:
-        await query.message.reply_text("❌ Butang ini bukan untuk anda.")
+        await _reply_to_query_message(query, "❌ Butang ini bukan untuk anda.")
         return
 
     if action == CB_USER_DEPOSIT_CANCEL:
@@ -1080,7 +1845,7 @@ async def handle_user_deposit_callback(update: Update, context: ContextTypes.DEF
         except Exception:
             pass
         update_submission_fields(submission_id, {"user_deposit_prompt_message_id": None})
-        await query.message.reply_text("Baik, status deposit anda kekal belum selesai.")
+        await _reply_to_query_message(query, "Baik, status deposit anda kekal belum selesai.")
         return
 
     if action == CB_USER_DEPOSIT_DONE:
@@ -1093,7 +1858,7 @@ async def handle_user_deposit_callback(update: Update, context: ContextTypes.DEF
             },
         )
         if not updated:
-            await query.message.reply_text("❌ Rekod submission tak jumpa.")
+            await _reply_to_query_message(query, "❌ Rekod submission tak jumpa.")
             return
         try:
             await query.edit_message_reply_markup(reply_markup=None)
@@ -1101,7 +1866,7 @@ async def handle_user_deposit_callback(update: Update, context: ContextTypes.DEF
             pass
         update_submission_fields(submission_id, {"user_deposit_prompt_message_id": None})
         await refresh_admin_submission_message(context, submission_id)
-        await query.message.reply_text(
+        await _reply_to_query_message(query, 
             "✅ Deposit selesai direkod.\n"
             "Permohonan anda dihantar semula kepada admin untuk semakan."
         )
@@ -1120,12 +1885,12 @@ async def handle_user_ib_callback(update: Update, context: ContextTypes.DEFAULT_
     action, submission_id = str(query.data).split(":", 1)
     item = get_submission(submission_id)
     if not item:
-        await query.message.reply_text("❌ Rekod submission tak jumpa.")
+        await _reply_to_query_message(query, "❌ Rekod submission tak jumpa.")
         return
 
     user_id = item.get("user_id")
     if query.from_user.id != user_id:
-        await query.message.reply_text("❌ Butang ini bukan untuk anda.")
+        await _reply_to_query_message(query, "❌ Butang ini bukan untuk anda.")
         return
 
     if action == CB_USER_IB_CANCEL:
@@ -1134,7 +1899,7 @@ async def handle_user_ib_callback(update: Update, context: ContextTypes.DEFAULT_
         except Exception:
             pass
         update_submission_fields(submission_id, {"user_ib_prompt_message_id": None})
-        await query.message.reply_text("Baik, status submit request penukaran IB anda kekal belum selesai.")
+        await _reply_to_query_message(query, "Baik, status submit request penukaran IB anda kekal belum selesai.")
         return
 
     if action == CB_USER_IB_DONE:
@@ -1147,7 +1912,7 @@ async def handle_user_ib_callback(update: Update, context: ContextTypes.DEFAULT_
             },
         )
         if not updated:
-            await query.message.reply_text("❌ Rekod submission tak jumpa.")
+            await _reply_to_query_message(query, "❌ Rekod submission tak jumpa.")
             return
         try:
             await query.edit_message_reply_markup(reply_markup=None)
@@ -1155,7 +1920,7 @@ async def handle_user_ib_callback(update: Update, context: ContextTypes.DEFAULT_
             pass
         update_submission_fields(submission_id, {"user_ib_prompt_message_id": None})
         await refresh_admin_submission_message(context, submission_id)
-        await query.message.reply_text(
+        await _reply_to_query_message(query, 
             "✅ Request penukaran IB selesai direkod.\n"
             "Permohonan anda dihantar semula kepada admin untuk semakan."
         )
@@ -1177,6 +1942,76 @@ async def group_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         f"- type: {chat.type}\n\n"
         "Salin chat_id ini dan letak dalam `.env`:\n"
         "SIDEBOT_ADMIN_GROUP_ID=<chat_id>",
+    )
+
+
+def _db_report_summary() -> str:
+    with _connect_shared_db() as conn:
+        _ensure_users_table(conn)
+        _ensure_submissions_table(conn)
+        users_total = int(conn.execute("SELECT COUNT(*) FROM sidebot_users").fetchone()[0])
+        users_tnc_yes = int(conn.execute("SELECT COUNT(*) FROM sidebot_users WHERE tnc_accepted = 1").fetchone()[0])
+        submissions_total = int(conn.execute("SELECT COUNT(*) FROM sidebot_submissions").fetchone()[0])
+        status_rows = conn.execute(
+            """
+            SELECT status, COUNT(*) AS c
+            FROM sidebot_submissions
+            GROUP BY status
+            ORDER BY status
+            """
+        ).fetchall()
+        latest_row = conn.execute(
+            "SELECT submitted_at, submission_id FROM sidebot_submissions ORDER BY submitted_at DESC, submission_id DESC LIMIT 1"
+        ).fetchone()
+
+    by_status = {str(row["status"] or "unknown"): int(row["c"] or 0) for row in status_rows}
+    approved = by_status.get("approved", 0)
+    pending = by_status.get("pending", 0)
+    rejected = by_status.get("rejected", 0)
+    other = submissions_total - approved - pending - rejected
+    latest_text = "-"
+    if latest_row is not None:
+        latest_text = f"{latest_row['submitted_at']} ({latest_row['submission_id']})"
+    return (
+        "📊 Sidebot DB Report\n\n"
+        f"Users total: {users_total}\n"
+        f"TnC accepted: {users_tnc_yes}\n"
+        f"Submissions total: {submissions_total}\n"
+        f"Approved: {approved}\n"
+        f"Pending: {pending}\n"
+        f"Rejected: {rejected}\n"
+        f"Other status: {other}\n"
+        f"Latest submission: {latest_text}"
+    )
+
+
+async def db_report(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.effective_message
+    user = update.effective_user
+    if not message or not user:
+        return
+    if not is_admin_user(user.id):
+        await message.reply_text("❌ Akses ditolak.")
+        return
+    try:
+        await message.reply_text(_db_report_summary())
+    except sqlite3.Error:
+        logger.exception("Failed to build DB report")
+        await message.reply_text("❌ Gagal baca DB report.")
+
+
+async def db_health(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await db_report(update, context)
+
+
+async def handle_application_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if context.error is None:
+        logger.error("Unhandled sidebot error without exception object")
+        return
+    logger.error(
+        "Unhandled sidebot exception: %s",
+        context.error,
+        exc_info=(type(context.error), context.error, context.error.__traceback__),
     )
 
 
@@ -1257,6 +2092,28 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             await message.reply_text("Buka miniapp One Time Purchase melalui butang web app pada menu.")
             return
         await message.reply_text("Miniapp URL belum diset. Isi SIDEBOT_ONETIME_EVIDEO_WEBAPP_URL dalam .env dulu.")
+        return
+
+    if text == MENU_OPEN_MMHELPER_BOT:
+        url = get_mmhelper_bot_url()
+        if not url:
+            await message.reply_text("Link MM Helper belum diset. Isi SIDEBOT_MMHELPER_BOT_URL dalam .env dulu.")
+            return
+        await message.reply_text(
+            "Tekan butang di bawah untuk buka MM Helper Bot.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Buka MM Helper Bot", url=url)]]),
+        )
+        return
+
+    if text == MENU_OPEN_EVIDEO_BOT:
+        url = get_evideo_bot_url()
+        if not url:
+            await message.reply_text("Link eVideo bot belum diset. Isi SIDEBOT_EVIDEO_BOT_URL dalam .env dulu.")
+            return
+        await message.reply_text(
+            "Tekan butang di bawah untuk buka NEXT eVideo Bot.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("Buka NEXT eVideo Bot", url=url)]]),
+        )
         return
 
     if text == MENU_ALL_PRODUCT_PREVIEW:
@@ -1390,14 +2247,20 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
         deposit_text = "Ya" if has_deposit_100 else "Belum"
         submission_id = str(saved.get("submission_id") or "-")
 
+        admin_notified = False
         try:
-            await send_submission_to_admin_group(context, saved)
+            admin_notified = await send_submission_to_admin_group(context, saved)
         except Exception:
             logger.exception("Failed to send verification notification to admin group")
 
+        notify_text = (
+            "Permohonan anda telah direkod dan dihantar ke admin.\n"
+            if admin_notified
+            else "Permohonan anda telah direkod. Notifikasi admin belum berjaya dihantar.\n"
+        )
         await message.reply_text(
             "✅ Pengesahan diterima.\n"
-            "Permohonan anda telah direkod dan dihantar ke admin.\n"
+            f"{notify_text}"
             "Sila tunggu approval.\n\n"
             f"Submission ID: {submission_id}\n"
             f"Wallet ID: {wallet_id}\n"
@@ -1439,10 +2302,16 @@ def main() -> None:
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
     )
     logging.getLogger("httpx").setLevel(logging.WARNING)
+    try:
+        init_sidebot_storage()
+    except sqlite3.Error:
+        logger.warning("Sidebot storage init failed, continuing with JSON fallback", exc_info=True)
 
     app = ApplicationBuilder().token(get_token()).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("groupid", group_id))
+    app.add_handler(CommandHandler("dbreport", db_report))
+    app.add_handler(CommandHandler("dbhealth", db_health))
     app.add_handler(CallbackQueryHandler(handle_tnc_callback, pattern=f"^({TNC_ACCEPT}|{TNC_DECLINE})$"))
     app.add_handler(
         CallbackQueryHandler(
@@ -1454,6 +2323,7 @@ def main() -> None:
     app.add_handler(CallbackQueryHandler(handle_user_ib_callback, pattern=f"^({CB_USER_IB_DONE}|{CB_USER_IB_CANCEL}).*"))
     app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp_data))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+    app.add_error_handler(handle_application_error)
     app.run_polling()
 
 
