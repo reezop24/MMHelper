@@ -3061,7 +3061,7 @@ def has_fibo_next_profile_access(user_id: int) -> bool:
                 SELECT 1 AS ok
                 FROM vip_whitelist
                 WHERE user_id = ?
-                  AND tier IN ('vip1', 'vip2')
+                  AND tier IN ('vip2')
                   AND status IN ('active', 'approved')
                 LIMIT 1
                 """,

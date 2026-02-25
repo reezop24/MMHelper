@@ -44,6 +44,7 @@ CB_VERIF_APPROVE = "VERIF_APPROVE"
 CB_VERIF_PENDING = "VERIF_PENDING"
 CB_VERIF_REJECT = "VERIF_REJECT"
 CB_VERIF_REQUEST_DEPOSIT = "VERIF_REQUEST_DEPOSIT"
+CB_VERIF_REQUEST_PAYMENT_CUSTOM = "VERIF_REQUEST_PAYMENT_CUSTOM"
 CB_VERIF_REQUEST_CHANGE_IB = "VERIF_REQUEST_CHANGE_IB"
 CB_VERIF_REVOKE_VIP = "VERIF_REVOKE_VIP"
 CB_USER_DEPOSIT_DONE = "USER_DEPOSIT_DONE"
@@ -64,6 +65,7 @@ MENU_OPEN_MMHELPER_BOT = "🤖 Buka MM Helper Bot"
 MENU_OPEN_EVIDEO_BOT = "🎥 Buka NEXT eVideo Bot"
 MENU_ALL_PRODUCT_PREVIEW = "🛍️ All Product Preview (coming soon)"
 MENU_ADMIN_PANEL = "🛡️ Admin Panel"
+MENU_ADMIN_USERS = "👥 User Directory"
 MENU_BETA_RESET = "🧪 BETA RESET"
 MENU_CHECK_UNDER_IB = "🔎 Check Under IB"
 MENU_BACK_MAIN = "⬅️ Back to Main Menu"
@@ -666,6 +668,98 @@ def get_onetime_evideo_webapp_url() -> str:
         return f"{base}/one-time-purchase.html"
 
 
+def get_admin_users_webapp_base_url() -> str:
+    explicit = (os.getenv("SIDEBOT_ADMIN_USERS_WEBAPP_URL") or "").strip()
+    if explicit.lower().startswith("https://"):
+        return explicit
+
+    base = get_register_next_webapp_url()
+    if not base:
+        return ""
+    try:
+        parts = urlsplit(base)
+        path = parts.path or "/"
+        if path.endswith("/"):
+            new_path = f"{path}admin-users.html"
+        elif path.endswith(".html"):
+            parent = path.rsplit("/", 1)[0] if "/" in path else ""
+            new_path = f"{parent}/admin-users.html" if parent else "/admin-users.html"
+        else:
+            new_path = f"{path}/admin-users.html"
+        return urlunsplit((parts.scheme, parts.netloc, new_path, parts.query, parts.fragment))
+    except Exception:
+        if base.endswith("/"):
+            return f"{base}admin-users.html"
+        if base.endswith(".html"):
+            return f"{base.rsplit('/', 1)[0]}/admin-users.html"
+        return f"{base}/admin-users.html"
+
+
+def _format_dt_display(value: str) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return "-"
+    try:
+        dt = datetime.fromisoformat(raw)
+    except ValueError:
+        return raw
+    return dt.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+
+def _admin_users_payload() -> str:
+    out: dict[str, list[dict[str, str]]] = {"next_member": [], "evideo_subscriber": []}
+    try:
+        with _connect_shared_db() as conn:
+            _ensure_submissions_table(conn)
+            rows = conn.execute(
+                """
+                SELECT submission_id, user_id, telegram_username, full_name, registration_flow, submitted_at, reviewed_at
+                FROM sidebot_submissions
+                WHERE LOWER(COALESCE(status, '')) = 'approved'
+                ORDER BY COALESCE(reviewed_at, submitted_at) DESC, submission_id DESC
+                """
+            ).fetchall()
+    except sqlite3.Error:
+        logger.warning("Failed to build admin users payload from DB", exc_info=True)
+        return json.dumps(out, ensure_ascii=False)
+
+    seen_next: set[str] = set()
+    seen_evideo: set[str] = set()
+    for row in rows:
+        user_id = str(row["user_id"] or "").strip()
+        if not user_id:
+            continue
+        flow = str(row["registration_flow"] or "").strip().lower()
+        user_item = {
+            "name": str(row["full_name"] or "-"),
+            "telegram_username": str(row["telegram_username"] or ""),
+            "user_id": user_id,
+            "verification_date": _format_dt_display(str(row["submitted_at"] or "")),
+            "approval_date": _format_dt_display(str(row["reviewed_at"] or "")),
+        }
+        if flow == "one_time_purchase":
+            if user_id in seen_evideo:
+                continue
+            seen_evideo.add(user_id)
+            out["evideo_subscriber"].append(user_item)
+            continue
+        if user_id in seen_next:
+            continue
+        seen_next.add(user_id)
+        out["next_member"].append(user_item)
+
+    return json.dumps(out, ensure_ascii=False)
+
+
+def get_admin_users_webapp_url() -> str:
+    base = get_admin_users_webapp_base_url()
+    if not base:
+        return ""
+    payload = quote(_admin_users_payload(), safe="")
+    sep = "&" if "?" in base else "?"
+    return f"{base}{sep}admin_users_payload={payload}"
+
+
 def get_mmhelper_bot_url() -> str:
     url = (os.getenv("SIDEBOT_MMHELPER_BOT_URL") or "").strip()
     if url.startswith("https://t.me/"):
@@ -1000,9 +1094,12 @@ def save_vip_whitelist(data: dict) -> None:
     _write_json_mirror(data)
 
 
-def add_user_to_vip1(item: dict) -> None:
+def add_user_to_vip_tier(item: dict, tier: str) -> None:
+    tier_key = str(tier or "").strip().lower()
+    if tier_key not in {"vip1", "vip2", "vip3"}:
+        return
     data = load_vip_whitelist()
-    vip_users = data.setdefault("vip1", {}).setdefault("users", {})
+    vip_users = data.setdefault(tier_key, {}).setdefault("users", {})
     user_id = str(item.get("user_id"))
     vip_users[user_id] = {
         "user_id": item.get("user_id"),
@@ -1016,12 +1113,19 @@ def add_user_to_vip1(item: dict) -> None:
     save_vip_whitelist(data)
 
 
-def remove_user_from_vip1(user_id: int) -> bool:
+def remove_user_from_vip_tier(user_id: int, tier: str) -> bool:
+    tier_key = str(tier or "").strip().lower()
+    if tier_key not in {"vip1", "vip2", "vip3"}:
+        return False
     data = load_vip_whitelist()
-    vip_users = data.setdefault("vip1", {}).setdefault("users", {})
+    vip_users = data.setdefault(tier_key, {}).setdefault("users", {})
     removed = vip_users.pop(str(user_id), None)
     save_vip_whitelist(data)
     return removed is not None
+
+
+def _tier_for_registration_flow(registration_flow: str) -> str:
+    return "vip3" if str(registration_flow or "").strip().lower() == "one_time_purchase" else "vip2"
 
 
 def get_required_deposit_amount(registration_flow: str) -> int:
@@ -1165,8 +1269,94 @@ def store_verification_submission(
     return payload
 
 
+def store_onetime_payment_submission(
+    *,
+    user_id: int,
+    telegram_username: str,
+    full_name: str,
+    phone_number: str,
+    transfer_to: str,
+    amount_paid: int,
+) -> dict:
+    submission_id = f"{user_id}-{uuid4().hex[:12]}"
+    payload = {
+        "submission_id": submission_id,
+        "user_id": user_id,
+        "telegram_username": telegram_username or "",
+        "wallet_id": "",
+        "has_deposit_100": True,
+        "full_name": full_name,
+        "phone_number": phone_number,
+        "registration_flow": "one_time_purchase",
+        "ib_request_submitted": None,
+        "deposit_required_usd": 0,
+        "submitted_at": datetime.now(timezone.utc).isoformat(),
+        "status": "pending",
+        "admin_group_message_id": None,
+        "user_deposit_prompt_message_id": None,
+        "user_ib_prompt_message_id": None,
+        "transfer_to": transfer_to,
+        "amount_paid": int(amount_paid),
+        "payment_request_amount_rm": 350,
+    }
+
+    try:
+        with _connect_shared_db() as conn:
+            _ensure_users_table(conn)
+            _ensure_submissions_table(conn)
+            _migrate_state_to_structured_tables_if_needed(conn)
+            row = conn.execute(
+                "SELECT tnc_accepted FROM sidebot_users WHERE user_id = ?",
+                (str(user_id),),
+            ).fetchone()
+            tnc_accepted = bool(int(row["tnc_accepted"])) if row is not None else False
+            _upsert_user_row(
+                conn,
+                user_id=user_id,
+                telegram_username=telegram_username or "",
+                full_name=full_name,
+                phone_number=phone_number,
+                wallet_id="",
+                tnc_accepted=tnc_accepted,
+                latest_submission_id=submission_id,
+            )
+            _insert_or_replace_submission(conn, payload)
+            _sync_state_json_mirror_from_db(conn)
+            return payload
+    except sqlite3.Error:
+        logger.warning("Failed writing one-time purchase submission into shared DB, fallback to JSON state", exc_info=True)
+
+    state = load_state()
+    users = state.setdefault("users", {})
+    user_obj = users.setdefault(str(user_id), {})
+    existing = user_obj.get("verification_history")
+    history = existing if isinstance(existing, list) else []
+    history.append(payload)
+    user_obj.update(
+        {
+            "user_id": user_id,
+            "telegram_username": telegram_username or "",
+            "full_name": full_name,
+            "phone_number": phone_number,
+            "wallet_id": "",
+            "latest_verification": payload,
+            "verification_history": history,
+        }
+    )
+    submissions = state.setdefault("verification_submissions", {})
+    if not isinstance(submissions, dict):
+        submissions = {}
+        state["verification_submissions"] = submissions
+    submissions[submission_id] = payload
+    save_state(state)
+    return payload
+
+
 def verification_action_keyboard(submission_id: str, registration_flow: str) -> InlineKeyboardMarkup:
-    second_row = [InlineKeyboardButton("💸 Request Deposit", callback_data=f"{CB_VERIF_REQUEST_DEPOSIT}:{submission_id}")]
+    request_label = "💸 Request Payment" if registration_flow == "one_time_purchase" else "💸 Request Deposit"
+    second_row = [InlineKeyboardButton(request_label, callback_data=f"{CB_VERIF_REQUEST_DEPOSIT}:{submission_id}")]
+    if registration_flow == "one_time_purchase":
+        second_row.append(InlineKeyboardButton("✍️ Request Payment (Custom)", callback_data=f"{CB_VERIF_REQUEST_PAYMENT_CUSTOM}:{submission_id}"))
     if registration_flow == "ib_transfer":
         second_row.append(InlineKeyboardButton("🔁 Request Change IB", callback_data=f"{CB_VERIF_REQUEST_CHANGE_IB}:{submission_id}"))
     return InlineKeyboardMarkup(
@@ -1189,11 +1379,12 @@ def approved_admin_keyboard(submission_id: str) -> InlineKeyboardMarkup:
     )
 
 
-def user_deposit_keyboard(submission_id: str) -> InlineKeyboardMarkup:
+def user_deposit_keyboard(submission_id: str, registration_flow: str = "") -> InlineKeyboardMarkup:
+    done_label = "✅ Payment Selesai" if registration_flow == "one_time_purchase" else "✅ Deposit Selesai"
     return InlineKeyboardMarkup(
         [
             [
-                InlineKeyboardButton("✅ Deposit Selesai", callback_data=f"{CB_USER_DEPOSIT_DONE}:{submission_id}"),
+                InlineKeyboardButton(done_label, callback_data=f"{CB_USER_DEPOSIT_DONE}:{submission_id}"),
                 InlineKeyboardButton("❌ Batal", callback_data=f"{CB_USER_DEPOSIT_CANCEL}:{submission_id}"),
             ]
         ]
@@ -1354,6 +1545,25 @@ def render_admin_submission_text(item: dict) -> str:
         "under_ib_reezo": "Client Under IB Reezo",
     }
     flow_text = flow_text_map.get(flow, flow)
+    if flow == "one_time_purchase":
+        channel = str(item.get("transfer_to") or "").strip().lower()
+        channel_text = {"maybank": "Maybank", "tng": "TNG"}.get(channel, channel or "-")
+        amount_paid = int(item.get("amount_paid") or 0)
+        requested_amount_rm = int(item.get("payment_request_amount_rm") or 0)
+        requested_line = f"Requested Payment: RM{requested_amount_rm}\n" if requested_amount_rm > 0 else ""
+        return (
+            "🧾 One-Time Purchase Payment Submit\n\n"
+            f"Flow: One-Time Purchase\n"
+            f"Submission ID: {item.get('submission_id')}\n"
+            f"User ID: {user_id}\n"
+            f"Username: {username_text}\n"
+            f"Nama: {item.get('full_name')}\n"
+            f"No Telefon: {item.get('phone_number')}\n"
+            f"Saluran Pembayaran: {channel_text}\n"
+            f"Jumlah Bayaran: RM{amount_paid}\n"
+            f"{requested_line}"
+            f"Status: {status_text}"
+        )
     ib_req = item.get("ib_request_submitted")
     ib_req_text = ""
     if flow == "ib_transfer":
@@ -1467,17 +1677,26 @@ async def send_user_deposit_request_message(
     user_id = item.get("user_id")
     if not isinstance(user_id, int):
         return
-    deposit_required_usd = int(item.get("deposit_required_usd") or get_required_deposit_amount(str(item.get("registration_flow") or "")))
+    registration_flow = str(item.get("registration_flow") or "")
+    deposit_required_usd = int(item.get("deposit_required_usd") or get_required_deposit_amount(registration_flow))
     await clear_user_deposit_prompt(context, item)
     await clear_user_ib_prompt(context, item)
-    sent = await context.bot.send_message(
-        chat_id=user_id,
-        text=(
+    if registration_flow == "one_time_purchase":
+        requested_amount_rm = int(item.get("payment_request_amount_rm") or 350)
+        request_text = (
+            f"Sila buat pembayaran RM{requested_amount_rm} untuk melengkapkan proses one-time purchase.\n\n"
+            "Tekan butang PAYMENT SELESAI untuk pengesahan semula."
+        )
+    else:
+        request_text = (
             f"Sila buat deposit USD{deposit_required_usd} ke akaun Amarkets ({item.get('wallet_id')}) "
             "untuk melengkapkan proses pendaftaran.\n\n"
             "Tekan butang DEPOSIT SELESAI untuk pengesahan semula."
-        ),
-        reply_markup=user_deposit_keyboard(submission_id),
+        )
+    sent = await context.bot.send_message(
+        chat_id=user_id,
+        text=request_text,
+        reply_markup=user_deposit_keyboard(submission_id, registration_flow=registration_flow),
     )
     update_submission_fields(submission_id, {"user_deposit_prompt_message_id": sent.message_id})
 
@@ -1560,6 +1779,7 @@ def admin_panel_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         [
             [KeyboardButton(MENU_CHECK_UNDER_IB)],
+            [KeyboardButton(MENU_ADMIN_USERS)],
             [KeyboardButton(MENU_BETA_RESET)],
             [KeyboardButton(MENU_BACK_MAIN)],
         ],
@@ -1673,11 +1893,16 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
             CB_VERIF_REJECT: "rejected",
         }
         if action == CB_VERIF_REQUEST_DEPOSIT:
+            current = get_submission(submission_id)
+            registration_flow = str(current.get("registration_flow") or "") if isinstance(current, dict) else ""
+            next_status = "request_payment" if registration_flow == "one_time_purchase" else "request_deposit"
+            request_amount = 350 if registration_flow == "one_time_purchase" else None
             item = update_submission_fields(
                 submission_id=submission_id,
                 fields={
-                    "status": "request_deposit",
+                    "status": next_status,
                     "has_deposit_100": False,
+                    "payment_request_amount_rm": request_amount,
                     "reviewed_at": datetime.now(timezone.utc).isoformat(),
                     "reviewed_by": query.from_user.id,
                 },
@@ -1692,7 +1917,27 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 except Exception:
                     logger.exception("Failed to notify user for deposit request")
             await refresh_admin_submission_message(context, submission_id)
-            await _reply_to_query_message(query, f"✅ Request deposit dihantar kepada user untuk submission {submission_id}.")
+            if registration_flow == "one_time_purchase":
+                await _reply_to_query_message(query, f"✅ Request payment RM350 dihantar kepada user untuk submission {submission_id}.")
+            else:
+                await _reply_to_query_message(query, f"✅ Request deposit dihantar kepada user untuk submission {submission_id}.")
+            return
+
+        if action == CB_VERIF_REQUEST_PAYMENT_CUSTOM:
+            current = get_submission(submission_id)
+            if not isinstance(current, dict):
+                await _reply_to_query_message(query, "❌ Rekod submission tak jumpa atau dah dipadam.")
+                return
+            registration_flow = str(current.get("registration_flow") or "")
+            if registration_flow != "one_time_purchase":
+                await _reply_to_query_message(query, "⚠️ Mode ini hanya untuk one-time purchase.")
+                return
+            context.user_data["awaiting_custom_payment_submission_id"] = submission_id
+            await _reply_to_query_message(
+                query,
+                "Masukkan amaun payment dalam RM untuk user ini.\nContoh: `350` atau `RM350`\n\nTaip `cancel` untuk batal.",
+                parse_mode="Markdown",
+            )
             return
 
         if action == CB_VERIF_REQUEST_CHANGE_IB:
@@ -1724,10 +1969,11 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 await _reply_to_query_message(query, "❌ Rekod submission tak jumpa atau dah dipadam.")
                 return
             user_id = item.get("user_id")
+            registration_flow = str(item.get("registration_flow") or "")
             if not isinstance(user_id, int):
                 await _reply_to_query_message(query, "❌ User ID tak sah.")
                 return
-            remove_user_from_vip1(user_id)
+            remove_user_from_vip_tier(user_id, _tier_for_registration_flow(registration_flow))
             update_submission_fields(
                 submission_id=submission_id,
                 fields={
@@ -1739,12 +1985,16 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
             await clear_user_deposit_prompt_by_submission(context, submission_id)
             await clear_user_ib_prompt_by_submission(context, submission_id)
             try:
+                revoked_text = (
+                    "Akses one-time purchase NEXT eVideo26 anda telah ditarik semula oleh admin.\n"
+                    "Sila hubungi admin untuk maklumat lanjut."
+                    if registration_flow == "one_time_purchase"
+                    else "Akses NEXTexclusive anda telah ditarik semula oleh admin.\n"
+                    "Sila hubungi admin untuk maklumat lanjut."
+                )
                 await context.bot.send_message(
                     chat_id=user_id,
-                    text=(
-                        "Akses NEXTexclusive anda telah ditarik semula oleh admin.\n"
-                        "Sila hubungi admin untuk maklumat lanjut."
-                    ),
+                    text=revoked_text,
                 )
             except Exception:
                 logger.exception("Failed to notify user after revoke")
@@ -1763,17 +2013,22 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
             return
 
         target_user_id = updated.get("user_id")
+        registration_flow = str(updated.get("registration_flow") or "")
         if isinstance(target_user_id, int):
             await clear_user_deposit_prompt_by_submission(context, submission_id)
             await clear_user_ib_prompt_by_submission(context, submission_id)
             try:
                 if status == "rejected":
+                    rejected_text = (
+                        "Permohonan NEXT eVideo26 one-time purchase anda tidak diluluskan.\n"
+                        "Sila hubungi admin untuk maklumat lanjut."
+                        if registration_flow == "one_time_purchase"
+                        else "Permohonan akses NEXTexclusive anda tidak diluluskan.\n"
+                        "Sila buat pendaftaran baru."
+                    )
                     await context.bot.send_message(
                         chat_id=target_user_id,
-                        text=(
-                            "Permohonan akses NEXTexclusive anda tidak diluluskan.\n"
-                            "Sila buat pendaftaran baru."
-                        ),
+                        text=rejected_text,
                     )
                 elif status == "pending":
                     await context.bot.send_message(
@@ -1784,12 +2039,16 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                         ),
                     )
                 elif status == "approved":
-                    add_user_to_vip1(updated)
+                    add_user_to_vip_tier(updated, _tier_for_registration_flow(registration_flow))
+                    approved_text = (
+                        "Tahniah! Pembayaran one-time purchase NEXT eVideo26 anda telah diluluskan.\n"
+                        "Sila tunggu arahan akses seterusnya daripada admin."
+                        if registration_flow == "one_time_purchase"
+                        else "Tahniah! Anda kini boleh menikmati semua keistimewaan/privilege NEXTexclusive."
+                    )
                     await context.bot.send_message(
                         chat_id=target_user_id,
-                        text=(
-                            "Tahniah! Anda kini boleh menikmati semua keistimewaan/privilege NEXTexclusive."
-                        ),
+                        text=approved_text,
                     )
             except Exception:
                 logger.exception("Failed to send status update to user")
@@ -2062,6 +2321,53 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         )
         return
 
+    awaiting_custom_payment_submission_id = str(context.user_data.get("awaiting_custom_payment_submission_id") or "").strip()
+    if awaiting_custom_payment_submission_id:
+        if not is_admin_user(user.id):
+            context.user_data.pop("awaiting_custom_payment_submission_id", None)
+            await message.reply_text("❌ Akses ditolak.")
+            return
+        lowered = text.lower().strip()
+        if lowered in {"cancel", "batal"}:
+            context.user_data.pop("awaiting_custom_payment_submission_id", None)
+            await message.reply_text("Request payment custom dibatalkan.", reply_markup=admin_panel_keyboard())
+            return
+        amount_text = lowered.replace("rm", "").replace(",", "").replace(" ", "")
+        if not amount_text.isdigit():
+            await message.reply_text("❌ Amaun tak sah. Masukkan nombor sahaja, contoh `350` atau `RM350`.", parse_mode="Markdown")
+            return
+        amount_rm = int(amount_text)
+        if amount_rm <= 0:
+            await message.reply_text("❌ Amaun mesti lebih besar dari 0.")
+            return
+
+        context.user_data.pop("awaiting_custom_payment_submission_id", None)
+        item = update_submission_fields(
+            submission_id=awaiting_custom_payment_submission_id,
+            fields={
+                "status": "request_payment",
+                "has_deposit_100": False,
+                "payment_request_amount_rm": amount_rm,
+                "reviewed_at": datetime.now(timezone.utc).isoformat(),
+                "reviewed_by": user.id,
+            },
+        )
+        if not item:
+            await message.reply_text("❌ Rekod submission tak jumpa atau dah dipadam.", reply_markup=admin_panel_keyboard())
+            return
+        target_user_id = item.get("user_id")
+        if isinstance(target_user_id, int):
+            try:
+                await send_user_deposit_request_message(context, awaiting_custom_payment_submission_id, item)
+            except Exception:
+                logger.exception("Failed to send custom payment request")
+        await refresh_admin_submission_message(context, awaiting_custom_payment_submission_id)
+        await message.reply_text(
+            f"✅ Request payment RM{amount_rm} dihantar kepada user untuk submission {awaiting_custom_payment_submission_id}.",
+            reply_markup=admin_panel_keyboard(),
+        )
+        return
+
     if text == MENU_ADMIN_PANEL:
         if not is_admin_user(user.id):
             await message.reply_text("❌ Akses ditolak.", reply_markup=main_menu_keyboard(user.id))
@@ -2077,6 +2383,24 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         await message.reply_text(
             "Masukkan AMarkets Wallet ID (7 angka) untuk semakan under IB.",
             reply_markup=admin_panel_keyboard(),
+        )
+        return
+
+    if text == MENU_ADMIN_USERS:
+        if not is_admin_user(user.id):
+            await message.reply_text("❌ Akses ditolak.", reply_markup=main_menu_keyboard(user.id))
+            return
+        admin_users_url = get_admin_users_webapp_url()
+        if not admin_users_url:
+            await message.reply_text("Miniapp URL belum diset. Isi SIDEBOT_ADMIN_USERS_WEBAPP_URL atau SIDEBOT_REGISTER_WEBAPP_URL dalam .env dulu.")
+            return
+        button = KeyboardButton(MENU_ADMIN_USERS, web_app=WebAppInfo(url=admin_users_url))
+        await message.reply_text(
+            "Buka miniapp User Directory di bawah.",
+            reply_markup=ReplyKeyboardMarkup(
+                [[button], [KeyboardButton(MENU_ADMIN_PANEL)], [KeyboardButton(MENU_BACK_MAIN)]],
+                resize_keyboard=True,
+            ),
         )
         return
 
@@ -2293,6 +2617,54 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 logger.exception("Failed to send deposit request after verification submit")
         return
 
+    if payload_type == "sidebot_onetime_payment_submit":
+        full_name = str(payload.get("full_name") or "").strip()
+        phone_number = str(payload.get("phone_number") or "").strip()
+        transfer_to = str(payload.get("transfer_to") or "").strip().lower()
+        amount_raw = str(payload.get("amount_paid") or "").strip()
+
+        if not full_name or not phone_number or transfer_to not in {"maybank", "tng"} or not amount_raw:
+            await message.reply_text("❌ Data pengesahan pembayaran tak lengkap. Sila isi semula.")
+            return
+        if not amount_raw.isdigit():
+            await message.reply_text("❌ Jumlah bayaran mesti nombor sahaja.")
+            return
+
+        amount_paid = int(amount_raw)
+        if amount_paid <= 0:
+            await message.reply_text("❌ Jumlah bayaran mesti lebih dari 0.")
+            return
+
+        saved = store_onetime_payment_submission(
+            user_id=user.id,
+            telegram_username=str(user.username or ""),
+            full_name=full_name,
+            phone_number=phone_number,
+            transfer_to=transfer_to,
+            amount_paid=amount_paid,
+        )
+        submission_id = str(saved.get("submission_id") or "-")
+
+        admin_notified = False
+        try:
+            admin_notified = await send_submission_to_admin_group(context, saved)
+        except Exception:
+            logger.exception("Failed to send one-time payment notification to admin group")
+
+        notify_text = (
+            "Pengesahan pembayaran anda telah dihantar ke admin."
+            if admin_notified
+            else "Pengesahan pembayaran direkod, tetapi notifikasi admin belum berjaya dihantar."
+        )
+        await message.reply_text(
+            "✅ Pengesahan pembayaran one-time purchase diterima.\n"
+            f"{notify_text}\n"
+            f"Submission ID: {submission_id}\n"
+            "Sila tunggu semakan admin.",
+            reply_markup=main_menu_keyboard(user.id),
+        )
+        return
+
     await message.reply_text("ℹ️ Miniapp demo diterima.", reply_markup=main_menu_keyboard(user.id))
 
 
@@ -2316,7 +2688,7 @@ def main() -> None:
     app.add_handler(
         CallbackQueryHandler(
             handle_admin_callback,
-            pattern=f"^({CB_BETA_RESET_CONFIRM}|{CB_BETA_RESET_CANCEL}|{CB_VERIF_APPROVE}|{CB_VERIF_PENDING}|{CB_VERIF_REJECT}|{CB_VERIF_REQUEST_DEPOSIT}|{CB_VERIF_REQUEST_CHANGE_IB}|{CB_VERIF_REVOKE_VIP}).*",
+            pattern=f"^({CB_BETA_RESET_CONFIRM}|{CB_BETA_RESET_CANCEL}|{CB_VERIF_APPROVE}|{CB_VERIF_PENDING}|{CB_VERIF_REJECT}|{CB_VERIF_REQUEST_DEPOSIT}|{CB_VERIF_REQUEST_PAYMENT_CUSTOM}|{CB_VERIF_REQUEST_CHANGE_IB}|{CB_VERIF_REVOKE_VIP}).*",
         )
     )
     app.add_handler(CallbackQueryHandler(handle_user_deposit_callback, pattern=f"^({CB_USER_DEPOSIT_DONE}|{CB_USER_DEPOSIT_CANCEL}).*"))

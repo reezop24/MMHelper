@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin User Directory</title>
+  <link rel="stylesheet" href="global.css" />
+  <style>
+    body {
+      margin: 0;
+      background: linear-gradient(160deg, #f6f9ff 0%, #edf3ff 100%);
+      color: #10203a;
+      font-family: "Segoe UI", Tahoma, sans-serif;
+    }
+    .wrap {
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 18px 14px 26px;
+    }
+    .top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .title {
+      font-size: 20px;
+      font-weight: 700;
+      margin: 0;
+    }
+    .subtitle {
+      margin: 2px 0 0;
+      color: #3f4f6a;
+      font-size: 13px;
+    }
+    .back-btn {
+      border: 1px solid #c8d7f8;
+      border-radius: 10px;
+      background: #fff;
+      color: #1a2f58;
+      font-weight: 600;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+    .tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin: 14px 0 12px;
+    }
+    .tab {
+      border: 1px solid #c7d8ff;
+      border-radius: 12px;
+      background: #f8fbff;
+      color: #22427d;
+      font-weight: 700;
+      padding: 10px 8px;
+      cursor: pointer;
+    }
+    .tab.active {
+      background: #2256b7;
+      border-color: #2256b7;
+      color: #fff;
+    }
+    .meta {
+      color: #4b5f83;
+      font-size: 13px;
+      margin-bottom: 10px;
+    }
+    .list {
+      display: grid;
+      gap: 10px;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid #d9e5ff;
+      border-radius: 12px;
+      padding: 12px;
+      box-shadow: 0 4px 12px rgba(32, 73, 151, 0.08);
+    }
+    .name {
+      font-size: 16px;
+      font-weight: 700;
+      color: #17356a;
+      margin: 0 0 8px;
+    }
+    .line {
+      margin: 3px 0;
+      font-size: 13px;
+      color: #1f3358;
+    }
+    .label {
+      color: #5a7098;
+      font-weight: 600;
+      margin-right: 5px;
+    }
+    .empty {
+      border: 1px dashed #b7c9ef;
+      border-radius: 12px;
+      background: #f8fbff;
+      color: #4b5f83;
+      padding: 14px;
+      text-align: center;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="top">
+      <div>
+        <h1 class="title">Admin User Directory</h1>
+        <p class="subtitle">Senarai pengguna ikut kategori kelulusan</p>
+      </div>
+      <button id="backBtn" type="button" class="back-btn">⬅️ Back</button>
+    </div>
+
+    <div class="tabs">
+      <button id="tabNext" type="button" class="tab active">Next Member</button>
+      <button id="tabEvideo" type="button" class="tab">Evideo Subscriber</button>
+    </div>
+
+    <div id="meta" class="meta">Loading data...</div>
+    <section id="list" class="list"></section>
+  </main>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    (function () {
+      var tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+      if (tg) {
+        tg.ready();
+        tg.expand();
+      }
+
+      var tabNext = document.getElementById("tabNext");
+      var tabEvideo = document.getElementById("tabEvideo");
+      var metaEl = document.getElementById("meta");
+      var listEl = document.getElementById("list");
+      var backBtn = document.getElementById("backBtn");
+      var active = "next_member";
+
+      function parsePayload() {
+        try {
+          var raw = new URLSearchParams(window.location.search).get("admin_users_payload");
+          if (!raw) return { next_member: [], evideo_subscriber: [] };
+          var parsed = JSON.parse(raw);
+          if (!parsed || typeof parsed !== "object") return { next_member: [], evideo_subscriber: [] };
+          return {
+            next_member: Array.isArray(parsed.next_member) ? parsed.next_member : [],
+            evideo_subscriber: Array.isArray(parsed.evideo_subscriber) ? parsed.evideo_subscriber : []
+          };
+        } catch (e) {
+          return { next_member: [], evideo_subscriber: [] };
+        }
+      }
+
+      var data = parsePayload();
+
+      function buildCard(item) {
+        var username = item.telegram_username ? "@" + item.telegram_username : "-";
+        return (
+          '<article class="card">' +
+            '<p class="name">' + (item.name || "-") + "</p>" +
+            '<p class="line"><span class="label">Telegram:</span>' + username + "</p>" +
+            '<p class="line"><span class="label">User ID:</span>' + (item.user_id || "-") + "</p>" +
+            '<p class="line"><span class="label">Tarikh Pengesahan:</span>' + (item.verification_date || "-") + "</p>" +
+            '<p class="line"><span class="label">Tarikh Approval:</span>' + (item.approval_date || "-") + "</p>" +
+          "</article>"
+        );
+      }
+
+      function render() {
+        var arr = active === "next_member" ? data.next_member : data.evideo_subscriber;
+        var label = active === "next_member" ? "Next Member" : "Evideo Subscriber";
+        tabNext.classList.toggle("active", active === "next_member");
+        tabEvideo.classList.toggle("active", active === "evideo_subscriber");
+        metaEl.textContent = label + " • " + arr.length + " user";
+        if (!arr.length) {
+          listEl.innerHTML = '<div class="empty">Tiada user dalam kategori ini.</div>';
+          return;
+        }
+        var html = "";
+        for (var i = 0; i < arr.length; i += 1) html += buildCard(arr[i] || {});
+        listEl.innerHTML = html;
+      }
+
+      function backToMainMenu() {
+        var payload = { type: "sidebot_back_to_main_menu" };
+        if (tg) {
+          tg.sendData(JSON.stringify(payload));
+          tg.close();
+          return;
+        }
+        window.history.back();
+      }
+
+      tabNext.addEventListener("click", function () { active = "next_member"; render(); });
+      tabEvideo.addEventListener("click", function () { active = "evideo_subscriber"; render(); });
+      backBtn.addEventListener("click", backToMainMenu);
+      render();
+    })();
+  </script>
+</body>
+</html>
