@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MMHelper SideBot Landing</title>
+  <link rel="stylesheet" href="landing-shared.css" />
+  <script src="landing-config.js"></script>
+</head>
+<body>
+  <div class="background-layer"></div>
+  <div class="watermark"></div>
+
+  <main class="page">
+    <header class="hero">
+      <img src="logo.png" alt="MMHelper" class="logo" />
+      <h1 id="heroTitle">MMHelper SideBot</h1>
+      <p id="heroSubtitle">Pilih saluran rasmi di bawah untuk teruskan.</p>
+    </header>
+
+    <section class="card">
+      <h2 class="section-title">Quick Access</h2>
+      <p class="section-subtitle">Semua link ini boleh dikemaskini dari Owner View tanpa ubah code HTML.</p>
+
+      <div class="action-list">
+        <a id="botButton" class="primary-btn" href="#" target="_blank" rel="noopener noreferrer">Open Bot</a>
+        <a id="channelButton" class="secondary-btn" href="#" target="_blank" rel="noopener noreferrer">Open WhatsApp Channel</a>
+      </div>
+
+      <div id="errorText" class="error-text"></div>
+      <div class="footer-note">MMHelper Official Access Page</div>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      var fallbackDefaults = {
+        title: "MMHelper SideBot",
+        subtitle: "Pilih saluran rasmi di bawah untuk teruskan.",
+        botLabel: "Open Bot",
+        channelLabel: "Open WhatsApp Channel",
+        botUrl: "https://t.me/MMHREEZO_BOT",
+        channelUrl: "https://whatsapp.com/channel/YOUR_CHANNEL_ID"
+      };
+      var defaults = Object.assign({}, fallbackDefaults, window.MMHELPER_LANDING_DEFAULTS || {});
+
+      function getParam(name) {
+        try {
+          var params = new URLSearchParams(window.location.search || "");
+          return String(params.get(name) || "").trim();
+        } catch (err) {
+          return "";
+        }
+      }
+
+      function safeText(input, fallback) {
+        return input ? input : fallback;
+      }
+
+      function safeUrl(input, fallback) {
+        if (!input) return fallback;
+        if (/^https?:\/\//i.test(input)) return input;
+        return fallback;
+      }
+
+      var title = safeText(getParam("title"), defaults.title);
+      var subtitle = safeText(getParam("subtitle"), defaults.subtitle);
+      var botLabel = safeText(getParam("bot_label"), defaults.botLabel);
+      var channelLabel = safeText(getParam("channel_label"), defaults.channelLabel);
+      var botUrl = safeUrl(getParam("bot_url"), defaults.botUrl);
+      var channelUrl = safeUrl(getParam("channel_url"), defaults.channelUrl);
+
+      var heroTitle = document.getElementById("heroTitle");
+      var heroSubtitle = document.getElementById("heroSubtitle");
+      var botButton = document.getElementById("botButton");
+      var channelButton = document.getElementById("channelButton");
+      var errorText = document.getElementById("errorText");
+
+      heroTitle.textContent = title;
+      heroSubtitle.textContent = subtitle;
+
+      botButton.textContent = botLabel;
+      botButton.href = botUrl;
+
+      channelButton.textContent = channelLabel;
+      channelButton.href = channelUrl;
+
+      var looksPlaceholder =
+        /YOUR_CHANNEL_ID/i.test(channelUrl) ||
+        /your_bot_username/i.test(botUrl) ||
+        botUrl === "https://t.me/" ||
+        channelUrl === "https://whatsapp.com/channel/";
+
+      if (looksPlaceholder) {
+        errorText.textContent = "Owner belum set link penuh lagi. Sila update dari Owner View.";
+      }
+    })();
+  </script>
+</body>
+</html>

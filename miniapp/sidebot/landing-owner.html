@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MMHelper Landing Owner</title>
+  <link rel="stylesheet" href="landing-shared.css" />
+  <script src="landing-config.js"></script>
+</head>
+<body>
+  <div class="background-layer"></div>
+  <div class="watermark"></div>
+
+  <main class="page">
+    <header class="hero">
+      <img src="logo.png" alt="MMHelper" class="logo" />
+      <h1>Owner Link Builder</h1>
+      <p>Isi form sekali, lepas itu copy URL user view yang siap dengan link custom.</p>
+    </header>
+
+    <section class="card">
+      <h2 class="section-title">Landing Setup</h2>
+      <div class="grid">
+        <div>
+          <label class="label" for="titleInput">Title</label>
+          <input class="input" id="titleInput" />
+        </div>
+
+        <div>
+          <label class="label" for="subtitleInput">Subtitle</label>
+          <textarea id="subtitleInput"></textarea>
+        </div>
+
+        <div>
+          <label class="label" for="botLabelInput">Bot Button Label</label>
+          <input class="input" id="botLabelInput" />
+        </div>
+
+        <div>
+          <label class="label" for="botUrlInput">Bot URL</label>
+          <input class="input" id="botUrlInput" placeholder="https://t.me/your_bot_username" />
+        </div>
+
+        <div>
+          <label class="label" for="channelLabelInput">Channel Button Label</label>
+          <input class="input" id="channelLabelInput" />
+        </div>
+
+        <div>
+          <label class="label" for="channelUrlInput">Channel URL</label>
+          <input class="input" id="channelUrlInput" placeholder="https://whatsapp.com/channel/your-id" />
+        </div>
+      </div>
+
+      <p class="inline-note">Tip: guna URL penuh bermula `https://` untuk elak link rosak.</p>
+
+      <div class="action-list">
+        <button id="openUserView" class="primary-btn" type="button">Open User View</button>
+        <button id="copyUserUrl" class="secondary-btn" type="button">Copy User URL</button>
+      </div>
+
+      <div id="errorText" class="error-text"></div>
+      <div id="successText" class="success-text"></div>
+    </section>
+
+    <section class="card">
+      <h2 class="section-title">Live Preview</h2>
+      <p class="section-subtitle">Preview ini ikut input semasa. User akan nampak rupa yang sama.</p>
+      <div class="action-list">
+        <a id="previewBotBtn" class="primary-btn" href="#" target="_blank" rel="noopener noreferrer">Open Bot</a>
+        <a id="previewChannelBtn" class="secondary-btn" href="#" target="_blank" rel="noopener noreferrer">Open WhatsApp Channel</a>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      var fallbackDefaults = {
+        title: "MMHelper SideBot",
+        subtitle: "Pilih saluran rasmi di bawah untuk teruskan.",
+        botLabel: "Open Bot",
+        channelLabel: "Open WhatsApp Channel",
+        botUrl: "https://t.me/MMHREEZO_BOT",
+        channelUrl: "https://whatsapp.com/channel/YOUR_CHANNEL_ID"
+      };
+      var defaults = Object.assign({}, fallbackDefaults, window.MMHELPER_LANDING_DEFAULTS || {});
+      var userPagePath = "landing-user.html";
+      var titleInput = document.getElementById("titleInput");
+      var subtitleInput = document.getElementById("subtitleInput");
+      var botLabelInput = document.getElementById("botLabelInput");
+      var botUrlInput = document.getElementById("botUrlInput");
+      var channelLabelInput = document.getElementById("channelLabelInput");
+      var channelUrlInput = document.getElementById("channelUrlInput");
+      var openUserViewBtn = document.getElementById("openUserView");
+      var copyUserUrlBtn = document.getElementById("copyUserUrl");
+      var previewBotBtn = document.getElementById("previewBotBtn");
+      var previewChannelBtn = document.getElementById("previewChannelBtn");
+      var errorText = document.getElementById("errorText");
+      var successText = document.getElementById("successText");
+
+      function toValue(el) {
+        return String((el && el.value) || "").trim();
+      }
+
+      function hasHttpUrl(value) {
+        return /^https?:\/\//i.test(value);
+      }
+
+      function buildUserUrl() {
+        var title = toValue(titleInput);
+        var subtitle = toValue(subtitleInput);
+        var botLabel = toValue(botLabelInput);
+        var botUrl = toValue(botUrlInput);
+        var channelLabel = toValue(channelLabelInput);
+        var channelUrl = toValue(channelUrlInput);
+
+        var params = new URLSearchParams();
+        if (title) params.set("title", title);
+        if (subtitle) params.set("subtitle", subtitle);
+        if (botLabel) params.set("bot_label", botLabel);
+        if (botUrl) params.set("bot_url", botUrl);
+        if (channelLabel) params.set("channel_label", channelLabel);
+        if (channelUrl) params.set("channel_url", channelUrl);
+
+        return userPagePath + "?" + params.toString();
+      }
+
+      function renderPreview() {
+        var botUrl = toValue(botUrlInput);
+        var channelUrl = toValue(channelUrlInput);
+
+        previewBotBtn.textContent = toValue(botLabelInput) || "Open Bot";
+        previewChannelBtn.textContent = toValue(channelLabelInput) || "Open WhatsApp Channel";
+        previewBotBtn.href = hasHttpUrl(botUrl) ? botUrl : "#";
+        previewChannelBtn.href = hasHttpUrl(channelUrl) ? channelUrl : "#";
+      }
+
+      function validateInputs() {
+        errorText.textContent = "";
+        successText.textContent = "";
+
+        var botUrl = toValue(botUrlInput);
+        var channelUrl = toValue(channelUrlInput);
+
+        if (!hasHttpUrl(botUrl)) {
+          errorText.textContent = "Bot URL mesti bermula dengan https:// atau http://";
+          return false;
+        }
+
+        if (!hasHttpUrl(channelUrl)) {
+          errorText.textContent = "Channel URL mesti bermula dengan https:// atau http://";
+          return false;
+        }
+
+        return true;
+      }
+
+      function saveDraft() {
+        var draft = {
+          title: toValue(titleInput),
+          subtitle: toValue(subtitleInput),
+          botLabel: toValue(botLabelInput),
+          botUrl: toValue(botUrlInput),
+          channelLabel: toValue(channelLabelInput),
+          channelUrl: toValue(channelUrlInput)
+        };
+
+        try {
+          localStorage.setItem("mmhelperLandingDraft", JSON.stringify(draft));
+        } catch (err) {
+          // ignore localStorage failures
+        }
+      }
+
+      function loadDraft() {
+        try {
+          var raw = localStorage.getItem("mmhelperLandingDraft");
+          if (!raw) return;
+          var draft = JSON.parse(raw);
+          if (draft.title) titleInput.value = draft.title;
+          if (draft.subtitle) subtitleInput.value = draft.subtitle;
+          if (draft.botLabel) botLabelInput.value = draft.botLabel;
+          if (draft.botUrl) botUrlInput.value = draft.botUrl;
+          if (draft.channelLabel) channelLabelInput.value = draft.channelLabel;
+          if (draft.channelUrl) channelUrlInput.value = draft.channelUrl;
+        } catch (err) {
+          // ignore parse errors
+        }
+      }
+
+      function onInputChange() {
+        renderPreview();
+        saveDraft();
+      }
+
+      function applyDefaults() {
+        titleInput.value = defaults.title;
+        subtitleInput.value = defaults.subtitle;
+        botLabelInput.value = defaults.botLabel;
+        botUrlInput.value = defaults.botUrl;
+        channelLabelInput.value = defaults.channelLabel;
+        channelUrlInput.value = defaults.channelUrl;
+      }
+
+      applyDefaults();
+      loadDraft();
+      renderPreview();
+
+      [titleInput, subtitleInput, botLabelInput, botUrlInput, channelLabelInput, channelUrlInput].forEach(function (el) {
+        el.addEventListener("input", onInputChange);
+      });
+
+      openUserViewBtn.addEventListener("click", function () {
+        if (!validateInputs()) return;
+        var url = buildUserUrl();
+        saveDraft();
+        window.open(url, "_blank", "noopener");
+      });
+
+      copyUserUrlBtn.addEventListener("click", async function () {
+        if (!validateInputs()) return;
+
+        var url = new URL(buildUserUrl(), window.location.href).toString();
+        saveDraft();
+
+        try {
+          await navigator.clipboard.writeText(url);
+          successText.textContent = "User URL berjaya disalin.";
+        } catch (err) {
+          successText.textContent = "Clipboard block. Copy manual: " + url;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
