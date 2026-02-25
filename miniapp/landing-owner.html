@@ -52,6 +52,15 @@
         </div>
       </div>
 
+      <div class="card" style="margin-top: 12px;">
+        <h3 class="section-title" style="font-size: 16px; margin-bottom: 8px;">Extra Buttons</h3>
+        <p class="section-subtitle">Tambah button tambahan (contoh: Website, TikTok, Telegram Channel lain).</p>
+        <div id="extraButtonsList" class="grid" style="margin-top: 10px;"></div>
+        <div class="action-list" style="margin-top: 10px;">
+          <button id="addExtraButton" class="secondary-btn" type="button">+ Add Extra Button</button>
+        </div>
+      </div>
+
       <p class="inline-note">Tip: guna URL penuh bermula `https://` untuk elak link rosak.</p>
 
       <div class="action-list">
@@ -69,6 +78,7 @@
       <div class="action-list">
         <a id="previewBotBtn" class="primary-btn" href="#" target="_blank" rel="noopener noreferrer">Open Bot</a>
         <a id="previewChannelBtn" class="secondary-btn" href="#" target="_blank" rel="noopener noreferrer">Open WhatsApp Channel</a>
+        <div id="previewExtraButtons" class="action-list" style="margin-top: 0;"></div>
       </div>
     </section>
   </main>
@@ -81,7 +91,8 @@
         botLabel: "Open Bot",
         channelLabel: "Open WhatsApp Channel",
         botUrl: "https://t.me/MMHREEZO_BOT",
-        channelUrl: "https://whatsapp.com/channel/YOUR_CHANNEL_ID"
+        channelUrl: "https://whatsapp.com/channel/YOUR_CHANNEL_ID",
+        extraButtons: []
       };
       var defaults = Object.assign({}, fallbackDefaults, window.MMHELPER_LANDING_DEFAULTS || {});
       var userPagePath = "landing-user.html";
@@ -91,10 +102,13 @@
       var botUrlInput = document.getElementById("botUrlInput");
       var channelLabelInput = document.getElementById("channelLabelInput");
       var channelUrlInput = document.getElementById("channelUrlInput");
+      var extraButtonsList = document.getElementById("extraButtonsList");
+      var addExtraButton = document.getElementById("addExtraButton");
       var openUserViewBtn = document.getElementById("openUserView");
       var copyUserUrlBtn = document.getElementById("copyUserUrl");
       var previewBotBtn = document.getElementById("previewBotBtn");
       var previewChannelBtn = document.getElementById("previewChannelBtn");
+      var previewExtraButtons = document.getElementById("previewExtraButtons");
       var errorText = document.getElementById("errorText");
       var successText = document.getElementById("successText");
 
@@ -106,6 +120,63 @@
         return /^https?:\/\//i.test(value);
       }
 
+      function normalizeExtraButtons(value) {
+        if (!Array.isArray(value)) return [];
+        return value
+          .map(function (item) {
+            return {
+              label: String((item && item.label) || "").trim(),
+              url: String((item && item.url) || "").trim()
+            };
+          })
+          .filter(function (item) {
+            return item.label || item.url;
+          });
+      }
+
+      function collectExtraButtons() {
+        var rows = Array.prototype.slice.call(extraButtonsList.querySelectorAll(".extra-btn-row"));
+        return rows
+          .map(function (row) {
+            var labelEl = row.querySelector(".extra-label");
+            var urlEl = row.querySelector(".extra-url");
+            return {
+              label: toValue(labelEl),
+              url: toValue(urlEl)
+            };
+          })
+          .filter(function (item) {
+            return item.label || item.url;
+          });
+      }
+
+      function renderExtraButtonsEditor(buttons) {
+        extraButtonsList.innerHTML = "";
+        buttons.forEach(function (item, idx) {
+          var row = document.createElement("div");
+          row.className = "extra-btn-row";
+          row.innerHTML =
+            '<div class="grid" style="grid-template-columns: 1fr; gap: 8px; border: 1px solid #5a3035; border-radius: 10px; padding: 10px;">' +
+              '<div><label class="label">Extra Label ' + (idx + 1) + '</label><input class="input extra-label" placeholder="Contoh: Website" value="' + (item.label || "").replace(/"/g, "&quot;") + '" /></div>' +
+              '<div><label class="label">Extra URL ' + (idx + 1) + '</label><input class="input extra-url" placeholder="https://example.com" value="' + (item.url || "").replace(/"/g, "&quot;") + '" /></div>' +
+              '<button type="button" class="secondary-btn remove-extra-btn">Remove</button>' +
+            '</div>';
+          extraButtonsList.appendChild(row);
+        });
+
+        Array.prototype.slice.call(extraButtonsList.querySelectorAll(".remove-extra-btn")).forEach(function (btn) {
+          btn.addEventListener("click", function () {
+            var row = btn.closest(".extra-btn-row");
+            if (row) row.remove();
+            onInputChange();
+          });
+        });
+
+        Array.prototype.slice.call(extraButtonsList.querySelectorAll(".extra-label, .extra-url")).forEach(function (el) {
+          el.addEventListener("input", onInputChange);
+        });
+      }
+
       function buildUserUrl() {
         var title = toValue(titleInput);
         var subtitle = toValue(subtitleInput);
@@ -113,6 +184,7 @@
         var botUrl = toValue(botUrlInput);
         var channelLabel = toValue(channelLabelInput);
         var channelUrl = toValue(channelUrlInput);
+        var extraButtons = collectExtraButtons();
 
         var params = new URLSearchParams();
         if (title) params.set("title", title);
@@ -121,6 +193,7 @@
         if (botUrl) params.set("bot_url", botUrl);
         if (channelLabel) params.set("channel_label", channelLabel);
         if (channelUrl) params.set("channel_url", channelUrl);
+        if (extraButtons.length) params.set("extra_buttons", JSON.stringify(extraButtons));
 
         return userPagePath + "?" + params.toString();
       }
@@ -133,6 +206,18 @@
         previewChannelBtn.textContent = toValue(channelLabelInput) || "Open WhatsApp Channel";
         previewBotBtn.href = hasHttpUrl(botUrl) ? botUrl : "#";
         previewChannelBtn.href = hasHttpUrl(channelUrl) ? channelUrl : "#";
+
+        var extraButtons = collectExtraButtons();
+        previewExtraButtons.innerHTML = "";
+        extraButtons.forEach(function (item) {
+          var a = document.createElement("a");
+          a.className = "secondary-btn";
+          a.textContent = item.label || "Open Link";
+          a.href = hasHttpUrl(item.url) ? item.url : "#";
+          a.target = "_blank";
+          a.rel = "noopener noreferrer";
+          previewExtraButtons.appendChild(a);
+        });
       }
 
       function validateInputs() {
@@ -141,6 +226,7 @@
 
         var botUrl = toValue(botUrlInput);
         var channelUrl = toValue(channelUrlInput);
+        var extraButtons = collectExtraButtons();
 
         if (!hasHttpUrl(botUrl)) {
           errorText.textContent = "Bot URL mesti bermula dengan https:// atau http://";
@@ -150,6 +236,18 @@
         if (!hasHttpUrl(channelUrl)) {
           errorText.textContent = "Channel URL mesti bermula dengan https:// atau http://";
           return false;
+        }
+
+        for (var i = 0; i < extraButtons.length; i += 1) {
+          var item = extraButtons[i];
+          if (!item.label || !item.url) {
+            errorText.textContent = "Extra button #" + (i + 1) + " perlu label dan URL.";
+            return false;
+          }
+          if (!hasHttpUrl(item.url)) {
+            errorText.textContent = "Extra URL #" + (i + 1) + " mesti bermula dengan https:// atau http://";
+            return false;
+          }
         }
 
         return true;
@@ -162,7 +260,8 @@
           botLabel: toValue(botLabelInput),
           botUrl: toValue(botUrlInput),
           channelLabel: toValue(channelLabelInput),
-          channelUrl: toValue(channelUrlInput)
+          channelUrl: toValue(channelUrlInput),
+          extraButtons: collectExtraButtons()
         };
 
         try {
@@ -183,6 +282,7 @@
           if (draft.botUrl) botUrlInput.value = draft.botUrl;
           if (draft.channelLabel) channelLabelInput.value = draft.channelLabel;
           if (draft.channelUrl) channelUrlInput.value = draft.channelUrl;
+          renderExtraButtonsEditor(normalizeExtraButtons(draft.extraButtons));
         } catch (err) {
           // ignore parse errors
         }
@@ -200,6 +300,7 @@
         botUrlInput.value = defaults.botUrl;
         channelLabelInput.value = defaults.channelLabel;
         channelUrlInput.value = defaults.channelUrl;
+        renderExtraButtonsEditor(normalizeExtraButtons(defaults.extraButtons));
       }
 
       applyDefaults();
@@ -208,6 +309,13 @@
 
       [titleInput, subtitleInput, botLabelInput, botUrlInput, channelLabelInput, channelUrlInput].forEach(function (el) {
         el.addEventListener("input", onInputChange);
+      });
+
+      addExtraButton.addEventListener("click", function () {
+        var extraButtons = collectExtraButtons();
+        extraButtons.push({ label: "", url: "" });
+        renderExtraButtonsEditor(extraButtons);
+        onInputChange();
       });
 
       openUserViewBtn.addEventListener("click", function () {

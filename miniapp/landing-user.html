@@ -25,6 +25,7 @@
       <div class="action-list">
         <a id="botButton" class="primary-btn" href="#" target="_blank" rel="noopener noreferrer">Open Bot</a>
         <a id="channelButton" class="secondary-btn" href="#" target="_blank" rel="noopener noreferrer">Open WhatsApp Channel</a>
+        <div id="extraButtons" class="action-list" style="margin-top: 0;"></div>
       </div>
 
       <div id="errorText" class="error-text"></div>
@@ -40,7 +41,8 @@
         botLabel: "Open Bot",
         channelLabel: "Open WhatsApp Channel",
         botUrl: "https://t.me/MMHREEZO_BOT",
-        channelUrl: "https://whatsapp.com/channel/YOUR_CHANNEL_ID"
+        channelUrl: "https://whatsapp.com/channel/YOUR_CHANNEL_ID",
+        extraButtons: []
       };
       var defaults = Object.assign({}, fallbackDefaults, window.MMHELPER_LANDING_DEFAULTS || {});
 
@@ -63,6 +65,41 @@
         return fallback;
       }
 
+      function readExtraButtonsFromParams() {
+        var raw = getParam("extra_buttons");
+        if (!raw) return [];
+        try {
+          var parsed = JSON.parse(raw);
+          if (!Array.isArray(parsed)) return [];
+          return parsed
+            .map(function (item) {
+              return {
+                label: String((item && item.label) || "").trim(),
+                url: String((item && item.url) || "").trim()
+              };
+            })
+            .filter(function (item) {
+              return item.label && /^https?:\/\//i.test(item.url);
+            });
+        } catch (err) {
+          return [];
+        }
+      }
+
+      function normalizeDefaultExtras(value) {
+        if (!Array.isArray(value)) return [];
+        return value
+          .map(function (item) {
+            return {
+              label: String((item && item.label) || "").trim(),
+              url: String((item && item.url) || "").trim()
+            };
+          })
+          .filter(function (item) {
+            return item.label && /^https?:\/\//i.test(item.url);
+          });
+      }
+
       var title = safeText(getParam("title"), defaults.title);
       var subtitle = safeText(getParam("subtitle"), defaults.subtitle);
       var botLabel = safeText(getParam("bot_label"), defaults.botLabel);
@@ -74,7 +111,10 @@
       var heroSubtitle = document.getElementById("heroSubtitle");
       var botButton = document.getElementById("botButton");
       var channelButton = document.getElementById("channelButton");
+      var extraButtons = document.getElementById("extraButtons");
       var errorText = document.getElementById("errorText");
+      var extrasFromParams = readExtraButtonsFromParams();
+      var extras = extrasFromParams.length ? extrasFromParams : normalizeDefaultExtras(defaults.extraButtons);
 
       heroTitle.textContent = title;
       heroSubtitle.textContent = subtitle;
@@ -84,6 +124,17 @@
 
       channelButton.textContent = channelLabel;
       channelButton.href = channelUrl;
+
+      extraButtons.innerHTML = "";
+      extras.forEach(function (item) {
+        var a = document.createElement("a");
+        a.className = "secondary-btn";
+        a.textContent = item.label;
+        a.href = item.url;
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        extraButtons.appendChild(a);
+      });
 
       var looksPlaceholder =
         /YOUR_CHANNEL_ID/i.test(channelUrl) ||
