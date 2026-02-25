@@ -200,7 +200,7 @@ BASIC_TOPICS: list[TopicItem] = [
     {
         "topic_no": 14,
         "topic_title": "BOS & CHoCH (Level 1)",
-        "message_id": 0,
+        "message_id": 27,
         "next_only": True,
         "subtopics": [
             "Pengenalan",
@@ -210,7 +210,7 @@ BASIC_TOPICS: list[TopicItem] = [
     {
         "topic_no": 15,
         "topic_title": "FVG & Imbalance (Level 1)",
-        "message_id": 0,
+        "message_id": 28,
         "next_only": True,
         "subtopics": [
             "Pengenalan",
