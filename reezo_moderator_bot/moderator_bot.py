@@ -282,6 +282,9 @@ def load_runtime_settings() -> dict:
             discussion_group_id = value.get("discussion_group_id")
             if isinstance(discussion_group_id, int):
                 one["discussion_group_id"] = discussion_group_id
+            comments_on_posts_enabled = value.get("comments_on_posts_enabled")
+            if isinstance(comments_on_posts_enabled, bool):
+                one["comments_on_posts_enabled"] = comments_on_posts_enabled
             broadcast_presets = value.get("broadcast_presets")
             if isinstance(broadcast_presets, list):
                 cleaned_presets = []
@@ -395,6 +398,9 @@ def save_runtime_settings(data: dict) -> None:
         discussion_group_id = value.get("discussion_group_id")
         if isinstance(discussion_group_id, int):
             out["discussion_group_id"] = discussion_group_id
+        comments_on_posts_enabled = value.get("comments_on_posts_enabled")
+        if isinstance(comments_on_posts_enabled, bool):
+            out["comments_on_posts_enabled"] = comments_on_posts_enabled
         broadcast_presets = value.get("broadcast_presets")
         if isinstance(broadcast_presets, list):
             cleaned_presets = []
@@ -678,14 +684,20 @@ async def chat_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     msg = update.effective_message
     chat = update.effective_chat
     user = update.effective_user
-    if not msg or not chat or not user:
+    if not msg or not chat:
+        return
+    if chat.type == ChatType.CHANNEL:
+        await context.bot.send_message(
+            chat_id=chat.id,
+            text=f"chat_id: `{chat.id}`\\nchat_type: `{chat.type}`",
+            parse_mode="Markdown",
+        )
+        return
+    if not user:
         return
     if user.id not in get_admin_ids():
         return
-    await msg.reply_text(
-        f"chat_id: `{chat.id}`\\nchat_type: `{chat.type}`",
-        parse_mode="Markdown",
-    )
+    await msg.reply_text(f"chat_id: `{chat.id}`\\nchat_type: `{chat.type}`", parse_mode="Markdown")
 
 
 async def user_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -698,6 +710,88 @@ async def user_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         f"user_id: `{user.id}`\nusername: `{username}`",
         parse_mode="Markdown",
     )
+
+
+def extract_forwarded_channel_info(message) -> tuple[int | None, str | None]:
+    forward_from_chat = getattr(message, "forward_from_chat", None)
+    if forward_from_chat is not None and getattr(forward_from_chat, "type", None) == ChatType.CHANNEL:
+        return int(forward_from_chat.id), str(getattr(forward_from_chat, "title", "") or "")
+    forward_origin = getattr(message, "forward_origin", None)
+    origin_chat = getattr(forward_origin, "chat", None)
+    if origin_chat is not None and getattr(origin_chat, "type", None) == ChatType.CHANNEL:
+        return int(origin_chat.id), str(getattr(origin_chat, "title", "") or "")
+    return None, None
+
+
+async def forwarded_channel_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    msg = update.effective_message
+    chat = update.effective_chat
+    if not msg or not chat:
+        return
+    if chat.type != ChatType.PRIVATE:
+        return
+    channel_id, title = extract_forwarded_channel_info(msg)
+    if channel_id is None:
+        if getattr(msg, "forward_origin", None) is not None or getattr(msg, "forward_date", None) is not None:
+            await msg.reply_text(
+                "Tak dapat baca channel id dari forward ini.\n"
+                "Kemungkinan channel aktifkan protected content.\n"
+                "Guna `/channelid <link t.me/c/...>` atau `/channelid @username`.",
+                parse_mode="Markdown",
+            )
+        return
+    title_text = title if title else "-"
+    await msg.reply_text(
+        f"forwarded_channel_id: `{channel_id}`\nchannel_title: `{title_text}`",
+        parse_mode="Markdown",
+    )
+
+
+async def channel_id_from_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    msg = update.effective_message
+    user = update.effective_user
+    if not msg or not user:
+        return
+    if user.id not in get_admin_ids():
+        return
+    args = context.args or []
+    if not args:
+        await msg.reply_text(
+            "Guna:\n"
+            "- `/channelid https://t.me/c/1234567890/11`\n"
+            "- `/channelid @channelusername`",
+            parse_mode="Markdown",
+        )
+        return
+    raw = " ".join(args).strip()
+    raw = raw.replace("https://", "").replace("http://", "").strip()
+    # Parse t.me/c/<id>/<msg> -> channel_id = -100<id>
+    m = re.search(r"(?:t\.me/)?c/(\d+)", raw, flags=re.IGNORECASE)
+    if m:
+        channel_id = int(f"-100{m.group(1)}")
+        await msg.reply_text(f"channel_id: {channel_id}")
+        return
+    # Parse t.me/<username>/<post_id>
+    m_user = re.search(r"(?:t\.me/)?([A-Za-z0-9_]{5,})/\d+", raw)
+    if m_user:
+        username = "@" + m_user.group(1)
+        try:
+            chat = await context.bot.get_chat(username)
+        except Exception:
+            await msg.reply_text("Tak dapat resolve username channel dari link.")
+            return
+        await msg.reply_text(f"channel_id: {chat.id}\nchat_type: {chat.type}")
+        return
+    # Parse @username by get_chat
+    if raw.startswith("@"):
+        try:
+            chat = await context.bot.get_chat(raw)
+        except Exception:
+            await msg.reply_text("Tak dapat resolve username channel.")
+            return
+        await msg.reply_text(f"channel_id: {chat.id}\nchat_type: {chat.type}")
+        return
+    await msg.reply_text("Format tak dikenali. Hantar link `t.me/c/...` atau `@username`.", parse_mode="Markdown")
 
 
 async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -721,6 +815,30 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
     one_target = target_settings.get(str(chat.id)) if isinstance(target_settings, dict) else {}
     if not isinstance(one_target, dict):
         one_target = {}
+
+    # Channel discussion control: if a linked channel sets comments_on_posts_enabled=false,
+    # delete comments in its discussion group.
+    if isinstance(target_settings, dict):
+        comments_disabled_for_discussion = False
+        for _, cfg in target_settings.items():
+            if not isinstance(cfg, dict):
+                continue
+            if cfg.get("discussion_group_id") != chat.id:
+                continue
+            if cfg.get("comments_on_posts_enabled") is False:
+                comments_disabled_for_discussion = True
+                break
+        if comments_disabled_for_discussion:
+            if not await is_chat_admin(context, chat.id, user.id):
+                try:
+                    await context.bot.delete_message(chat_id=chat.id, message_id=msg.message_id)
+                except Exception:
+                    logger.exception(
+                        "Failed deleting message in discussion comments-off mode chat_id=%s msg_id=%s",
+                        chat.id,
+                        msg.message_id,
+                    )
+            return
 
     # Group lock window from profile settings: if active, delete comments for selected duration.
     profiles = one_target.get("group_profiles")
@@ -1091,9 +1209,13 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
             return
 
         discussion_group_id = payload.get("discussion_group_id")
+        comments_on_posts_enabled = payload.get("comments_on_posts_enabled")
         broadcast_presets = payload.get("broadcast_presets")
         if discussion_group_id is not None and not isinstance(discussion_group_id, int):
             await msg.reply_text("❌ discussion_group_id invalid.")
+            return
+        if comments_on_posts_enabled is not None and not isinstance(comments_on_posts_enabled, bool):
+            await msg.reply_text("❌ comments_on_posts_enabled invalid.")
             return
         cleaned_presets = []
         if broadcast_presets is not None:
@@ -1113,6 +1235,10 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
             existing["discussion_group_id"] = discussion_group_id
         else:
             existing.pop("discussion_group_id", None)
+        if isinstance(comments_on_posts_enabled, bool):
+            existing["comments_on_posts_enabled"] = comments_on_posts_enabled
+        else:
+            existing["comments_on_posts_enabled"] = True
         existing["broadcast_presets"] = cleaned_presets
         target_settings[str(target_id)] = existing
         settings["target_settings"] = target_settings
@@ -1122,6 +1248,7 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
             "✅ Target settings saved.\n"
             f"- target: {matched_target.get('name')} ({target_id})\n"
             f"- discussion_group_id: {discussion_group_id if isinstance(discussion_group_id, int) else '(not set)'}\n"
+            f"- comments_on_posts: {'on' if existing.get('comments_on_posts_enabled', True) else 'off'}\n"
             f"- broadcast_presets: {len(cleaned_presets)}",
             reply_markup=moderation_app_keyboard(),
         )
@@ -1451,10 +1578,12 @@ def main() -> None:
     app = ApplicationBuilder().token(get_token()).build()
 
     app.add_handler(CommandHandler("userid", user_id))
+    app.add_handler(CommandHandler("channelid", channel_id_from_input))
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("chatid", chat_id))
     app.add_handler(CommandHandler("groupid", chat_id))
     app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp_data))
+    app.add_handler(MessageHandler(filters.ChatType.PRIVATE, forwarded_channel_id), group=1)
     app.add_handler(
         MessageHandler(
             filters.ChatType.GROUPS & (filters.TEXT | filters.CaptionRegex(r".+")),

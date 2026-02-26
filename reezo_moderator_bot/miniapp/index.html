@@ -213,6 +213,13 @@
               <label for="discussionGroupIdInput">Discussion Group ID</label>
               <input id="discussionGroupIdInput" type="text" placeholder="-1001234567890" />
             </div>
+            <div>
+              <label for="commentsOnPostsEnabled">Comment on post</label>
+              <select id="commentsOnPostsEnabled">
+                <option value="true">on</option>
+                <option value="false">off</option>
+              </select>
+            </div>
           </div>
           <div class="profiles-box" style="margin-top:10px;">
             <div class="row">
@@ -355,6 +362,7 @@
       if (!state.channel_draft) {
         state.channel_draft = {
           discussion_group_id: "",
+          comments_on_posts_enabled: true,
           broadcast_presets: [{ name: "Preset 1", text: "" }]
         };
       }
@@ -394,10 +402,12 @@
 
       ensureChannelDraft();
       state.channel_draft.discussion_group_id = String(saved.discussion_group_id || "");
+      state.channel_draft.comments_on_posts_enabled = saved.comments_on_posts_enabled !== false;
       state.channel_draft.broadcast_presets = Array.isArray(saved.broadcast_presets) && saved.broadcast_presets.length
         ? saved.broadcast_presets.map((p) => ({ name: String(p.name || "").trim(), text: String(p.text || "") }))
         : [{ name: "Preset 1", text: "" }];
       document.getElementById("discussionGroupIdInput").value = state.channel_draft.discussion_group_id;
+      document.getElementById("commentsOnPostsEnabled").value = state.channel_draft.comments_on_posts_enabled ? "true" : "false";
       renderBroadcastPresets();
     }
 
@@ -411,6 +421,7 @@
       } else {
         ensureChannelDraft();
         document.getElementById("discussionGroupIdInput").value = state.channel_draft.discussion_group_id || "";
+        document.getElementById("commentsOnPostsEnabled").value = state.channel_draft.comments_on_posts_enabled ? "true" : "false";
         renderBroadcastPresets();
       }
     }
@@ -570,6 +581,7 @@
     function persistChannelDraft() {
       ensureChannelDraft();
       state.channel_draft.discussion_group_id = String(document.getElementById("discussionGroupIdInput").value || "").trim();
+      state.channel_draft.comments_on_posts_enabled = document.getElementById("commentsOnPostsEnabled").value === "true";
       state.channel_draft.broadcast_presets = collectBroadcastPresetsFromUI();
       if (!state.channel_draft.broadcast_presets.length) {
         state.channel_draft.broadcast_presets = [{ name: "Preset 1", text: "" }];
@@ -710,6 +722,9 @@
     document.getElementById("discussionGroupIdInput").addEventListener("change", () => {
       persistChannelDraft();
     });
+    document.getElementById("commentsOnPostsEnabled").addEventListener("change", () => {
+      persistChannelDraft();
+    });
 
     document.getElementById("submitSetting").addEventListener("click", () => {
       const select = document.getElementById("targetSelect");
@@ -768,6 +783,7 @@
       state.target_settings[String(targetId)] = {
         ...(state.target_settings[String(targetId)] || {}),
         discussion_group_id: discussionGroupId,
+        comments_on_posts_enabled: state.channel_draft.comments_on_posts_enabled,
         broadcast_presets: presets
       };
 
@@ -776,9 +792,10 @@
         target_type: "channel",
         target_id: targetId,
         discussion_group_id: discussionGroupId,
+        comments_on_posts_enabled: state.channel_draft.comments_on_posts_enabled,
         broadcast_presets: presets
       });
-      setStatus(status, "Channel setting submitted.\nDiscussion group: " + (discussionGroupId !== null ? discussionGroupId : "(not set)") + "\nPresets: " + presets.length, true);
+      setStatus(status, "Channel setting submitted.\nDiscussion group: " + (discussionGroupId !== null ? discussionGroupId : "(not set)") + "\nComment on post: " + (state.channel_draft.comments_on_posts_enabled ? "on" : "off") + "\nPresets: " + presets.length, true);
     });
 
     typeButtonStyle();
