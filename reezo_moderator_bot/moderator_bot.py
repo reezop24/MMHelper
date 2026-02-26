@@ -816,29 +816,9 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
     if not isinstance(one_target, dict):
         one_target = {}
 
-    # Channel discussion control: if a linked channel sets comments_on_posts_enabled=false,
-    # delete comments in its discussion group.
-    if isinstance(target_settings, dict):
-        comments_disabled_for_discussion = False
-        for _, cfg in target_settings.items():
-            if not isinstance(cfg, dict):
-                continue
-            if cfg.get("discussion_group_id") != chat.id:
-                continue
-            if cfg.get("comments_on_posts_enabled") is False:
-                comments_disabled_for_discussion = True
-                break
-        if comments_disabled_for_discussion:
-            if not await is_chat_admin(context, chat.id, user.id):
-                try:
-                    await context.bot.delete_message(chat_id=chat.id, message_id=msg.message_id)
-                except Exception:
-                    logger.exception(
-                        "Failed deleting message in discussion comments-off mode chat_id=%s msg_id=%s",
-                        chat.id,
-                        msg.message_id,
-                    )
-            return
+    # NOTE:
+    # comments_on_posts_enabled is currently metadata only.
+    # Telegram Bot API does not provide a direct per-post discussion toggle here.
 
     # Group lock window from profile settings: if active, delete comments for selected duration.
     profiles = one_target.get("group_profiles")
