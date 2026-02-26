@@ -1,0 +1,14 @@
+[Unit]
+Description=Reezo Channel Comment Userbot
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/mmhelper/reezo_comment_userbot
+ExecStart=/root/mmhelper/reezo_comment_userbot/run_userbot.sh
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
