@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reezo Moderator Miniapp</title>
+  <style>
+    :root {
+      --bg: #070d18;
+      --panel: #101c33;
+      --panel2: #0d1730;
+      --text: #f2f7ff;
+      --muted: #9cb2d7;
+      --line: #2f436c;
+      --accent: #2f8cff;
+      --accent2: #4ab274;
+      --danger: #e46464;
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--text);
+      background: radial-gradient(circle at top, #1a2f57 0%, var(--bg) 45%);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    main { max-width: 760px; margin: 0 auto; padding: 14px 14px 28px; }
+    .header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .title { margin: 0; font-size: 22px; }
+    .muted { color: var(--muted); margin: 6px 0 0; font-size: 13px; }
+    .card {
+      margin-top: 12px;
+      background: linear-gradient(180deg, var(--panel), var(--panel2));
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 12px;
+    }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .row > * { flex: 1 1 180px; }
+    label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 4px; }
+    input, select, button {
+      width: 100%;
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      background: #0b1730;
+      color: var(--text);
+      padding: 10px 11px;
+      font-size: 14px;
+    }
+    button { cursor: pointer; background: #17325b; font-weight: 700; }
+    .btn-accent { background: linear-gradient(90deg, #2a7bea, #3a9dff); border-color: #4d97ff; }
+    .btn-ok { background: linear-gradient(90deg, #2a8d5e, #49b67f); border-color: #66c796; }
+    .btn-ghost { background: #102449; }
+    .pill {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      border: 1px solid var(--line);
+      background: #102043;
+      margin-right: 6px;
+    }
+    .seg { display: flex; gap: 8px; }
+    .seg button.active { border-color: #7fb4ff; background: #245197; }
+    .status { min-height: 18px; margin-top: 8px; font-size: 13px; }
+    .status.ok { color: #8fe3b8; }
+    .status.err { color: #ff9b9b; }
+    ul { margin: 8px 0 0; padding-left: 18px; }
+    li { margin: 4px 0; color: #d7e5ff; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="header">
+      <div>
+        <h1 class="title">Moderator Miniapp</h1>
+        <p class="muted" id="subtitle">Manage groups/channels</p>
+      </div>
+      <button id="btnBack" class="btn-ghost" type="button">Back</button>
+    </div>
+
+    <section id="menuView" class="card hidden">
+      <div class="row">
+        <button id="goAdd" class="btn-accent" type="button">Add New Group/Channel</button>
+        <button id="goSettings" class="btn-ok" type="button">Group/Channel Setting</button>
+      </div>
+    </section>
+
+    <section id="addView" class="card hidden">
+      <p class="muted">Tambah target baru untuk moderation.</p>
+      <div class="seg" style="margin-bottom:10px;">
+        <button id="typeGroup" type="button" class="active">Group</button>
+        <button id="typeChannel" type="button">Channel</button>
+      </div>
+      <div class="row">
+        <div>
+          <label for="targetId">Group/Channel ID</label>
+          <input id="targetId" type="text" placeholder="-1001234567890" />
+        </div>
+        <div>
+          <label for="targetName">Group/Channel Name</label>
+          <input id="targetName" type="text" placeholder="NEXT Main Group" />
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px;">
+        <button id="submitAdd" class="btn-accent" type="button">Submit</button>
+      </div>
+      <p id="addStatus" class="status"></p>
+      <div style="margin-top:8px;">
+        <span class="pill">Saved list</span>
+        <ul id="savedList"></ul>
+      </div>
+    </section>
+
+    <section id="settingsView" class="card hidden">
+      <p class="muted">Pilih target ikut tab dan ubah setting.</p>
+      <div class="seg" style="margin-bottom:10px;">
+        <button id="tabGroup" type="button" class="active">Group</button>
+        <button id="tabChannel" type="button">Channel</button>
+      </div>
+      <label for="targetSelect">Select target</label>
+      <select id="targetSelect"></select>
+
+      <div id="settingsFields" style="margin-top:10px;">
+        <div class="row">
+          <div>
+            <label for="modeSelect">Mode</label>
+            <select id="modeSelect">
+              <option value="delete_and_ban">delete_and_ban</option>
+              <option value="delete_only">delete_only</option>
+              <option value="ban_only">ban_only</option>
+            </select>
+          </div>
+          <div>
+            <label for="floodInput">Flood per minute</label>
+            <input id="floodInput" type="number" min="1" step="1" value="6" />
+          </div>
+        </div>
+        <div class="row" style="margin-top:8px;">
+          <div>
+            <label for="enabledSelect">Moderation enabled</label>
+            <select id="enabledSelect">
+              <option value="true">true</option>
+              <option value="false">false</option>
+            </select>
+          </div>
+          <div>
+            <label for="autoBanInput">Auto-ban user IDs (comma)</label>
+            <input id="autoBanInput" type="text" placeholder="12345,67890" />
+          </div>
+        </div>
+        <div class="row" style="margin-top:10px;">
+          <button id="submitSetting" class="btn-ok" type="button">Save Setting</button>
+        </div>
+      </div>
+      <p id="settingsStatus" class="status"></p>
+    </section>
+  </main>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+    if (tg) {
+      tg.ready();
+      tg.expand();
+    }
+
+    const qs = new URLSearchParams(window.location.search);
+    let view = (qs.get("view") || "menu").trim();
+
+    function decodeState(raw) {
+      if (!raw) return { targets: [], target_settings: {} };
+      try {
+        const padded = raw + "=".repeat((4 - (raw.length % 4)) % 4);
+        const bin = atob(padded.replace(/-/g, "+").replace(/_/g, "/"));
+        const utf8 = decodeURIComponent(Array.from(bin).map((c) => "%" + c.charCodeAt(0).toString(16).padStart(2, "0")).join(""));
+        const parsed = JSON.parse(utf8);
+        return {
+          targets: Array.isArray(parsed.targets) ? parsed.targets : [],
+          target_settings: parsed && typeof parsed.target_settings === "object" && parsed.target_settings ? parsed.target_settings : {}
+        };
+      } catch (_) {
+        return { targets: [], target_settings: {} };
+      }
+    }
+
+    const state = decodeState(qs.get("state"));
+    let addType = "group";
+    let settingsTab = "group";
+
+    const menuView = document.getElementById("menuView");
+    const addView = document.getElementById("addView");
+    const settingsView = document.getElementById("settingsView");
+    const subtitle = document.getElementById("subtitle");
+
+    function sendPayload(payload) {
+      if (!tg) return;
+      tg.sendData(JSON.stringify(payload));
+    }
+
+    function setStatus(el, text, ok) {
+      el.textContent = text;
+      el.className = "status " + (ok ? "ok" : "err");
+    }
+
+    function switchView(next) {
+      view = next;
+      menuView.classList.add("hidden");
+      addView.classList.add("hidden");
+      settingsView.classList.add("hidden");
+      if (next === "add") {
+        subtitle.textContent = "Add new group/channel";
+        addView.classList.remove("hidden");
+        renderSavedList();
+      } else if (next === "settings") {
+        subtitle.textContent = "Group/channel setting";
+        settingsView.classList.remove("hidden");
+        renderTargetSelect();
+      } else {
+        subtitle.textContent = "Manage groups/channels";
+        menuView.classList.remove("hidden");
+      }
+    }
+
+    function typeButtonStyle() {
+      document.getElementById("typeGroup").classList.toggle("active", addType === "group");
+      document.getElementById("typeChannel").classList.toggle("active", addType === "channel");
+    }
+
+    function tabButtonStyle() {
+      document.getElementById("tabGroup").classList.toggle("active", settingsTab === "group");
+      document.getElementById("tabChannel").classList.toggle("active", settingsTab === "channel");
+    }
+
+    function renderSavedList() {
+      const ul = document.getElementById("savedList");
+      ul.innerHTML = "";
+      if (!state.targets.length) {
+        const li = document.createElement("li");
+        li.textContent = "No target yet.";
+        ul.appendChild(li);
+        return;
+      }
+      state.targets.forEach((t) => {
+        const li = document.createElement("li");
+        li.textContent = `[${String(t.type || "").toUpperCase()}] ${t.name || t.id} (${t.id})`;
+        ul.appendChild(li);
+      });
+    }
+
+    function parseAutoBanCsv(raw) {
+      const out = [];
+      const seen = new Set();
+      String(raw || "").split(",").map((x) => x.trim()).filter(Boolean).forEach((part) => {
+        if (!/^\d+$/.test(part)) return;
+        const id = Number(part);
+        if (!Number.isSafeInteger(id)) return;
+        if (seen.has(id)) return;
+        seen.add(id);
+        out.push(id);
+      });
+      return out;
+    }
+
+    function renderTargetSelect() {
+      const select = document.getElementById("targetSelect");
+      select.innerHTML = "";
+      const filtered = state.targets.filter((x) => String(x.type) === settingsTab);
+      if (!filtered.length) {
+        const opt = document.createElement("option");
+        opt.value = "";
+        opt.textContent = `No ${settingsTab} target`;
+        select.appendChild(opt);
+        document.getElementById("settingsFields").style.opacity = "0.5";
+        document.getElementById("settingsFields").style.pointerEvents = "none";
+        setStatus(document.getElementById("settingsStatus"), `Tambah ${settingsTab} dulu dalam Add New Group/Channel.`, false);
+        return;
+      }
+      document.getElementById("settingsFields").style.opacity = "1";
+      document.getElementById("settingsFields").style.pointerEvents = "auto";
+      document.getElementById("settingsStatus").textContent = "";
+      filtered.forEach((t) => {
+        const opt = document.createElement("option");
+        opt.value = String(t.id);
+        opt.textContent = `${t.name || t.id} (${t.id})`;
+        select.appendChild(opt);
+      });
+      fillCurrentSetting();
+    }
+
+    function fillCurrentSetting() {
+      const select = document.getElementById("targetSelect");
+      const targetId = select.value;
+      const s = state.target_settings && state.target_settings[targetId] ? state.target_settings[targetId] : {};
+      document.getElementById("modeSelect").value = s.mode || "delete_and_ban";
+      document.getElementById("floodInput").value = String(s.flood_threshold_per_minute || 6);
+      document.getElementById("enabledSelect").value = (s.moderation_enabled === false ? "false" : "true");
+      const autoBan = Array.isArray(s.auto_ban_user_ids) ? s.auto_ban_user_ids.join(",") : "";
+      document.getElementById("autoBanInput").value = autoBan;
+    }
+
+    document.getElementById("btnBack").addEventListener("click", () => {
+      if (view === "menu") {
+        sendPayload({ type: "reezo_moderator_back_to_menu" });
+        if (tg) tg.close();
+        return;
+      }
+      switchView("menu");
+    });
+
+    document.getElementById("goAdd").addEventListener("click", () => switchView("add"));
+    document.getElementById("goSettings").addEventListener("click", () => switchView("settings"));
+
+    document.getElementById("typeGroup").addEventListener("click", () => { addType = "group"; typeButtonStyle(); });
+    document.getElementById("typeChannel").addEventListener("click", () => { addType = "channel"; typeButtonStyle(); });
+
+    document.getElementById("submitAdd").addEventListener("click", () => {
+      const idRaw = document.getElementById("targetId").value.trim();
+      const name = document.getElementById("targetName").value.trim();
+      const status = document.getElementById("addStatus");
+      if (!/^-\d+$/.test(idRaw)) {
+        setStatus(status, "ID mesti nombor negatif. Contoh: -1001234567890", false);
+        return;
+      }
+      if (!name) {
+        setStatus(status, "Nama group/channel wajib isi.", false);
+        return;
+      }
+      const targetId = Number(idRaw);
+      if (!Number.isSafeInteger(targetId)) {
+        setStatus(status, "ID terlalu besar/tak sah.", false);
+        return;
+      }
+      const existing = state.targets.find((t) => Number(t.id) === targetId);
+      if (existing) {
+        existing.type = addType;
+        existing.name = name;
+      } else {
+        state.targets.push({ type: addType, id: targetId, name });
+      }
+      renderSavedList();
+      sendPayload({
+        type: "reezo_moderator_target_add",
+        target_type: addType,
+        target_id: targetId,
+        target_name: name
+      });
+      setStatus(status, "Submitted. Target saved in list.", true);
+      document.getElementById("targetId").value = "";
+      document.getElementById("targetName").value = "";
+    });
+
+    document.getElementById("tabGroup").addEventListener("click", () => {
+      settingsTab = "group";
+      tabButtonStyle();
+      renderTargetSelect();
+    });
+    document.getElementById("tabChannel").addEventListener("click", () => {
+      settingsTab = "channel";
+      tabButtonStyle();
+      renderTargetSelect();
+    });
+    document.getElementById("targetSelect").addEventListener("change", fillCurrentSetting);
+
+    document.getElementById("submitSetting").addEventListener("click", () => {
+      const select = document.getElementById("targetSelect");
+      const status = document.getElementById("settingsStatus");
+      if (!select.value) {
+        setStatus(status, "Tiada target dipilih.", false);
+        return;
+      }
+      const targetId = Number(select.value);
+      const mode = document.getElementById("modeSelect").value;
+      const flood = Math.max(1, Number(document.getElementById("floodInput").value || 6));
+      const enabled = document.getElementById("enabledSelect").value === "true";
+      const autoBan = parseAutoBanCsv(document.getElementById("autoBanInput").value);
+
+      state.target_settings[String(targetId)] = {
+        mode,
+        flood_threshold_per_minute: flood,
+        moderation_enabled: enabled,
+        auto_ban_user_ids: autoBan
+      };
+
+      sendPayload({
+        type: "reezo_moderator_target_settings_save",
+        target_type: settingsTab,
+        target_id: targetId,
+        mode,
+        flood_threshold_per_minute: flood,
+        moderation_enabled: enabled,
+        auto_ban_user_ids: autoBan
+      });
+      setStatus(status, "Setting submitted.", true);
+    });
+
+    typeButtonStyle();
+    tabButtonStyle();
+    if (!["menu", "add", "settings"].includes(view)) view = "menu";
+    switchView(view);
+  </script>
+</body>
+</html>

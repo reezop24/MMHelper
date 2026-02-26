@@ -1,0 +1,14 @@
+[Unit]
+Description=Reezo Moderator Telegram Bot
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/mmhelper/reezo_moderator_bot
+ExecStart=/root/mmhelper/reezo_moderator_bot/run_moderator_bot.sh
+Restart=always
+RestartSec=3
+User=root
+
+[Install]
+WantedBy=multi-user.target
