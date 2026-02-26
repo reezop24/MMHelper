@@ -27,7 +27,7 @@ MENU_CHAT_ID = "📍 Current Chat ID"
 MENU_MOD_STATUS = "🛡️ Moderation Status"
 MENU_BROADCAST = "📢 Broadcast To Channel"
 MENU_SETTINGS = "⚙️ Settings"
-MENU_MODERATION_APP = "🧰 Moderation Miniapp"
+MENU_MODERATION_APP = "🧰 Moderation"
 MENU_MOD_ADD = "➕ Add New Group/Channel"
 MENU_MOD_TARGET_SETTINGS = "⚙️ Group/Channel Setting"
 MENU_SET_GROUPS = "👥 Set Group Whitelist"
@@ -35,6 +35,8 @@ MENU_SET_CHANNEL = "📡 Set Default Channel"
 MENU_VIEW_SETTINGS = "📋 View Settings"
 MENU_BACK = "⬅️ Back"
 MENU_CANCEL = "❌ Cancel"
+MENU_BROADCAST_SEND = "✅ Send Broadcast"
+MENU_BROADCAST_EDIT = "✏️ Edit Text"
 
 SPAM_PATTERNS = [
     re.compile(r"https?://", re.IGNORECASE),
@@ -46,6 +48,20 @@ SPAM_PATTERNS = [
 ]
 
 SETTINGS_PATH = os.path.join(os.path.dirname(__file__), "settings.json")
+
+
+def utc_now_iso() -> str:
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def profile_duration_seconds(mode: str, custom_hours: int) -> int:
+    if mode == "12h":
+        return 12 * 3600
+    if mode == "24h":
+        return 24 * 3600
+    if mode == "custom":
+        return max(1, custom_hours) * 3600
+    return 6 * 3600
 
 
 def load_local_env() -> None:
@@ -99,6 +115,36 @@ def get_default_channel_id() -> int | None:
         return int(raw)
     except ValueError:
         return None
+
+
+def get_channel_target_settings(channel_id: int | None) -> dict:
+    if channel_id is None:
+        return {}
+    settings = load_runtime_settings()
+    target_settings = settings.get("target_settings")
+    if not isinstance(target_settings, dict):
+        return {}
+    one = target_settings.get(str(channel_id))
+    if isinstance(one, dict):
+        return one
+    return {}
+
+
+def get_channel_broadcast_presets(channel_id: int | None) -> list[dict]:
+    one = get_channel_target_settings(channel_id)
+    presets = one.get("broadcast_presets") if isinstance(one, dict) else None
+    if not isinstance(presets, list):
+        return []
+    out = []
+    for item in presets:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or "").strip()
+        text = str(item.get("text") or "").strip()
+        if not name or not text:
+            continue
+        out.append({"name": name, "text": text})
+    return out
 
 
 def get_moderation_webapp_url() -> str:
@@ -193,6 +239,9 @@ def load_runtime_settings() -> dict:
     auto_ban = raw.get("auto_ban_user_ids")
     if isinstance(auto_ban, list):
         data["auto_ban_user_ids"] = [int(x) for x in auto_ban if isinstance(x, int)]
+    blacklisted = raw.get("blacklisted_user_ids")
+    if isinstance(blacklisted, list):
+        data["blacklisted_user_ids"] = [int(x) for x in blacklisted if isinstance(x, int)]
     targets = raw.get("targets")
     if isinstance(targets, list):
         normalized_targets = []
@@ -230,6 +279,87 @@ def load_runtime_settings() -> dict:
             auto_ban_user_ids = value.get("auto_ban_user_ids")
             if isinstance(auto_ban_user_ids, list):
                 one["auto_ban_user_ids"] = [int(x) for x in auto_ban_user_ids if isinstance(x, int)]
+            discussion_group_id = value.get("discussion_group_id")
+            if isinstance(discussion_group_id, int):
+                one["discussion_group_id"] = discussion_group_id
+            broadcast_presets = value.get("broadcast_presets")
+            if isinstance(broadcast_presets, list):
+                cleaned_presets = []
+                for item in broadcast_presets:
+                    if not isinstance(item, dict):
+                        continue
+                    name = str(item.get("name") or "").strip()
+                    text = str(item.get("text") or "").strip()
+                    if not name or not text:
+                        continue
+                    cleaned_presets.append({"name": name, "text": text})
+                one["broadcast_presets"] = cleaned_presets
+            enabled_profile_ids = value.get("enabled_profile_ids")
+            if isinstance(enabled_profile_ids, list):
+                cleaned_ids = [int(x) for x in enabled_profile_ids if isinstance(x, int) and 1 <= int(x) <= 4]
+                one["enabled_profile_ids"] = sorted(set(cleaned_ids))
+            group_profiles = value.get("group_profiles")
+            if isinstance(group_profiles, list):
+                cleaned_profiles = []
+                for item in group_profiles[:4]:
+                    if not isinstance(item, dict):
+                        continue
+                    trigger_link_mode = str(item.get("trigger_link_mode") or "all_links")
+                    if trigger_link_mode not in {"all_links", "specific_prefix"}:
+                        trigger_link_mode = "all_links"
+                    link_action = str(item.get("link_action") or item.get("action") or "delete")
+                    if link_action not in {"delete", "delete_and_ban", "delete_plus_one_chance"}:
+                        link_action = "delete"
+                    bg_toggle_mode = str(item.get("bg_toggle_mode") or "6h")
+                    if bg_toggle_mode not in {"6h", "12h", "24h", "custom"}:
+                        bg_toggle_mode = "6h"
+                    custom_hours = item.get("bg_toggle_custom_hours")
+                    if not isinstance(custom_hours, int) or custom_hours < 1:
+                        custom_hours = 6
+                    comment_rules = item.get("trigger_comment_rules")
+                    if not isinstance(comment_rules, list):
+                        legacy_comment = str(item.get("trigger_comment") or "").strip()
+                        legacy_action = str(item.get("action") or "delete")
+                        comment_rules = [{"text": legacy_comment, "action": legacy_action}] if legacy_comment else []
+                    normalized_rules = []
+                    for rule in comment_rules:
+                        if not isinstance(rule, dict):
+                            continue
+                        token = str(rule.get("text") or "").strip()
+                        rule_action = str(rule.get("action") or "delete")
+                        if rule_action not in {"delete", "delete_and_ban", "delete_plus_one_chance"}:
+                            rule_action = "delete"
+                        if not token:
+                            continue
+                        normalized_rules.append({"text": token, "action": rule_action})
+                    cleaned_profiles.append(
+                        {
+                            "trigger_link_mode": trigger_link_mode,
+                            "trigger_link_prefix": str(item.get("trigger_link_prefix") or "").strip(),
+                            "link_action": link_action,
+                            "trigger_comment_rules": normalized_rules,
+                            "disable_comments_enabled": bool(item.get("disable_comments_enabled", False)),
+                            "bg_toggle_mode": bg_toggle_mode,
+                            "bg_toggle_custom_hours": custom_hours,
+                        }
+                    )
+                if cleaned_profiles:
+                    while len(cleaned_profiles) < 4:
+                        cleaned_profiles.append(
+                            {
+                                "trigger_link_mode": "all_links",
+                                "trigger_link_prefix": "",
+                                "link_action": "delete",
+                                "trigger_comment_rules": [],
+                                "disable_comments_enabled": False,
+                                "bg_toggle_mode": "6h",
+                                "bg_toggle_custom_hours": 6,
+                            }
+                        )
+                    one["group_profiles"] = cleaned_profiles
+            saved_at = value.get("group_profiles_saved_at")
+            if isinstance(saved_at, str) and saved_at:
+                one["group_profiles_saved_at"] = saved_at
             normalized_target_settings[str(key)] = one
         data["target_settings"] = normalized_target_settings
     return data
@@ -262,6 +392,87 @@ def save_runtime_settings(data: dict) -> None:
                 int(x) for x in (value.get("auto_ban_user_ids") or []) if isinstance(x, int)
             ],
         }
+        discussion_group_id = value.get("discussion_group_id")
+        if isinstance(discussion_group_id, int):
+            out["discussion_group_id"] = discussion_group_id
+        broadcast_presets = value.get("broadcast_presets")
+        if isinstance(broadcast_presets, list):
+            cleaned_presets = []
+            for item in broadcast_presets:
+                if not isinstance(item, dict):
+                    continue
+                name = str(item.get("name") or "").strip()
+                text = str(item.get("text") or "").strip()
+                if not name or not text:
+                    continue
+                cleaned_presets.append({"name": name, "text": text})
+            out["broadcast_presets"] = cleaned_presets
+        enabled_profile_ids = value.get("enabled_profile_ids")
+        if isinstance(enabled_profile_ids, list):
+            cleaned_ids = [int(x) for x in enabled_profile_ids if isinstance(x, int) and 1 <= int(x) <= 4]
+            out["enabled_profile_ids"] = sorted(set(cleaned_ids))
+        group_profiles = value.get("group_profiles")
+        if isinstance(group_profiles, list):
+            cleaned_profiles = []
+            for item in group_profiles[:4]:
+                if not isinstance(item, dict):
+                    continue
+                trigger_link_mode = str(item.get("trigger_link_mode") or "all_links")
+                if trigger_link_mode not in {"all_links", "specific_prefix"}:
+                    trigger_link_mode = "all_links"
+                link_action = str(item.get("link_action") or item.get("action") or "delete")
+                if link_action not in {"delete", "delete_and_ban", "delete_plus_one_chance"}:
+                    link_action = "delete"
+                bg_toggle_mode = str(item.get("bg_toggle_mode") or "6h")
+                if bg_toggle_mode not in {"6h", "12h", "24h", "custom"}:
+                    bg_toggle_mode = "6h"
+                custom_hours = item.get("bg_toggle_custom_hours")
+                if not isinstance(custom_hours, int) or custom_hours < 1:
+                    custom_hours = 6
+                comment_rules = item.get("trigger_comment_rules")
+                if not isinstance(comment_rules, list):
+                    legacy_comment = str(item.get("trigger_comment") or "").strip()
+                    legacy_action = str(item.get("action") or "delete")
+                    comment_rules = [{"text": legacy_comment, "action": legacy_action}] if legacy_comment else []
+                normalized_rules = []
+                for rule in comment_rules:
+                    if not isinstance(rule, dict):
+                        continue
+                    token = str(rule.get("text") or "").strip()
+                    if not token:
+                        continue
+                    rule_action = str(rule.get("action") or "delete")
+                    if rule_action not in {"delete", "delete_and_ban", "delete_plus_one_chance"}:
+                        rule_action = "delete"
+                    normalized_rules.append({"text": token, "action": rule_action})
+                cleaned_profiles.append(
+                    {
+                        "trigger_link_mode": trigger_link_mode,
+                        "trigger_link_prefix": str(item.get("trigger_link_prefix") or "").strip(),
+                        "link_action": link_action,
+                        "trigger_comment_rules": normalized_rules,
+                        "disable_comments_enabled": bool(item.get("disable_comments_enabled", False)),
+                        "bg_toggle_mode": bg_toggle_mode,
+                        "bg_toggle_custom_hours": custom_hours,
+                    }
+                )
+            if cleaned_profiles:
+                while len(cleaned_profiles) < 4:
+                    cleaned_profiles.append(
+                        {
+                            "trigger_link_mode": "all_links",
+                            "trigger_link_prefix": "",
+                            "link_action": "delete",
+                            "trigger_comment_rules": [],
+                            "disable_comments_enabled": False,
+                            "bg_toggle_mode": "6h",
+                            "bg_toggle_custom_hours": 6,
+                        }
+                    )
+                out["group_profiles"] = cleaned_profiles
+        group_profiles_saved_at = value.get("group_profiles_saved_at")
+        if isinstance(group_profiles_saved_at, str) and group_profiles_saved_at:
+            out["group_profiles_saved_at"] = group_profiles_saved_at
         normalized_target_settings[str(key)] = out
     payload = {
         "default_channel_id": data.get("default_channel_id"),
@@ -270,6 +481,7 @@ def save_runtime_settings(data: dict) -> None:
         "mode": str(data.get("mode") or "delete_and_ban"),
         "flood_threshold_per_minute": int(data.get("flood_threshold_per_minute") or 6),
         "auto_ban_user_ids": data.get("auto_ban_user_ids") or [],
+        "blacklisted_user_ids": data.get("blacklisted_user_ids") or [],
         "targets": normalized_targets,
         "target_settings": normalized_target_settings,
     }
@@ -336,6 +548,110 @@ def looks_like_spam(text: str) -> bool:
     return False
 
 
+def extract_links(text: str) -> list[str]:
+    if not text:
+        return []
+    return re.findall(r"(https?://\S+|t\.me/\S+)", text, flags=re.IGNORECASE)
+
+
+def add_blacklisted_user(user_id: int) -> None:
+    settings = load_runtime_settings()
+    existing = settings.get("blacklisted_user_ids")
+    if not isinstance(existing, list):
+        existing = []
+    ids = set(int(x) for x in existing if isinstance(x, int))
+    ids.add(int(user_id))
+    settings["blacklisted_user_ids"] = sorted(ids)
+    save_runtime_settings(settings)
+
+
+async def apply_profile_action(
+    context: ContextTypes.DEFAULT_TYPE,
+    chat_id: int,
+    msg_id: int,
+    user_id: int,
+    action: str,
+    reason: str,
+    chance_key: str,
+) -> None:
+    one_chance = context.bot_data.setdefault("one_chance_tracker", {})
+    base_reason = reason.strip() or "trigger"
+    if action not in {"delete", "delete_and_ban", "delete_plus_one_chance"}:
+        action = "delete"
+
+    if action == "delete":
+        try:
+            await context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
+        except Exception:
+            logger.exception("Failed delete (profile action) chat_id=%s msg_id=%s", chat_id, msg_id)
+        try:
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=f"⚠️ Message deleted (`{base_reason}`).",
+                parse_mode="Markdown",
+            )
+        except Exception:
+            logger.exception("Failed sending group action message chat_id=%s", chat_id)
+        return
+
+    if action == "delete_and_ban":
+        try:
+            await context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
+        except Exception:
+            logger.exception("Failed delete before ban chat_id=%s msg_id=%s", chat_id, msg_id)
+        try:
+            await context.bot.ban_chat_member(chat_id=chat_id, user_id=user_id, revoke_messages=True)
+            add_blacklisted_user(user_id)
+        except Exception:
+            logger.exception("Failed ban (profile action) chat_id=%s user_id=%s", chat_id, user_id)
+            return
+        try:
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=f"🚫 User `{user_id}` deleted + banned (`{base_reason}`). Kalau ban kesilapan, sila hubungi admin.",
+                parse_mode="Markdown",
+            )
+        except Exception:
+            logger.exception("Failed sending group action message chat_id=%s", chat_id)
+        return
+
+    count = int(one_chance.get(chance_key, 0)) + 1
+    one_chance[chance_key] = count
+    if count == 1:
+        try:
+            await context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
+        except Exception:
+            logger.exception("Failed delete (one chance) chat_id=%s msg_id=%s", chat_id, msg_id)
+        try:
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=f"⚠️ User `{user_id}` warning 1/1. Message deleted (`{base_reason}`). Repeat = ban.",
+                parse_mode="Markdown",
+            )
+        except Exception:
+            logger.exception("Failed sending one-chance warning chat_id=%s", chat_id)
+        return
+
+    try:
+        await context.bot.delete_message(chat_id=chat_id, message_id=msg_id)
+    except Exception:
+        logger.exception("Failed delete on second chance chat_id=%s msg_id=%s", chat_id, msg_id)
+    try:
+        await context.bot.ban_chat_member(chat_id=chat_id, user_id=user_id, revoke_messages=True)
+        add_blacklisted_user(user_id)
+    except Exception:
+        logger.exception("Failed ban on second chance chat_id=%s user_id=%s", chat_id, user_id)
+        return
+    try:
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=f"🚫 User `{user_id}` repeated offense. Deleted + banned (`{base_reason}`). Kalau ban kesilapan, sila hubungi admin.",
+            parse_mode="Markdown",
+        )
+    except Exception:
+        logger.exception("Failed sending second-chance ban message chat_id=%s", chat_id)
+
+
 async def is_chat_admin(context: ContextTypes.DEFAULT_TYPE, chat_id: int, user_id: int) -> bool:
     try:
         member = await context.bot.get_chat_member(chat_id=chat_id, user_id=user_id)
@@ -372,6 +688,18 @@ async def chat_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
 
+async def user_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    msg = update.effective_message
+    user = update.effective_user
+    if not msg or not user:
+        return
+    username = f"@{user.username}" if user.username else "-"
+    await msg.reply_text(
+        f"user_id: `{user.id}`\nusername: `{username}`",
+        parse_mode="Markdown",
+    )
+
+
 async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     msg = update.effective_message
     chat = update.effective_chat
@@ -394,6 +722,107 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
     if not isinstance(one_target, dict):
         one_target = {}
 
+    # Group lock window from profile settings: if active, delete comments for selected duration.
+    profiles = one_target.get("group_profiles")
+    enabled_profile_ids = one_target.get("enabled_profile_ids")
+    saved_at_raw = one_target.get("group_profiles_saved_at")
+    if isinstance(profiles, list) and isinstance(enabled_profile_ids, list) and isinstance(saved_at_raw, str):
+        try:
+            start_ts = datetime.fromisoformat(saved_at_raw.replace("Z", "+00:00")).timestamp()
+        except ValueError:
+            start_ts = 0.0
+        now_ts = datetime.now(timezone.utc).timestamp()
+        for pid in enabled_profile_ids:
+            if not isinstance(pid, int) or pid < 1 or pid > len(profiles):
+                continue
+            profile = profiles[pid - 1]
+            if not isinstance(profile, dict):
+                continue
+            if not bool(profile.get("disable_comments_enabled", False)):
+                continue
+            bg_mode = str(profile.get("bg_toggle_mode") or "6h")
+            custom_hours = profile.get("bg_toggle_custom_hours")
+            if not isinstance(custom_hours, int):
+                custom_hours = 6
+            duration = profile_duration_seconds(bg_mode, custom_hours)
+            if start_ts <= 0 or now_ts > start_ts + duration:
+                continue
+            try:
+                await context.bot.delete_message(chat_id=chat.id, message_id=msg.message_id)
+            except Exception:
+                logger.exception("Failed deleting message in disable-comment window chat_id=%s msg_id=%s", chat.id, msg.message_id)
+            try:
+                await context.bot.send_message(
+                    chat_id=chat.id,
+                    text=f"🔒 Comment disabled by profile {pid} window. Message deleted.",
+                )
+            except Exception:
+                logger.exception("Failed sending disable-comment action message chat_id=%s", chat.id)
+            return
+
+    text = (msg.text or msg.caption or "").strip()
+    user_is_admin = await is_chat_admin(context, chat.id, user.id)
+
+    # Group trigger profiles (link/comment rules).
+    if text and not user_is_admin and isinstance(profiles, list) and isinstance(enabled_profile_ids, list):
+        links = extract_links(text)
+        text_lower = text.lower()
+        for pid in enabled_profile_ids:
+            if not isinstance(pid, int) or pid < 1 or pid > len(profiles):
+                continue
+            p = profiles[pid - 1]
+            if not isinstance(p, dict):
+                continue
+
+            link_mode = str(p.get("trigger_link_mode") or "all_links")
+            link_prefix = str(p.get("trigger_link_prefix") or "").strip().lower()
+            link_action = str(p.get("link_action") or "delete")
+            link_hit = False
+            if link_mode == "all_links":
+                link_hit = bool(links)
+            elif link_mode == "specific_prefix" and link_prefix:
+                link_hit = any(url.lower().startswith(link_prefix) for url in links)
+            if link_hit:
+                chance_key = f"{chat.id}:{user.id}:p{pid}:link"
+                await apply_profile_action(
+                    context=context,
+                    chat_id=chat.id,
+                    msg_id=msg.message_id,
+                    user_id=user.id,
+                    action=link_action,
+                    reason=f"profile {pid} link",
+                    chance_key=chance_key,
+                )
+                return
+
+            rules = p.get("trigger_comment_rules")
+            if not isinstance(rules, list):
+                single_comment = str(p.get("trigger_comment") or "").strip()
+                if single_comment:
+                    rules = [{"text": single_comment, "action": str(p.get("action") or "delete")}]
+                else:
+                    rules = []
+            for ridx, rule in enumerate(rules, start=1):
+                if not isinstance(rule, dict):
+                    continue
+                token = str(rule.get("text") or "").strip().lower()
+                if not token:
+                    continue
+                if token not in text_lower:
+                    continue
+                action = str(rule.get("action") or "delete")
+                chance_key = f"{chat.id}:{user.id}:p{pid}:c{ridx}:{token}"
+                await apply_profile_action(
+                    context=context,
+                    chat_id=chat.id,
+                    msg_id=msg.message_id,
+                    user_id=user.id,
+                    action=action,
+                    reason=f"profile {pid} comment:{token}",
+                    chance_key=chance_key,
+                )
+                return
+
     mode = str(one_target.get("mode") or settings.get("mode") or "delete_and_ban")
     flood_threshold = int(one_target.get("flood_threshold_per_minute") or settings.get("flood_threshold_per_minute") or 6)
     auto_ban_raw = one_target.get("auto_ban_user_ids")
@@ -414,8 +843,18 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
         if mode in {"delete_and_ban", "ban_only"}:
             try:
                 await context.bot.ban_chat_member(chat_id=chat.id, user_id=user.id, revoke_messages=True)
+                add_blacklisted_user(user.id)
             except Exception:
                 logger.exception("Failed banning auto-ban user chat_id=%s user_id=%s", chat.id, user.id)
+            else:
+                try:
+                    await context.bot.send_message(
+                        chat_id=chat.id,
+                        text=f"🚫 User `{user.id}` banned by auto-ban rule. Kalau ban kesilapan, sila hubungi admin.",
+                        parse_mode="Markdown",
+                    )
+                except Exception:
+                    logger.exception("Failed sending auto-ban group message chat_id=%s", chat.id)
         return
 
     # Flood control per user per chat.
@@ -427,11 +866,11 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
     bucket[key] = recent
     is_flood = len(recent) >= max(1, flood_threshold)
 
-    text = msg.text or msg.caption or ""
-    if not looks_like_spam(text) and not is_flood:
+    spam_text = msg.text or msg.caption or ""
+    if not looks_like_spam(spam_text) and not is_flood:
         return
 
-    if await is_chat_admin(context, chat.id, user.id):
+    if user_is_admin:
         return
 
     if mode in {"delete_and_ban", "delete_only"}:
@@ -443,6 +882,7 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
     if mode in {"delete_and_ban", "ban_only"}:
         try:
             await context.bot.ban_chat_member(chat_id=chat.id, user_id=user.id, revoke_messages=True)
+            add_blacklisted_user(user.id)
         except Exception:
             logger.exception("Failed banning spam user chat_id=%s user_id=%s", chat.id, user.id)
             return
@@ -453,9 +893,9 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
         if mode == "delete_only":
             action_text = "message deleted"
         elif mode == "ban_only":
-            action_text = "user banned"
+            action_text = "user banned. Kalau ban kesilapan, sila hubungi admin."
         else:
-            action_text = "user banned + message deleted"
+            action_text = "user banned + message deleted. Kalau ban kesilapan, sila hubungi admin."
         await context.bot.send_message(chat_id=chat.id, text=f"🚫 User `{user.id}` {action_text}. {reason}", parse_mode="Markdown")
     except Exception:
         logger.exception("Failed sending moderation notification")
@@ -521,24 +961,12 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if payload_type == "reezo_moderator_target_settings_save":
         target_id = payload.get("target_id")
         target_type = str(payload.get("target_type") or "").strip().lower()
-        moderation_enabled = bool(payload.get("moderation_enabled", True))
-        mode = str(payload.get("mode") or "delete_and_ban")
-        flood = int(payload.get("flood_threshold_per_minute") or 6)
-        auto_ban_user_ids = payload.get("auto_ban_user_ids")
 
         if target_type not in {"group", "channel"}:
             await msg.reply_text("❌ target_type invalid.")
             return
         if not isinstance(target_id, int):
             await msg.reply_text("❌ target_id invalid.")
-            return
-        if mode not in {"delete_and_ban", "delete_only", "ban_only"}:
-            await msg.reply_text("❌ mode invalid.")
-            return
-        if flood < 1:
-            flood = 1
-        if not isinstance(auto_ban_user_ids, list) or not all(isinstance(x, int) for x in auto_ban_user_ids):
-            await msg.reply_text("❌ auto_ban_user_ids invalid.")
             return
 
         settings = load_runtime_settings()
@@ -555,22 +983,146 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
         target_settings = settings.get("target_settings")
         if not isinstance(target_settings, dict):
             target_settings = {}
-        target_settings[str(target_id)] = {
-            "moderation_enabled": moderation_enabled,
-            "mode": mode,
-            "flood_threshold_per_minute": flood,
-            "auto_ban_user_ids": auto_ban_user_ids,
-        }
+        existing = target_settings.get(str(target_id))
+        if not isinstance(existing, dict):
+            existing = {}
+
+        if target_type == "group":
+            raw_profiles = payload.get("group_profiles")
+            enabled_profile_ids = payload.get("enabled_profile_ids")
+            if not isinstance(raw_profiles, list):
+                await msg.reply_text("❌ group_profiles invalid.")
+                return
+            if not isinstance(enabled_profile_ids, list):
+                await msg.reply_text("❌ enabled_profile_ids invalid.")
+                return
+
+            cleaned_profiles: list[dict] = []
+            for idx, item in enumerate(raw_profiles[:4], start=1):
+                if not isinstance(item, dict):
+                    await msg.reply_text(f"❌ profile {idx} invalid.")
+                    return
+                trigger_link_mode = str(item.get("trigger_link_mode") or "all_links")
+                if trigger_link_mode not in {"all_links", "specific_prefix"}:
+                    trigger_link_mode = "all_links"
+                link_action = str(item.get("link_action") or item.get("action") or "delete")
+                if link_action not in {"delete", "delete_and_ban", "delete_plus_one_chance"}:
+                    link_action = "delete"
+                bg_toggle_mode = str(item.get("bg_toggle_mode") or "6h")
+                if bg_toggle_mode not in {"6h", "12h", "24h", "custom"}:
+                    bg_toggle_mode = "6h"
+                custom_hours = item.get("bg_toggle_custom_hours")
+                if not isinstance(custom_hours, int) or custom_hours < 1:
+                    custom_hours = 6
+                comment_rules = item.get("trigger_comment_rules")
+                if not isinstance(comment_rules, list):
+                    legacy_comment = str(item.get("trigger_comment") or "").strip()
+                    legacy_action = str(item.get("action") or "delete")
+                    comment_rules = [{"text": legacy_comment, "action": legacy_action}] if legacy_comment else []
+                normalized_rules = []
+                for rule in comment_rules:
+                    if not isinstance(rule, dict):
+                        continue
+                    token = str(rule.get("text") or "").strip()
+                    if not token:
+                        continue
+                    rule_action = str(rule.get("action") or "delete")
+                    if rule_action not in {"delete", "delete_and_ban", "delete_plus_one_chance"}:
+                        rule_action = "delete"
+                    normalized_rules.append({"text": token, "action": rule_action})
+                cleaned_profiles.append(
+                    {
+                        "trigger_link_mode": trigger_link_mode,
+                        "trigger_link_prefix": str(item.get("trigger_link_prefix") or "").strip(),
+                        "link_action": link_action,
+                        "trigger_comment_rules": normalized_rules,
+                        "disable_comments_enabled": bool(item.get("disable_comments_enabled", False)),
+                        "bg_toggle_mode": bg_toggle_mode,
+                        "bg_toggle_custom_hours": custom_hours,
+                    }
+                )
+            while len(cleaned_profiles) < 4:
+                cleaned_profiles.append(
+                    {
+                        "trigger_link_mode": "all_links",
+                        "trigger_link_prefix": "",
+                        "link_action": "delete",
+                        "trigger_comment_rules": [],
+                        "disable_comments_enabled": False,
+                        "bg_toggle_mode": "6h",
+                        "bg_toggle_custom_hours": 6,
+                    }
+                )
+            cleaned_enabled = sorted(
+                set(int(x) for x in enabled_profile_ids if isinstance(x, int) and 1 <= int(x) <= 4)
+            )
+            if not cleaned_enabled:
+                await msg.reply_text("❌ Pilih sekurang-kurangnya 1 profile.")
+                return
+
+            existing["group_profiles"] = cleaned_profiles
+            existing["enabled_profile_ids"] = cleaned_enabled
+            existing["group_profiles_saved_at"] = utc_now_iso()
+            target_settings[str(target_id)] = existing
+            settings["target_settings"] = target_settings
+            save_runtime_settings(settings)
+
+            summary_lines = []
+            for pid in cleaned_enabled:
+                p = cleaned_profiles[pid - 1]
+                link_rule = "all_links" if p["trigger_link_mode"] == "all_links" else f"prefix:{p['trigger_link_prefix'] or '-'}"
+                bg_rule = p["bg_toggle_mode"]
+                if bg_rule == "custom":
+                    bg_rule = f"custom:{p['bg_toggle_custom_hours']}h"
+                comment_rules = p.get("trigger_comment_rules") or []
+                comments_text = ", ".join(
+                    f"{r.get('text')}:{r.get('action')}" for r in comment_rules if isinstance(r, dict) and r.get("text")
+                ) or "-"
+                summary_lines.append(
+                    f"P{pid} link={link_rule} link_action={p['link_action']} comments={comments_text} disable_comment={'on' if p['disable_comments_enabled'] else 'off'} bg={bg_rule}"
+                )
+            await msg.reply_text(
+                "✅ Group profile settings saved.\n"
+                f"- target: {matched_target.get('name')} ({target_id})\n"
+                f"- active profiles: {', '.join(str(x) for x in cleaned_enabled)}\n"
+                + "\n".join(f"- {line}" for line in summary_lines),
+                reply_markup=moderation_app_keyboard(),
+            )
+            return
+
+        discussion_group_id = payload.get("discussion_group_id")
+        broadcast_presets = payload.get("broadcast_presets")
+        if discussion_group_id is not None and not isinstance(discussion_group_id, int):
+            await msg.reply_text("❌ discussion_group_id invalid.")
+            return
+        cleaned_presets = []
+        if broadcast_presets is not None:
+            if not isinstance(broadcast_presets, list):
+                await msg.reply_text("❌ broadcast_presets invalid.")
+                return
+            for item in broadcast_presets:
+                if not isinstance(item, dict):
+                    continue
+                name = str(item.get("name") or "").strip()
+                ptext = str(item.get("text") or "").strip()
+                if not name or not ptext:
+                    continue
+                cleaned_presets.append({"name": name, "text": ptext})
+
+        if isinstance(discussion_group_id, int):
+            existing["discussion_group_id"] = discussion_group_id
+        else:
+            existing.pop("discussion_group_id", None)
+        existing["broadcast_presets"] = cleaned_presets
+        target_settings[str(target_id)] = existing
         settings["target_settings"] = target_settings
         save_runtime_settings(settings)
 
         await msg.reply_text(
             "✅ Target settings saved.\n"
             f"- target: {matched_target.get('name')} ({target_id})\n"
-            f"- enabled: {moderation_enabled}\n"
-            f"- mode: {mode}\n"
-            f"- auto-ban users: {len(auto_ban_user_ids)}\n"
-            f"- flood/min: {flood}",
+            f"- discussion_group_id: {discussion_group_id if isinstance(discussion_group_id, int) else '(not set)'}\n"
+            f"- broadcast_presets: {len(cleaned_presets)}",
             reply_markup=moderation_app_keyboard(),
         )
         return
@@ -693,9 +1245,45 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             return
 
     if context.user_data.get("awaiting_broadcast") and chat.type == ChatType.PRIVATE:
+        pending = context.user_data.get("pending_broadcast")
         if text == MENU_CANCEL or text.lower() in {"cancel", "batal"}:
             context.user_data.pop("awaiting_broadcast", None)
+            context.user_data.pop("pending_broadcast", None)
             await msg.reply_text("Broadcast dibatalkan.", reply_markup=main_keyboard(is_admin))
+            return
+
+        if isinstance(pending, dict):
+            if text == MENU_BROADCAST_EDIT:
+                context.user_data.pop("pending_broadcast", None)
+                await msg.reply_text(
+                    "Hantar semula text broadcast baru.",
+                    reply_markup=ReplyKeyboardMarkup([[KeyboardButton(MENU_CANCEL)]], resize_keyboard=True),
+                )
+                return
+            if text != MENU_BROADCAST_SEND:
+                await msg.reply_text(
+                    "Pilih `✅ Send Broadcast` untuk hantar atau `✏️ Edit Text` untuk ubah.",
+                    parse_mode="Markdown",
+                    reply_markup=ReplyKeyboardMarkup(
+                        [[KeyboardButton(MENU_BROADCAST_SEND), KeyboardButton(MENU_BROADCAST_EDIT)], [KeyboardButton(MENU_CANCEL)]],
+                        resize_keyboard=True,
+                    ),
+                )
+                return
+            channel_id = pending.get("channel_id")
+            body = str(pending.get("body") or "").strip()
+            if not isinstance(channel_id, int) or not body:
+                context.user_data.pop("pending_broadcast", None)
+                await msg.reply_text("Preview rosak. Sila hantar semula broadcast text.")
+                return
+            try:
+                await context.bot.send_message(chat_id=channel_id, text=body)
+            except (BadRequest, Forbidden):
+                await msg.reply_text("Gagal broadcast. Pastikan bot admin di channel dan channel_id betul.")
+                return
+            context.user_data.pop("pending_broadcast", None)
+            context.user_data.pop("awaiting_broadcast", None)
+            await msg.reply_text(f"✅ Broadcast berjaya ke {channel_id}.", reply_markup=main_keyboard(is_admin))
             return
 
         channel_id: int | None = get_default_channel_id()
@@ -706,6 +1294,18 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             if first_line.startswith("-100") and first_line[1:].isdigit():
                 channel_id = int(first_line)
                 body = rest.strip()
+        presets = get_channel_broadcast_presets(channel_id)
+        # Allow selecting preset by number only, e.g. "1".
+        if body.isdigit() and presets:
+            idx = int(body)
+            if 1 <= idx <= len(presets):
+                body = presets[idx - 1]["text"]
+        # Allow selecting preset by exact preset name.
+        if presets and body:
+            for item in presets:
+                if body.strip().lower() == item["name"].strip().lower():
+                    body = item["text"]
+                    break
 
         if channel_id is None:
             await msg.reply_text(
@@ -718,14 +1318,16 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             await msg.reply_text("Mesej kosong. Cuba lagi atau cancel.")
             return
 
-        try:
-            await context.bot.send_message(chat_id=channel_id, text=body)
-        except (BadRequest, Forbidden):
-            await msg.reply_text("Gagal broadcast. Pastikan bot admin di channel dan channel_id betul.")
-            return
-
-        context.user_data.pop("awaiting_broadcast", None)
-        await msg.reply_text(f"✅ Broadcast berjaya ke {channel_id}.", reply_markup=main_keyboard(is_admin))
+        context.user_data["pending_broadcast"] = {"channel_id": channel_id, "body": body}
+        preview = body if len(body) <= 700 else (body[:700] + "...")
+        await msg.reply_text(
+            f"Preview broadcast ke `{channel_id}`:\n\n{preview}\n\nTekan `✅ Send Broadcast` untuk hantar.",
+            parse_mode="Markdown",
+            reply_markup=ReplyKeyboardMarkup(
+                [[KeyboardButton(MENU_BROADCAST_SEND), KeyboardButton(MENU_BROADCAST_EDIT)], [KeyboardButton(MENU_CANCEL)]],
+                resize_keyboard=True,
+            ),
+        )
         return
 
     if text == MENU_CHAT_ID:
@@ -768,8 +1370,18 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             await msg.reply_text("❌ Admin only.")
             return
         context.user_data["awaiting_broadcast"] = True
+        context.user_data.pop("pending_broadcast", None)
+        channel_id = get_default_channel_id()
+        presets = get_channel_broadcast_presets(channel_id)
+        preset_lines = ""
+        if presets:
+            preset_lines = "\nPreset tersedia:\n" + "\n".join(
+                f"{idx}. {item['name']}" for idx, item in enumerate(presets, start=1)
+            ) + "\n(Hantar nombor preset atau nama preset untuk guna text siap.)"
         await msg.reply_text(
-            "Hantar mesej broadcast sekarang.\\nOpsyen: baris pertama boleh channel_id (-100...).",
+            "Hantar mesej broadcast sekarang.\\nOpsyen: baris pertama boleh channel_id (-100...).\\n"
+            "Selepas hantar text, bot akan tunjuk preview dulu sebelum send."
+            + preset_lines,
             reply_markup=ReplyKeyboardMarkup([[KeyboardButton(MENU_CANCEL)]], resize_keyboard=True),
         )
         return
@@ -838,6 +1450,7 @@ def main() -> None:
     )
     app = ApplicationBuilder().token(get_token()).build()
 
+    app.add_handler(CommandHandler("userid", user_id))
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("chatid", chat_id))
     app.add_handler(CommandHandler("groupid", chat_id))

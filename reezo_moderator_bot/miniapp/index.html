@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Reezo Moderator Miniapp</title>
+  <title>Reezo Moderation Miniapp</title>
   <style>
     :root {
       --bg: #070d18;
@@ -38,7 +38,7 @@
     .row { display: flex; gap: 8px; flex-wrap: wrap; }
     .row > * { flex: 1 1 180px; }
     label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 4px; }
-    input, select, button {
+    input, textarea, select, button {
       width: 100%;
       border-radius: 10px;
       border: 1px solid var(--line);
@@ -62,19 +62,29 @@
     }
     .seg { display: flex; gap: 8px; }
     .seg button.active { border-color: #7fb4ff; background: #245197; }
-    .status { min-height: 18px; margin-top: 8px; font-size: 13px; }
+    .status { min-height: 18px; margin-top: 8px; font-size: 13px; white-space: pre-wrap; }
     .status.ok { color: #8fe3b8; }
     .status.err { color: #ff9b9b; }
     ul { margin: 8px 0 0; padding-left: 18px; }
     li { margin: 4px 0; color: #d7e5ff; }
     .hidden { display: none; }
+    .profiles-box { margin-top: 10px; border: 1px solid var(--line); border-radius: 10px; padding: 10px; background: #0a1530; }
+    .profiles-tab { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+    .profiles-tab button { flex: 1 1 100px; }
+    .profile-card { border: 1px solid #2f4f84; border-radius: 10px; padding: 10px; }
+    .checkbox-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+    .check-item { display: flex; gap: 8px; align-items: center; padding: 8px; border: 1px solid #2e4675; border-radius: 10px; background: #0c1b38; }
+    .check-item input { width: 16px; height: 16px; }
+    .summary-box { margin-top: 10px; padding: 8px; border: 1px dashed #4869a7; border-radius: 10px; font-size: 12px; color: #c8dcff; white-space: pre-wrap; }
+    .rule-row { display: grid; grid-template-columns: 1.3fr 1fr auto; gap: 8px; margin-top: 8px; }
+    .rule-del { width: auto; padding: 10px 12px; border-color: #74516c; background: #2f1d2f; }
   </style>
 </head>
 <body>
   <main>
     <div class="header">
       <div>
-        <h1 class="title">Moderator Miniapp</h1>
+        <h1 class="title">Moderation</h1>
         <p class="muted" id="subtitle">Manage groups/channels</p>
       </div>
       <button id="btnBack" class="btn-ghost" type="button">Back</button>
@@ -119,41 +129,107 @@
         <button id="tabGroup" type="button" class="active">Group</button>
         <button id="tabChannel" type="button">Channel</button>
       </div>
+
       <label for="targetSelect">Select target</label>
       <select id="targetSelect"></select>
 
       <div id="settingsFields" style="margin-top:10px;">
-        <div class="row">
-          <div>
-            <label for="modeSelect">Mode</label>
-            <select id="modeSelect">
-              <option value="delete_and_ban">delete_and_ban</option>
-              <option value="delete_only">delete_only</option>
-              <option value="ban_only">ban_only</option>
-            </select>
-          </div>
-          <div>
-            <label for="floodInput">Flood per minute</label>
-            <input id="floodInput" type="number" min="1" step="1" value="6" />
+        <div id="groupSettingsPanel" class="hidden">
+          <div class="profiles-box">
+            <div class="profiles-tab">
+              <button id="profileTab1" type="button" class="active">Profile 1</button>
+              <button id="profileTab2" type="button">Profile 2</button>
+              <button id="profileTab3" type="button">Profile 3</button>
+              <button id="profileTab4" type="button">Profile 4</button>
+            </div>
+
+            <div class="profile-card">
+              <div class="row">
+                <div>
+                  <label for="triggerLinkMode">Trigger Link</label>
+                  <select id="triggerLinkMode">
+                    <option value="all_links">All links</option>
+                    <option value="specific_prefix">Specific URL prefix</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="triggerLinkPrefix">Specific URL prefix</label>
+                  <input id="triggerLinkPrefix" type="text" placeholder="https://t.me/" />
+                </div>
+              </div>
+              <div class="row" style="margin-top:8px;">
+                <div>
+                  <label for="linkAction">Link Action</label>
+                  <select id="linkAction">
+                    <option value="delete">delete</option>
+                    <option value="delete_and_ban">delete & ban</option>
+                    <option value="delete_plus_one_chance">delete + 1 chance</option>
+                  </select>
+                </div>
+                <div>
+                  <label>Trigger Comment Rules</label>
+                  <button id="addCommentRule" type="button" class="btn-ghost">+ tambah trigger</button>
+                </div>
+              </div>
+              <div id="commentRulesList"></div>
+              <div class="row" style="margin-top:8px;">
+                <div>
+                  <label for="disableCommentsEnabled">Disable Comment</label>
+                  <select id="disableCommentsEnabled">
+                    <option value="false">off</option>
+                    <option value="true">on</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="bgToggleMode">BG Toggle</label>
+                  <select id="bgToggleMode">
+                    <option value="6h">6 jam</option>
+                    <option value="12h">12 jam</option>
+                    <option value="24h">24 jam</option>
+                    <option value="custom">custom</option>
+                  </select>
+                  <input id="bgToggleCustomHours" type="number" min="1" max="720" value="6" style="margin-top:8px;" placeholder="custom jam" />
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-top:10px;">
+              <label>Active Profile (boleh pilih lebih dari satu)</label>
+              <div class="checkbox-grid">
+                <label class="check-item"><input type="checkbox" id="activeP1" /> Profile 1</label>
+                <label class="check-item"><input type="checkbox" id="activeP2" /> Profile 2</label>
+                <label class="check-item"><input type="checkbox" id="activeP3" /> Profile 3</label>
+                <label class="check-item"><input type="checkbox" id="activeP4" /> Profile 4</label>
+              </div>
+            </div>
+
+            <div id="groupSummary" class="summary-box"></div>
           </div>
         </div>
-        <div class="row" style="margin-top:8px;">
-          <div>
-            <label for="enabledSelect">Moderation enabled</label>
-            <select id="enabledSelect">
-              <option value="true">true</option>
-              <option value="false">false</option>
-            </select>
+
+        <div id="channelSettingsPanel" class="hidden">
+          <div class="row">
+            <div>
+              <label for="discussionGroupIdInput">Discussion Group ID</label>
+              <input id="discussionGroupIdInput" type="text" placeholder="-1001234567890" />
+            </div>
           </div>
-          <div>
-            <label for="autoBanInput">Auto-ban user IDs (comma)</label>
-            <input id="autoBanInput" type="text" placeholder="12345,67890" />
+          <div class="profiles-box" style="margin-top:10px;">
+            <div class="row">
+              <div>
+                <label>Broadcast Preset</label>
+                <button id="addBroadcastPreset" type="button" class="btn-ghost">+ tambah preset</button>
+              </div>
+            </div>
+            <div id="broadcastPresetList"></div>
           </div>
         </div>
+
         <div class="row" style="margin-top:10px;">
           <button id="submitSetting" class="btn-ok" type="button">Save Setting</button>
         </div>
       </div>
+
       <p id="settingsStatus" class="status"></p>
     </section>
   </main>
@@ -188,6 +264,7 @@
     const state = decodeState(qs.get("state"));
     let addType = "group";
     let settingsTab = "group";
+    let activeProfileTab = 1;
 
     const menuView = document.getElementById("menuView");
     const addView = document.getElementById("addView");
@@ -231,6 +308,31 @@
     function tabButtonStyle() {
       document.getElementById("tabGroup").classList.toggle("active", settingsTab === "group");
       document.getElementById("tabChannel").classList.toggle("active", settingsTab === "channel");
+      document.getElementById("groupSettingsPanel").classList.toggle("hidden", settingsTab !== "group");
+      document.getElementById("channelSettingsPanel").classList.toggle("hidden", settingsTab !== "channel");
+    }
+
+    function profileTabStyle() {
+      [1, 2, 3, 4].forEach((id) => {
+        document.getElementById("profileTab" + id).classList.toggle("active", activeProfileTab === id);
+      });
+    }
+
+    function ensureGroupProfiles() {
+      if (!state.group_profile_draft) {
+        state.group_profile_draft = {
+          profiles: [1, 2, 3, 4].map(() => ({
+            trigger_link_mode: "all_links",
+            trigger_link_prefix: "",
+            link_action: "delete",
+            trigger_comment_rules: [{ text: "", action: "delete" }],
+            disable_comments_enabled: false,
+            bg_toggle_mode: "6h",
+            bg_toggle_custom_hours: 6
+          })),
+          enabled_profile_ids: [1]
+        };
+      }
     }
 
     function renderSavedList() {
@@ -249,18 +351,68 @@
       });
     }
 
-    function parseAutoBanCsv(raw) {
-      const out = [];
-      const seen = new Set();
-      String(raw || "").split(",").map((x) => x.trim()).filter(Boolean).forEach((part) => {
-        if (!/^\d+$/.test(part)) return;
-        const id = Number(part);
-        if (!Number.isSafeInteger(id)) return;
-        if (seen.has(id)) return;
-        seen.add(id);
-        out.push(id);
-      });
-      return out;
+    function ensureChannelDraft() {
+      if (!state.channel_draft) {
+        state.channel_draft = {
+          discussion_group_id: "",
+          broadcast_presets: [{ name: "Preset 1", text: "" }]
+        };
+      }
+      if (!Array.isArray(state.channel_draft.broadcast_presets)) {
+        state.channel_draft.broadcast_presets = [{ name: "Preset 1", text: "" }];
+      }
+      if (!state.channel_draft.broadcast_presets.length) {
+        state.channel_draft.broadcast_presets.push({ name: "Preset 1", text: "" });
+      }
+    }
+
+    function loadDraftFromTarget(targetId) {
+      ensureGroupProfiles();
+      const saved = state.target_settings && state.target_settings[targetId] ? state.target_settings[targetId] : {};
+      if (!saved || typeof saved !== "object") return;
+
+      if (Array.isArray(saved.group_profiles) && saved.group_profiles.length === 4) {
+        state.group_profile_draft.profiles = saved.group_profiles.map((p) => ({
+          trigger_link_mode: p.trigger_link_mode === "specific_prefix" ? "specific_prefix" : "all_links",
+          trigger_link_prefix: String(p.trigger_link_prefix || ""),
+          link_action: ["delete", "delete_and_ban", "delete_plus_one_chance"].includes(p.link_action) ? p.link_action : "delete",
+          trigger_comment_rules: Array.isArray(p.trigger_comment_rules) && p.trigger_comment_rules.length
+            ? p.trigger_comment_rules.map((r) => ({
+                text: String(r.text || "").trim(),
+                action: ["delete", "delete_and_ban", "delete_plus_one_chance"].includes(r.action) ? r.action : "delete"
+              }))
+            : [{ text: "", action: "delete" }],
+          disable_comments_enabled: !!p.disable_comments_enabled,
+          bg_toggle_mode: ["6h", "12h", "24h", "custom"].includes(p.bg_toggle_mode) ? p.bg_toggle_mode : "6h",
+          bg_toggle_custom_hours: Number.isFinite(Number(p.bg_toggle_custom_hours)) ? Math.max(1, Number(p.bg_toggle_custom_hours)) : 6
+        }));
+      }
+      if (Array.isArray(saved.enabled_profile_ids) && saved.enabled_profile_ids.length) {
+        const ids = saved.enabled_profile_ids.map((x) => Number(x)).filter((x) => [1,2,3,4].includes(x));
+        state.group_profile_draft.enabled_profile_ids = ids.length ? Array.from(new Set(ids)) : [1];
+      }
+
+      ensureChannelDraft();
+      state.channel_draft.discussion_group_id = String(saved.discussion_group_id || "");
+      state.channel_draft.broadcast_presets = Array.isArray(saved.broadcast_presets) && saved.broadcast_presets.length
+        ? saved.broadcast_presets.map((p) => ({ name: String(p.name || "").trim(), text: String(p.text || "") }))
+        : [{ name: "Preset 1", text: "" }];
+      document.getElementById("discussionGroupIdInput").value = state.channel_draft.discussion_group_id;
+      renderBroadcastPresets();
+    }
+
+    function fillCurrentSetting() {
+      const select = document.getElementById("targetSelect");
+      const targetId = select.value;
+      if (!targetId) return;
+      loadDraftFromTarget(targetId);
+      if (settingsTab === "group") {
+        renderGroupProfileUI();
+      } else {
+        ensureChannelDraft();
+        document.getElementById("discussionGroupIdInput").value = state.channel_draft.discussion_group_id || "";
+        renderBroadcastPresets();
+      }
     }
 
     function renderTargetSelect() {
@@ -289,15 +441,139 @@
       fillCurrentSetting();
     }
 
-    function fillCurrentSetting() {
-      const select = document.getElementById("targetSelect");
-      const targetId = select.value;
-      const s = state.target_settings && state.target_settings[targetId] ? state.target_settings[targetId] : {};
-      document.getElementById("modeSelect").value = s.mode || "delete_and_ban";
-      document.getElementById("floodInput").value = String(s.flood_threshold_per_minute || 6);
-      document.getElementById("enabledSelect").value = (s.moderation_enabled === false ? "false" : "true");
-      const autoBan = Array.isArray(s.auto_ban_user_ids) ? s.auto_ban_user_ids.join(",") : "";
-      document.getElementById("autoBanInput").value = autoBan;
+    function persistProfileDraft() {
+      ensureGroupProfiles();
+      const p = state.group_profile_draft.profiles[activeProfileTab - 1];
+      p.trigger_link_mode = document.getElementById("triggerLinkMode").value;
+      p.trigger_link_prefix = document.getElementById("triggerLinkPrefix").value.trim();
+      p.link_action = document.getElementById("linkAction").value;
+      p.trigger_comment_rules = collectCommentRulesFromUI();
+      p.disable_comments_enabled = document.getElementById("disableCommentsEnabled").value === "true";
+      p.bg_toggle_mode = document.getElementById("bgToggleMode").value;
+      p.bg_toggle_custom_hours = Math.max(1, Number(document.getElementById("bgToggleCustomHours").value || 6));
+
+      const enabled = [];
+      if (document.getElementById("activeP1").checked) enabled.push(1);
+      if (document.getElementById("activeP2").checked) enabled.push(2);
+      if (document.getElementById("activeP3").checked) enabled.push(3);
+      if (document.getElementById("activeP4").checked) enabled.push(4);
+      state.group_profile_draft.enabled_profile_ids = enabled;
+    }
+
+    function renderGroupSummary() {
+      ensureGroupProfiles();
+      const active = state.group_profile_draft.enabled_profile_ids;
+      const lines = [];
+      lines.push("Enabled profile: " + (active.length ? active.join(", ") : "none"));
+      active.forEach((id) => {
+        const p = state.group_profile_draft.profiles[id - 1];
+        const linkRule = p.trigger_link_mode === "all_links" ? "all links" : ("prefix=" + (p.trigger_link_prefix || "(empty)"));
+        const bgRule = p.bg_toggle_mode === "custom" ? ("custom " + p.bg_toggle_custom_hours + "h") : p.bg_toggle_mode;
+        const comments = (Array.isArray(p.trigger_comment_rules) ? p.trigger_comment_rules : [])
+          .filter((r) => r && r.text)
+          .map((r) => `${r.text}:${r.action}`)
+          .join(", ");
+        lines.push("P" + id + ": " + linkRule + " | link_action=" + p.link_action + " | comments=" + (comments || "-") + " | disable_comment=" + (p.disable_comments_enabled ? "on" : "off") + " | bg=" + bgRule);
+      });
+      document.getElementById("groupSummary").textContent = lines.join("\n");
+    }
+
+    function renderCommentRules() {
+      const list = document.getElementById("commentRulesList");
+      const p = state.group_profile_draft.profiles[activeProfileTab - 1];
+      const rules = Array.isArray(p.trigger_comment_rules) && p.trigger_comment_rules.length
+        ? p.trigger_comment_rules
+        : [{ text: "", action: "delete" }];
+      p.trigger_comment_rules = rules;
+      list.innerHTML = "";
+      rules.forEach((rule, idx) => {
+        const row = document.createElement("div");
+        row.className = "rule-row";
+        row.innerHTML =
+          `<input data-rule-text=\"${idx}\" type=\"text\" placeholder=\"contoh: join now\" value=\"${String(rule.text || "").replace(/\"/g, "&quot;")}\" />` +
+          `<select data-rule-action=\"${idx}\">` +
+            `<option value=\"delete\" ${rule.action === "delete" ? "selected" : ""}>delete</option>` +
+            `<option value=\"delete_and_ban\" ${rule.action === "delete_and_ban" ? "selected" : ""}>delete & ban</option>` +
+            `<option value=\"delete_plus_one_chance\" ${rule.action === "delete_plus_one_chance" ? "selected" : ""}>delete + 1 chance</option>` +
+          `</select>` +
+          `<button class=\"rule-del\" type=\"button\" data-rule-del=\"${idx}\">buang</button>`;
+        list.appendChild(row);
+      });
+    }
+
+    function collectCommentRulesFromUI() {
+      const rows = [];
+      const textNodes = Array.from(document.querySelectorAll("#commentRulesList [data-rule-text]"));
+      textNodes.forEach((node) => {
+        const idx = node.getAttribute("data-rule-text");
+        const actionNode = document.querySelector(`#commentRulesList [data-rule-action="${idx}"]`);
+        const text = String(node.value || "").trim();
+        const action = actionNode ? actionNode.value : "delete";
+        if (!text) return;
+        rows.push({
+          text,
+          action: ["delete", "delete_and_ban", "delete_plus_one_chance"].includes(action) ? action : "delete"
+        });
+      });
+      return rows.length ? rows : [{ text: "", action: "delete" }];
+    }
+
+    function renderGroupProfileUI() {
+      ensureGroupProfiles();
+      const p = state.group_profile_draft.profiles[activeProfileTab - 1];
+      document.getElementById("triggerLinkMode").value = p.trigger_link_mode;
+      document.getElementById("triggerLinkPrefix").value = p.trigger_link_prefix;
+      document.getElementById("linkAction").value = p.link_action;
+      document.getElementById("disableCommentsEnabled").value = p.disable_comments_enabled ? "true" : "false";
+      document.getElementById("bgToggleMode").value = p.bg_toggle_mode;
+      document.getElementById("bgToggleCustomHours").value = String(p.bg_toggle_custom_hours || 6);
+
+      document.getElementById("activeP1").checked = state.group_profile_draft.enabled_profile_ids.includes(1);
+      document.getElementById("activeP2").checked = state.group_profile_draft.enabled_profile_ids.includes(2);
+      document.getElementById("activeP3").checked = state.group_profile_draft.enabled_profile_ids.includes(3);
+      document.getElementById("activeP4").checked = state.group_profile_draft.enabled_profile_ids.includes(4);
+
+      profileTabStyle();
+      renderCommentRules();
+      renderGroupSummary();
+    }
+
+    function collectBroadcastPresetsFromUI() {
+      const rows = [];
+      const nameNodes = Array.from(document.querySelectorAll("#broadcastPresetList [data-preset-name]"));
+      nameNodes.forEach((node) => {
+        const idx = node.getAttribute("data-preset-name");
+        const textNode = document.querySelector(`#broadcastPresetList [data-preset-text="${idx}"]`);
+        const name = String(node.value || "").trim();
+        const text = textNode ? String(textNode.value || "").trim() : "";
+        if (!name || !text) return;
+        rows.push({ name, text });
+      });
+      return rows;
+    }
+
+    function renderBroadcastPresets() {
+      ensureChannelDraft();
+      const box = document.getElementById("broadcastPresetList");
+      box.innerHTML = "";
+      state.channel_draft.broadcast_presets.forEach((preset, idx) => {
+        const row = document.createElement("div");
+        row.className = "rule-row";
+        row.innerHTML =
+          `<input data-preset-name="${idx}" type="text" placeholder="Preset name" value="${String(preset.name || "").replace(/\"/g, "&quot;")}" />` +
+          `<input data-preset-text="${idx}" type="text" placeholder="Broadcast text" value="${String(preset.text || "").replace(/\"/g, "&quot;")}" />` +
+          `<button class="rule-del" type="button" data-preset-del="${idx}">buang</button>`;
+        box.appendChild(row);
+      });
+    }
+
+    function persistChannelDraft() {
+      ensureChannelDraft();
+      state.channel_draft.discussion_group_id = String(document.getElementById("discussionGroupIdInput").value || "").trim();
+      state.channel_draft.broadcast_presets = collectBroadcastPresetsFromUI();
+      if (!state.channel_draft.broadcast_presets.length) {
+        state.channel_draft.broadcast_presets = [{ name: "Preset 1", text: "" }];
+      }
     }
 
     document.getElementById("btnBack").addEventListener("click", () => {
@@ -319,7 +595,7 @@
       const idRaw = document.getElementById("targetId").value.trim();
       const name = document.getElementById("targetName").value.trim();
       const status = document.getElementById("addStatus");
-      if (!/^-\d+$/.test(idRaw)) {
+      if (!/^\-\d+$/.test(idRaw)) {
         setStatus(status, "ID mesti nombor negatif. Contoh: -1001234567890", false);
         return;
       }
@@ -361,7 +637,79 @@
       tabButtonStyle();
       renderTargetSelect();
     });
+
     document.getElementById("targetSelect").addEventListener("change", fillCurrentSetting);
+
+    [1,2,3,4].forEach((id) => {
+      document.getElementById("profileTab" + id).addEventListener("click", () => {
+        persistProfileDraft();
+        activeProfileTab = id;
+        renderGroupProfileUI();
+      });
+    });
+
+    ["triggerLinkMode", "triggerLinkPrefix", "linkAction", "disableCommentsEnabled", "bgToggleMode", "bgToggleCustomHours", "activeP1", "activeP2", "activeP3", "activeP4"].forEach((id) => {
+      document.getElementById(id).addEventListener("change", () => {
+        persistProfileDraft();
+        renderGroupSummary();
+      });
+    });
+
+    document.getElementById("addCommentRule").addEventListener("click", () => {
+      ensureGroupProfiles();
+      persistProfileDraft();
+      const p = state.group_profile_draft.profiles[activeProfileTab - 1];
+      p.trigger_comment_rules.push({ text: "", action: "delete" });
+      renderCommentRules();
+    });
+
+    document.getElementById("commentRulesList").addEventListener("click", (ev) => {
+      const btn = ev.target.closest("[data-rule-del]");
+      if (!btn) return;
+      ensureGroupProfiles();
+      persistProfileDraft();
+      const idx = Number(btn.getAttribute("data-rule-del"));
+      const p = state.group_profile_draft.profiles[activeProfileTab - 1];
+      if (!Number.isInteger(idx) || idx < 0 || idx >= p.trigger_comment_rules.length) return;
+      p.trigger_comment_rules.splice(idx, 1);
+      if (!p.trigger_comment_rules.length) p.trigger_comment_rules.push({ text: "", action: "delete" });
+      renderCommentRules();
+      renderGroupSummary();
+    });
+
+    document.getElementById("commentRulesList").addEventListener("change", () => {
+      persistProfileDraft();
+      renderGroupSummary();
+    });
+
+    document.getElementById("addBroadcastPreset").addEventListener("click", () => {
+      ensureChannelDraft();
+      persistChannelDraft();
+      const nextIdx = state.channel_draft.broadcast_presets.length + 1;
+      state.channel_draft.broadcast_presets.push({ name: "Preset " + nextIdx, text: "" });
+      renderBroadcastPresets();
+    });
+
+    document.getElementById("broadcastPresetList").addEventListener("click", (ev) => {
+      const btn = ev.target.closest("[data-preset-del]");
+      if (!btn) return;
+      ensureChannelDraft();
+      persistChannelDraft();
+      const idx = Number(btn.getAttribute("data-preset-del"));
+      if (!Number.isInteger(idx) || idx < 0 || idx >= state.channel_draft.broadcast_presets.length) return;
+      state.channel_draft.broadcast_presets.splice(idx, 1);
+      if (!state.channel_draft.broadcast_presets.length) {
+        state.channel_draft.broadcast_presets.push({ name: "Preset 1", text: "" });
+      }
+      renderBroadcastPresets();
+    });
+
+    document.getElementById("broadcastPresetList").addEventListener("change", () => {
+      persistChannelDraft();
+    });
+    document.getElementById("discussionGroupIdInput").addEventListener("change", () => {
+      persistChannelDraft();
+    });
 
     document.getElementById("submitSetting").addEventListener("click", () => {
       const select = document.getElementById("targetSelect");
@@ -370,29 +718,67 @@
         setStatus(status, "Tiada target dipilih.", false);
         return;
       }
+
       const targetId = Number(select.value);
-      const mode = document.getElementById("modeSelect").value;
-      const flood = Math.max(1, Number(document.getElementById("floodInput").value || 6));
-      const enabled = document.getElementById("enabledSelect").value === "true";
-      const autoBan = parseAutoBanCsv(document.getElementById("autoBanInput").value);
+      if (!Number.isSafeInteger(targetId)) {
+        setStatus(status, "Target ID tak sah.", false);
+        return;
+      }
+
+      if (settingsTab === "group") {
+        persistProfileDraft();
+        ensureGroupProfiles();
+        const enabled = state.group_profile_draft.enabled_profile_ids;
+        if (!enabled.length) {
+          setStatus(status, "Pilih sekurang-kurangnya 1 profile aktif.", false);
+          return;
+        }
+
+        const payload = {
+          type: "reezo_moderator_target_settings_save",
+          target_type: "group",
+          target_id: targetId,
+          group_profiles: state.group_profile_draft.profiles,
+          enabled_profile_ids: enabled
+        };
+
+        state.target_settings[String(targetId)] = {
+          ...(state.target_settings[String(targetId)] || {}),
+          group_profiles: state.group_profile_draft.profiles,
+          enabled_profile_ids: enabled
+        };
+
+        sendPayload(payload);
+        setStatus(status, "Setting group submitted.\n" + document.getElementById("groupSummary").textContent, true);
+        return;
+      }
+
+      persistChannelDraft();
+      const discussionGroupRaw = state.channel_draft.discussion_group_id;
+      let discussionGroupId = null;
+      if (discussionGroupRaw) {
+        if (!/^\-\d+$/.test(discussionGroupRaw)) {
+          setStatus(status, "Discussion group id mesti nombor negatif.", false);
+          return;
+        }
+        discussionGroupId = Number(discussionGroupRaw);
+      }
+      const presets = state.channel_draft.broadcast_presets.filter((x) => x && x.name && x.text);
 
       state.target_settings[String(targetId)] = {
-        mode,
-        flood_threshold_per_minute: flood,
-        moderation_enabled: enabled,
-        auto_ban_user_ids: autoBan
+        ...(state.target_settings[String(targetId)] || {}),
+        discussion_group_id: discussionGroupId,
+        broadcast_presets: presets
       };
 
       sendPayload({
         type: "reezo_moderator_target_settings_save",
-        target_type: settingsTab,
+        target_type: "channel",
         target_id: targetId,
-        mode,
-        flood_threshold_per_minute: flood,
-        moderation_enabled: enabled,
-        auto_ban_user_ids: autoBan
+        discussion_group_id: discussionGroupId,
+        broadcast_presets: presets
       });
-      setStatus(status, "Setting submitted.", true);
+      setStatus(status, "Channel setting submitted.\nDiscussion group: " + (discussionGroupId !== null ? discussionGroupId : "(not set)") + "\nPresets: " + presets.length, true);
     });
 
     typeButtonStyle();
