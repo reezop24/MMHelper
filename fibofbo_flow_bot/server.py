@@ -14,6 +14,7 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 from dbo import get_engine_status, load_candles
+from impulse_engine import ImpulseConfig, detectImpulseAll, explainImpulse
 from mtf_engine import MTFConfig, evaluateMTF, explainMTF
 
 
@@ -62,6 +63,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "/engine [tf] - status chart engine (cth: /engine h1)\n"
         "/candles [tf] [limit] - preview candle terakhir\n"
         "/mtf - run MTF Bias + Scoring check\n"
+        "/impulse - run impulse phase sensor (H4/H1/M30/M15)\n"
         "/dbo - status reset logic"
     )
     await update.effective_message.reply_text(msg)
@@ -212,6 +214,39 @@ async def cmd_mtf(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.effective_message.reply_text(explainMTF(result))
 
 
+async def cmd_impulse(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    db_path = Path(context.application.bot_data["candles_db"])
+    cfg = ImpulseConfig(
+        swing_lookback=int(context.application.bot_data["impulse_swing_lookback"]),
+    )
+    tf_map = {
+        "H4": "h4",
+        "H1": "h1",
+        "M30": "m30",
+        "M15": "m15",
+    }
+    candles_by_tf: dict[str, list[dict[str, Any]]] = {}
+    for tf, tf_key in tf_map.items():
+        rows = load_candles(db_path=db_path, timeframe=tf_key, limit=320)
+        candles_by_tf[tf] = [
+            {
+                "time": r.ts,
+                "open": r.open,
+                "high": r.high,
+                "low": r.low,
+                "close": r.close,
+            }
+            for r in rows
+        ]
+
+    out = detectImpulseAll(candles_by_tf, cfg)
+    blocks = ["XAUUSD Impulse Sensor"]
+    for tf in ("H4", "H1", "M30", "M15"):
+        blocks.append("")
+        blocks.append(explainImpulse(out.get(tf, {})))
+    await update.effective_message.reply_text("\n".join(blocks))
+
+
 def main() -> None:
     load_local_env()
     log_level = get_env("LOG_LEVEL", "INFO").upper()
@@ -243,6 +278,7 @@ def main() -> None:
         mtf_weekly_conflict_mode = "soft"
     mtf_swing_lookback = max(1, int(get_env("FIBOFBO_FLOW_MTF_SWING_LOOKBACK", "2")))
     mtf_trend_swings_n = max(3, int(get_env("FIBOFBO_FLOW_MTF_TREND_SWINGS_N", "4")))
+    impulse_swing_lookback = max(1, int(get_env("FIBOFBO_FLOW_IMPULSE_SWING_LOOKBACK", "2")))
 
     app = ApplicationBuilder().token(bot_token).build()
     app.bot_data["signal_file"] = str(signal_file)
@@ -254,6 +290,7 @@ def main() -> None:
     app.bot_data["mtf_weekly_conflict_mode"] = mtf_weekly_conflict_mode
     app.bot_data["mtf_swing_lookback"] = mtf_swing_lookback
     app.bot_data["mtf_trend_swings_n"] = mtf_trend_swings_n
+    app.bot_data["impulse_swing_lookback"] = impulse_swing_lookback
 
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("ping", cmd_ping))
@@ -262,6 +299,7 @@ def main() -> None:
     app.add_handler(CommandHandler("candles", cmd_candles))
     app.add_handler(CommandHandler("dbo", cmd_dbo))
     app.add_handler(CommandHandler("mtf", cmd_mtf))
+    app.add_handler(CommandHandler("impulse", cmd_impulse))
 
     LOGGER.info(
         "Starting FiboFBO Flow baseline bot (signal_file=%s candles_db=%s default_tf=%s)",
