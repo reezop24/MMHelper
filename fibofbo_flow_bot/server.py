@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +14,7 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
 from dbo import get_engine_status, load_candles
+from mtf_engine import MTFConfig, evaluateMTF, explainMTF
 
 
 LOGGER = logging.getLogger("fibofbo_flow_bot")
@@ -59,6 +61,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "/signal - latest feeder signal\n"
         "/engine [tf] - status chart engine (cth: /engine h1)\n"
         "/candles [tf] [limit] - preview candle terakhir\n"
+        "/mtf - run MTF Bias + Scoring check\n"
         "/dbo - status reset logic"
     )
     await update.effective_message.reply_text(msg)
@@ -167,6 +170,48 @@ async def cmd_dbo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     )
 
 
+async def cmd_mtf(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    db_path = Path(context.application.bot_data["candles_db"])
+    cfg = MTFConfig(
+        score_min=int(context.application.bot_data["mtf_score_min"]),
+        near_session_end_minutes=int(context.application.bot_data["mtf_near_end_min"]),
+        daily_conflict_mode=str(context.application.bot_data["mtf_daily_conflict_mode"]),
+        weekly_conflict_mode=str(context.application.bot_data["mtf_weekly_conflict_mode"]),
+        swing_lookback=int(context.application.bot_data["mtf_swing_lookback"]),
+        trend_swings_n=int(context.application.bot_data["mtf_trend_swings_n"]),
+    )
+    tf_map = {
+        "W1": "w1",
+        "D1": "d1",
+        "H4": "h4",
+        "H1": "h1",
+        "M30": "m30",
+        "M15": "m15",
+        "M5": "m5",
+    }
+    candles_by_tf: dict[str, list[dict[str, Any]]] = {}
+    for tf, tf_key in tf_map.items():
+        rows = load_candles(db_path=db_path, timeframe=tf_key, limit=320)
+        candles_by_tf[tf] = [
+            {
+                "time": r.ts,
+                "open": r.open,
+                "high": r.high,
+                "low": r.low,
+                "close": r.close,
+            }
+            for r in rows
+        ]
+
+    result = evaluateMTF(
+        symbol="XAUUSD",
+        candlesByTF=candles_by_tf,
+        nowTimestamp=datetime.now(timezone.utc),
+        config=cfg,
+    )
+    await update.effective_message.reply_text(explainMTF(result))
+
+
 def main() -> None:
     load_local_env()
     log_level = get_env("LOG_LEVEL", "INFO").upper()
@@ -188,11 +233,27 @@ def main() -> None:
     default_tf = get_env("FIBOFBO_FLOW_DEFAULT_TF", "h1").lower()
     if default_tf not in VALID_TFS:
         default_tf = "h1"
+    mtf_score_min = max(1, min(int(get_env("FIBOFBO_FLOW_MTF_SCORE_MIN", "7")), 10))
+    mtf_near_end_min = max(1, int(get_env("FIBOFBO_FLOW_MTF_NEAR_END_MIN", "45")))
+    mtf_daily_conflict_mode = get_env("FIBOFBO_FLOW_DAILY_CONFLICT_MODE", "soft").lower()
+    mtf_weekly_conflict_mode = get_env("FIBOFBO_FLOW_WEEKLY_CONFLICT_MODE", "soft").lower()
+    if mtf_daily_conflict_mode not in {"soft", "strict"}:
+        mtf_daily_conflict_mode = "soft"
+    if mtf_weekly_conflict_mode not in {"soft", "ignore"}:
+        mtf_weekly_conflict_mode = "soft"
+    mtf_swing_lookback = max(1, int(get_env("FIBOFBO_FLOW_MTF_SWING_LOOKBACK", "2")))
+    mtf_trend_swings_n = max(3, int(get_env("FIBOFBO_FLOW_MTF_TREND_SWINGS_N", "4")))
 
     app = ApplicationBuilder().token(bot_token).build()
     app.bot_data["signal_file"] = str(signal_file)
     app.bot_data["candles_db"] = str(candles_db)
     app.bot_data["default_tf"] = default_tf
+    app.bot_data["mtf_score_min"] = mtf_score_min
+    app.bot_data["mtf_near_end_min"] = mtf_near_end_min
+    app.bot_data["mtf_daily_conflict_mode"] = mtf_daily_conflict_mode
+    app.bot_data["mtf_weekly_conflict_mode"] = mtf_weekly_conflict_mode
+    app.bot_data["mtf_swing_lookback"] = mtf_swing_lookback
+    app.bot_data["mtf_trend_swings_n"] = mtf_trend_swings_n
 
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("ping", cmd_ping))
@@ -200,6 +261,7 @@ def main() -> None:
     app.add_handler(CommandHandler("engine", cmd_engine))
     app.add_handler(CommandHandler("candles", cmd_candles))
     app.add_handler(CommandHandler("dbo", cmd_dbo))
+    app.add_handler(CommandHandler("mtf", cmd_mtf))
 
     LOGGER.info(
         "Starting FiboFBO Flow baseline bot (signal_file=%s candles_db=%s default_tf=%s)",
