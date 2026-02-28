@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Telegram bot scaffold for FiboFBO Flow."""
+"""FiboFBO Flow bot (reset baseline: chart engine feeder only)."""
 
 from __future__ import annotations
 
@@ -12,11 +12,12 @@ from typing import Any
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 
-from dbo import detect_dbo, find_pivots, load_candles
+from dbo import get_engine_status, load_candles
 
 
 LOGGER = logging.getLogger("fibofbo_flow_bot")
 BASE_DIR = Path(__file__).resolve().parent
+VALID_TFS = {"m5", "m15", "m30", "h1", "h4", "d1", "w1", "mn1"}
 
 
 def load_local_env() -> None:
@@ -52,12 +53,13 @@ def read_latest_signal(signal_file: Path) -> dict[str, Any] | None:
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     msg = (
-        "FiboFBO Flow bot online.\n"
+        "FiboFBO Flow baseline aktif (logic reset).\n"
         "Commands:\n"
         "/ping - health check\n"
         "/signal - latest feeder signal\n"
-        "/dbo [tf] - DBO setup/trigger check (cth: /dbo m5)\n"
-        "/dbochart - buka chart viewer miniapp"
+        "/engine [tf] - status chart engine (cth: /engine h1)\n"
+        "/candles [tf] [limit] - preview candle terakhir\n"
+        "/dbo - status reset logic"
     )
     await update.effective_message.reply_text(msg)
 
@@ -71,7 +73,7 @@ async def cmd_signal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     payload = read_latest_signal(signal_file)
     if payload is None:
         await update.effective_message.reply_text(
-            f"Signal belum ada atau fail tak valid.\nPath: {signal_file}"
+            f"Signal belum ada atau fail tak valid.\\nPath: {signal_file}"
         )
         return
 
@@ -92,53 +94,77 @@ async def cmd_signal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     await update.effective_message.reply_text("\n".join(lines))
 
 
-async def cmd_dbo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    default_tf = str(context.application.bot_data["dbo_default_tf"])
-    tf = default_tf
+async def cmd_engine(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    tf = str(context.application.bot_data["default_tf"])
     if context.args:
         tf = str(context.args[0]).strip().lower()
-
-    valid_tfs = {"m5", "m15", "m30", "h1", "h4"}
-    if tf not in valid_tfs:
+    if tf not in VALID_TFS:
         await update.effective_message.reply_text(
-            f"TF tak sah: {tf}\nGunakan: {', '.join(sorted(valid_tfs))}"
+            f"TF tak sah: {tf}\\nGunakan: {', '.join(sorted(VALID_TFS))}"
         )
         return
 
     db_path = Path(context.application.bot_data["candles_db"])
-    lookback = int(context.application.bot_data["dbo_lookback"])
-
-    candles = load_candles(db_path=db_path, timeframe=tf, limit=lookback)
-    pivots = find_pivots(candles=candles, swing_window=2)
-    result = detect_dbo(candles=candles, pivots=pivots)
-
-    if result.get("status") == "NO_SETUP":
+    status = get_engine_status(db_path=db_path, timeframe=tf, limit=5)
+    if status.get("status") != "OK":
         await update.effective_message.reply_text(
-            f"DBO {tf.upper()}: NO_SETUP\ncandles={len(candles)} pivots={len(pivots)}"
+            f"Engine {tf.upper()}: NO_DATA\\nDB: {db_path}"
         )
         return
 
-    points = result.get("points") or {}
-    ls = points.get("left_shoulder", {})
-    hd = points.get("head", {})
-    rs = points.get("right_shoulder", {})
+    latest = status.get("latest") or {}
     lines = [
-        f"DBO {tf.upper()}",
-        f"status: {result.get('status')}",
-        f"side: {result.get('side')}",
-        f"pattern: {result.get('pattern')}",
-        f"trigger_level: {float(result.get('trigger_level', 0.0)):.2f}",
-        f"latest_close: {float(result.get('latest_close', 0.0)):.2f}",
-        f"LS: {ls.get('ts', '-')}, {float(ls.get('price', 0.0)):.2f}",
-        f"Head: {hd.get('ts', '-')}, {float(hd.get('price', 0.0)):.2f}",
-        f"RS: {rs.get('ts', '-')}, {float(rs.get('price', 0.0)):.2f}",
+        f"Engine {tf.upper()} status: OK",
+        f"count(last5): {status.get('count')}",
+        f"latest_ts: {latest.get('ts', '-')}",
+        (
+            "latest_ohlc: "
+            f"O={float(latest.get('open', 0.0)):.2f} "
+            f"H={float(latest.get('high', 0.0)):.2f} "
+            f"L={float(latest.get('low', 0.0)):.2f} "
+            f"C={float(latest.get('close', 0.0)):.2f}"
+        ),
     ]
     await update.effective_message.reply_text("\n".join(lines))
 
 
-async def cmd_dbochart(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    url = str(context.application.bot_data["dbo_chart_url"])
-    await update.effective_message.reply_text(f"DBO chart viewer:\n{url}")
+async def cmd_candles(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    tf = str(context.application.bot_data["default_tf"])
+    limit = 10
+    if context.args:
+        tf = str(context.args[0]).strip().lower()
+    if len(context.args) > 1:
+        try:
+            limit = int(context.args[1])
+        except ValueError:
+            limit = 10
+    limit = max(1, min(limit, 30))
+
+    if tf not in VALID_TFS:
+        await update.effective_message.reply_text(
+            f"TF tak sah: {tf}\\nGunakan: {', '.join(sorted(VALID_TFS))}"
+        )
+        return
+
+    db_path = Path(context.application.bot_data["candles_db"])
+    candles = load_candles(db_path=db_path, timeframe=tf, limit=limit)
+    if not candles:
+        await update.effective_message.reply_text(f"Tiada candle untuk TF {tf.upper()}.")
+        return
+
+    lines = [f"{tf.upper()} candles (last {len(candles)}):"]
+    for row in candles[-min(len(candles), 8):]:
+        lines.append(
+            f"{row.ts} | O:{row.open:.2f} H:{row.high:.2f} L:{row.low:.2f} C:{row.close:.2f}"
+        )
+    await update.effective_message.reply_text("\n".join(lines))
+
+
+async def cmd_dbo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.effective_message.reply_text(
+        "Logic DBO/FE lama dah dipadam (reset baseline).\n"
+        "Sekarang bot hanya feeder chart-engine."
+    )
 
 
 def main() -> None:
@@ -156,28 +182,30 @@ def main() -> None:
     signal_file = Path(
         get_env("FIBOFBO_FLOW_SIGNAL_FILE", "/root/mmhelper/db/twelve_data_bot/latest_signal.json")
     ).resolve()
-    candles_db = Path(get_env("FIBOFBO_FLOW_CANDLES_DB", "/root/mmhelper/db/twelve_data_bot/candles.db")).resolve()
-    dbo_default_tf = get_env("FIBOFBO_FLOW_DBO_TF", "m5").lower()
-    dbo_lookback = int(get_env("FIBOFBO_FLOW_DBO_LOOKBACK", "600"))
-    dbo_chart_url = get_env("FIBOFBO_FLOW_DBO_CHART_URL", "https://mm-helper.vercel.app/dbo-viewer.html")
+    candles_db = Path(
+        get_env("FIBOFBO_FLOW_CANDLES_DB", "/root/mmhelper/db/twelve_data_bot/candles.db")
+    ).resolve()
+    default_tf = get_env("FIBOFBO_FLOW_DEFAULT_TF", "h1").lower()
+    if default_tf not in VALID_TFS:
+        default_tf = "h1"
 
     app = ApplicationBuilder().token(bot_token).build()
     app.bot_data["signal_file"] = str(signal_file)
     app.bot_data["candles_db"] = str(candles_db)
-    app.bot_data["dbo_default_tf"] = dbo_default_tf
-    app.bot_data["dbo_lookback"] = dbo_lookback
-    app.bot_data["dbo_chart_url"] = dbo_chart_url
+    app.bot_data["default_tf"] = default_tf
+
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("ping", cmd_ping))
     app.add_handler(CommandHandler("signal", cmd_signal))
+    app.add_handler(CommandHandler("engine", cmd_engine))
+    app.add_handler(CommandHandler("candles", cmd_candles))
     app.add_handler(CommandHandler("dbo", cmd_dbo))
-    app.add_handler(CommandHandler("dbochart", cmd_dbochart))
 
     LOGGER.info(
-        "Starting FiboFBO Flow bot (signal_file=%s candles_db=%s dbo_default_tf=%s)",
+        "Starting FiboFBO Flow baseline bot (signal_file=%s candles_db=%s default_tf=%s)",
         signal_file,
         candles_db,
-        dbo_default_tf,
+        default_tf,
     )
     app.run_polling(drop_pending_updates=True)
 
