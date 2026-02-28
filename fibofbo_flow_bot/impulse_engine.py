@@ -195,10 +195,15 @@ def _collect_legs(swings: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def _pick_effective_leg(swings: list[dict[str, Any]], candles: list[dict[str, Any]], atrs: list[float]) -> dict[str, Any] | None:
     legs = _collect_legs(swings)
     if not legs:
-        return _recent_leg_from_price(candles, window=14)
-    recent = legs[-6:] if len(legs) > 6 else legs
-    qualified: list[dict[str, Any]] = []
-    for leg in recent:
+        return _recent_leg_from_price(candles, window=10)
+    # Filter by recency: only legs ending within last 25% candles.
+    min_end_idx = int(len(candles) * 0.75)
+    recent_legs = [leg for leg in legs if int(leg.get("end_idx", -1)) >= min_end_idx]
+    if not recent_legs:
+        return _recent_leg_from_price(candles, window=10)
+
+    scored: list[dict[str, Any]] = []
+    for leg in recent_legs:
         e = int(leg["end_idx"])
         if e < 0 or e >= len(candles):
             continue
@@ -206,21 +211,17 @@ def _pick_effective_leg(swings: list[dict[str, Any]], candles: list[dict[str, An
         if atr_ref <= 0:
             continue
         ratio = float(leg["range"]) / atr_ref
-        if ratio >= 1.0:
-            x = dict(leg)
-            x["atr_ratio"] = ratio
-            qualified.append(x)
-    if qualified:
-        swing_pick = qualified[-1]
-    else:
-        # Fallback: choose largest leg in recent set instead of last micro leg.
-        swing_pick = max(recent, key=lambda x: float(x.get("range", 0.0)))
-    price_pick = _recent_leg_from_price(candles, window=14)
-    if not price_pick:
-        return swing_pick
-    if float(price_pick.get("range", 0.0)) >= float(swing_pick.get("range", 0.0)) * 0.9:
-        return price_pick
-    return swing_pick
+        x = dict(leg)
+        x["atr_ratio"] = ratio
+        scored.append(x)
+    if not scored:
+        return _recent_leg_from_price(candles, window=10)
+
+    # Choose highest ATR-ratio leg in recent zone only if sufficiently meaningful.
+    viable = [x for x in scored if float(x.get("atr_ratio", 0.0)) >= 1.0]
+    if viable:
+        return max(viable, key=lambda x: float(x.get("atr_ratio", 0.0)))
+    return _recent_leg_from_price(candles, window=10)
 
 
 def _recent_leg_from_price(candles: list[dict[str, Any]], window: int = 14) -> dict[str, Any] | None:
@@ -352,7 +353,13 @@ def _retrace_guard_ok(candles: list[dict[str, Any]], leg: dict[str, Any], retrac
     return retr <= retrace_guard_max
 
 
-def _latest_compression(candles: list[dict[str, Any]], atrs: list[float], cfg: ImpulseConfig) -> dict[str, Any]:
+def _latest_compression(
+    candles: list[dict[str, Any]],
+    atrs: list[float],
+    cfg: ImpulseConfig,
+    atr_ratio: float,
+    tf_threshold: float,
+) -> dict[str, Any]:
     n = min(max(cfg.compression_window, cfg.compression_min_candles), cfg.compression_max_candles)
     if len(candles) < n:
         return {"is_compression": False}
@@ -375,6 +382,8 @@ def _latest_compression(candles: list[dict[str, Any]], atrs: list[float], cfg: I
         and wick_dom >= cfg.compression_wick_dom_min
         and not bos_inside
     )
+    if atr_ratio >= tf_threshold:
+        is_compression = False
     return {
         "is_compression": bool(is_compression),
         "start_index": len(candles) - n,
@@ -439,7 +448,7 @@ def analyzeImpulse(tf_name: str, candles: list[dict[str, Any]], config: ImpulseC
     atrs = _atr(rows, cfg.atr_period)
     leg = _pick_effective_leg(swings, rows, atrs)
     tf_threshold = float(cfg.atr_multiplier_by_tf.get(tf, 1.6))
-    compression = _latest_compression(rows, atrs, cfg)
+    compression = _latest_compression(rows, atrs, cfg, atr_ratio=0.0, tf_threshold=tf_threshold)
 
     if not leg:
         notes = ["No clear leg from swings"]
@@ -462,25 +471,18 @@ def analyzeImpulse(tf_name: str, candles: list[dict[str, Any]], config: ImpulseC
     s_idx = int(leg["start_idx"])
     e_idx = int(leg["end_idx"])
     seg = rows[s_idx : e_idx + 1]
-    prev20 = rows[max(0, s_idx - 20) : s_idx]
-    avg_body_leg = _avg_body(seg)
-    avg_body_prev20 = _avg_body(prev20) if prev20 else avg_body_leg
 
     atr_ref = atrs[e_idx] if e_idx < len(atrs) else atrs[-1]
     atr_ratio = (float(leg["range"]) / atr_ref) if atr_ref > 0 else 0.0
+    compression = _latest_compression(rows, atrs, cfg, atr_ratio=atr_ratio, tf_threshold=tf_threshold)
 
     body_dom_ok, strong_body_count = _body_dominance(seg, cfg.body_dominance_ratio)
     bos = _detect_bos(rows, swings, leg)
     spike_pen = _spike_penalty(seg)
-    retrace_ok = _retrace_guard_ok(rows, leg, cfg.retrace_guard_max)
 
     displacement = (
-        avg_body_prev20 > 0
-        and avg_body_leg > (avg_body_prev20 * cfg.displacement_body_avg_mult)
-        and atr_ratio >= tf_threshold
+        atr_ratio >= tf_threshold
         and strong_body_count >= cfg.body_dominance_min_count
-        and not spike_pen
-        and retrace_ok
     )
 
     score = 0
@@ -498,7 +500,7 @@ def analyzeImpulse(tf_name: str, candles: list[dict[str, Any]], config: ImpulseC
         notes.append(f"ATR ratio {atr_ratio:.2f} < {tf_threshold:.2f}")
 
     if displacement:
-        score += 2
+        score += 1
         notes.append("Displacement: YES")
     else:
         notes.append("Displacement: NO")
@@ -520,12 +522,16 @@ def analyzeImpulse(tf_name: str, candles: list[dict[str, Any]], config: ImpulseC
         notes.append("Compression breakout bonus")
 
     prev_impulse = _find_prev_impulse_leg(swings, rows, atrs, tf_threshold, cfg)
-
     overlap_seg = _overlap_ratio(seg)
+
+    # Priority-based classification:
+    # 1) IMPULSE, 2) COMPRESSION(low ATR), 3) CORRECTION-like, 4) fallback CORRECTION.
     phase = "CORRECTION"
     correction_like = False
-    if displacement and bos:
+    if bos and atr_ratio >= tf_threshold:
         phase = "IMPULSE"
+    elif compression.get("is_compression") and atr_ratio < tf_threshold:
+        phase = "COMPRESSION"
     else:
         correction_retrace = None
         if prev_impulse is not None:
@@ -534,54 +540,24 @@ def analyzeImpulse(tf_name: str, candles: list[dict[str, Any]], config: ImpulseC
                 correction_retrace = (float(prev_impulse["end"]["price"]) - float(leg["end"]["price"])) / prev_range
             else:
                 correction_retrace = (float(leg["end"]["price"]) - float(prev_impulse["end"]["price"])) / prev_range
-        if prev_impulse is not None:
-            correction_like = (
-                atr_ratio < cfg.correction_atr_ratio_max
-                and overlap_seg >= cfg.correction_overlap_min
-            )
-            if correction_retrace is not None:
-                correction_like = correction_like and (cfg.correction_retrace_min <= correction_retrace <= cfg.correction_retrace_max)
-        else:
-            correction_like = False
+
+        correction_like = (
+            atr_ratio < cfg.correction_atr_ratio_max
+            and overlap_seg >= cfg.correction_overlap_min
+        )
+        if correction_retrace is not None:
+            correction_like = correction_like and (cfg.correction_retrace_min <= correction_retrace <= cfg.correction_retrace_max)
 
         if correction_like:
             phase = "CORRECTION"
         else:
-            phase = "COMPRESSION" if compression.get("is_compression") else "CORRECTION"
-
-    # Latest-state override: if recent candles clearly move opposite prior impulse
-    # with correction characteristics, classify as CORRECTION.
-    if prev_impulse is not None and len(rows) >= 6:
-        recent = rows[-6:]
-        recent_delta = float(recent[-1]["close"]) - float(recent[0]["close"])
-        recent_dir = "BULL" if recent_delta > 0 else "BEAR"
-        recent_range = max(float(c["high"]) for c in recent) - min(float(c["low"]) for c in recent)
-        recent_overlap = _overlap_ratio(recent)
-        recent_atr_ratio = (recent_range / atr_ref) if atr_ref > 0 else 0.0
-        opposite = recent_dir != prev_impulse["direction"]
-        correction_shape = (
-            recent_atr_ratio < cfg.correction_atr_ratio_max
-            and recent_overlap >= cfg.correction_overlap_min
-        )
-        if opposite and correction_shape:
-            correction_like = True
             phase = "CORRECTION"
 
-    if phase != "IMPULSE" and not correction_like and compression.get("is_compression"):
-        phase = "COMPRESSION"
-
-    valid_impulse = bool(bos and phase == "IMPULSE" and score >= 6)
+    valid_impulse = bool(phase == "IMPULSE" and score >= 6)
 
     direction: str | None = None
     if phase in {"IMPULSE", "CORRECTION"}:
         direction = str(leg["direction"])
-        if phase == "CORRECTION":
-            # Correction direction follows the latest move.
-            look = rows[-6:] if len(rows) >= 6 else rows
-            if len(look) >= 2:
-                delta = float(look[-1]["close"]) - float(look[0]["close"])
-                recent_dir = "BULL" if delta > 0 else "BEAR"
-                direction = recent_dir
 
     return {
         "timeframe": tf,
