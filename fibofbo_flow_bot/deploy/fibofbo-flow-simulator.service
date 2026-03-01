@@ -1,0 +1,17 @@
+[Unit]
+Description=FiboFBO Flow Simulator Preview
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/mmhelper/fibofbo_flow_bot
+ExecStart=/root/mmhelper/fibofbo_flow_bot/run_simulator_preview.sh
+Restart=always
+RestartSec=3
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
+

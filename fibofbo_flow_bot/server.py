@@ -154,6 +154,7 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "/fd - evaluate FD positioning (external + impulse)\n"
         "/swing - evaluate wick-based swing structure (W1/D1/H4)\n"
         "/state - unified state snapshot\n"
+        "/preview - link web preview\n"
         "/dbo - status reset logic"
     )
     await update.effective_message.reply_text(msg)
@@ -260,6 +261,22 @@ async def cmd_dbo(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.effective_message.reply_text(
         "Logic DBO/FE lama dah dipadam (reset baseline).\n"
         "Sekarang bot hanya feeder chart-engine."
+    )
+
+
+async def cmd_preview(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    preview_url = str(context.application.bot_data.get("preview_url") or "").strip()
+    if not preview_url:
+        preview_url = "http://194.233.71.34:8766/preview"
+    await update.effective_message.reply_text(
+        "\n".join(
+            [
+                "FiboFBO Web Preview",
+                preview_url,
+                "",
+                "Tip: tambah `?v=<timestamp>` kalau browser masih cache lama.",
+            ]
+        )
     )
 
 
@@ -747,6 +764,7 @@ def main() -> None:
     anomaly_range_multiplier = _safe_env_float(get_env("FIBOFBO_FLOW_ANOMALY_RANGE_MULTIPLIER", "4.0"), 4.0)
     anomaly_wick_multiplier = _safe_env_float(get_env("FIBOFBO_FLOW_ANOMALY_WICK_MULTIPLIER", "2.0"), 2.0)
     anomaly_micro_range_ratio = _safe_env_float(get_env("FIBOFBO_FLOW_ANOMALY_MICRO_RANGE_RATIO", "0.25"), 0.25)
+    preview_url = get_env("FIBOFBO_FLOW_PREVIEW_URL", "http://194.233.71.34:8766/preview")
 
     app = ApplicationBuilder().token(bot_token).build()
     app.bot_data["signal_file"] = str(signal_file)
@@ -770,6 +788,7 @@ def main() -> None:
     app.bot_data["anomaly_range_multiplier"] = anomaly_range_multiplier
     app.bot_data["anomaly_wick_multiplier"] = anomaly_wick_multiplier
     app.bot_data["anomaly_micro_range_ratio"] = anomaly_micro_range_ratio
+    app.bot_data["preview_url"] = preview_url
 
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("ping", cmd_ping))
@@ -785,6 +804,7 @@ def main() -> None:
     app.add_handler(CommandHandler("swing", cmd_swing))
     app.add_handler(CommandHandler("state", cmd_state))
     app.add_handler(CommandHandler("unified", cmd_state))
+    app.add_handler(CommandHandler("preview", cmd_preview))
 
     LOGGER.info(
         "Starting FiboFBO Flow baseline bot (signal_file=%s candles_db=%s default_tf=%s)",
