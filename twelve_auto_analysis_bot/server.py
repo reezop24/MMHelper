@@ -9,7 +9,7 @@ import os
 import sqlite3
 import time
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -34,8 +34,10 @@ RETENTION_WINDOWS = {
     "m30": timedelta(days=90),
     "h1": timedelta(days=90),
     "h4": timedelta(days=365),
+    "d1": timedelta(days=730),
+    "w1": timedelta(days=1825),
+    "mn1": timedelta(days=3650),
 }
-
 
 @dataclass
 class Config:
@@ -48,7 +50,12 @@ class Config:
     state_dir: Path
     db_path: Path
     bootstrap_m5_points: int
+    bootstrap_h1_points: int
+    bootstrap_d1_points: int
+    bootstrap_w1_points: int
+    bootstrap_mn1_points: int
     incremental_m5_points: int
+    incremental_h1_points: int
     direct_points: int
     analysis_timeframe: str
     run_once: bool
@@ -60,7 +67,11 @@ class Config:
     direct_fetch_d1_sec: int
     direct_fetch_w1_sec: int
     direct_fetch_mn1_sec: int
-    direct_fetch_d1_time_myt: str
+    direct_fetch_daily_time_myt: str
+    m5_session_start_myt: str
+    m5_fetch_delay_sec: int
+    h1_session_start_myt: str
+    h1_fetch_delay_sec: int
     display_timezone: str
     h4_session_mode: str
 
@@ -102,7 +113,12 @@ def load_config() -> Config:
         state_dir=state_dir,
         db_path=db_path,
         bootstrap_m5_points=int(get_env("BOOTSTRAP_M5_POINTS", "1500")),
+        bootstrap_h1_points=int(get_env("BOOTSTRAP_H1_POINTS", "690")),
+        bootstrap_d1_points=int(get_env("BOOTSTRAP_D1_POINTS", "365")),
+        bootstrap_w1_points=int(get_env("BOOTSTRAP_W1_POINTS", "104")),
+        bootstrap_mn1_points=int(get_env("BOOTSTRAP_MN1_POINTS", "24")),
         incremental_m5_points=int(get_env("INCREMENTAL_M5_POINTS", "250")),
+        incremental_h1_points=int(get_env("INCREMENTAL_H1_POINTS", "48")),
         direct_points=int(get_env("DIRECT_HIGHER_TF_POINTS", "220")),
         analysis_timeframe=get_env("ANALYSIS_TIMEFRAME", "h1").lower(),
         run_once=get_env("RUN_ONCE", "0") == "1",
@@ -114,9 +130,13 @@ def load_config() -> Config:
         direct_fetch_d1_sec=int(get_env("DIRECT_FETCH_D1_SEC", "86400")),
         direct_fetch_w1_sec=int(get_env("DIRECT_FETCH_W1_SEC", "604800")),
         direct_fetch_mn1_sec=int(get_env("DIRECT_FETCH_MN1_SEC", "2592000")),
-        direct_fetch_d1_time_myt=get_env("DIRECT_FETCH_D1_TIME_MYT", "06:30"),
+        direct_fetch_daily_time_myt=get_env("DIRECT_FETCH_DAILY_TIME_MYT", "06:00:15"),
+        m5_session_start_myt=get_env("M5_SESSION_START_MYT", "07:00"),
+        m5_fetch_delay_sec=int(get_env("M5_FETCH_DELAY_SEC", "5")),
+        h1_session_start_myt=get_env("H1_SESSION_START_MYT", "07:00"),
+        h1_fetch_delay_sec=int(get_env("H1_FETCH_DELAY_SEC", "15")),
         display_timezone=get_env("DISPLAY_TIMEZONE", "Asia/Kuala_Lumpur"),
-        h4_session_mode=get_env("H4_SESSION_MODE", "standard").lower(),
+        h4_session_mode=get_env("H4_SESSION_MODE", "auto").lower(),
     )
 
 
@@ -143,6 +163,90 @@ def to_iso_local(dt: datetime, tz_name: str) -> str:
     return dt.astimezone(local_tz).strftime("%Y-%m-%d %H:%M:%S")
 
 
+def _first_sunday(year: int, month: int) -> date:
+    d = date(year, month, 1)
+    shift = (6 - d.weekday()) % 7  # Monday=0 .. Sunday=6
+    return d + timedelta(days=shift)
+
+
+def _second_sunday(year: int, month: int) -> date:
+    return _first_sunday(year, month) + timedelta(days=7)
+
+
+def _is_dst_myt_date(d: date) -> bool:
+    # DST season: first Sunday November until second Sunday March.
+    if d.month >= 11:
+        return d >= _first_sunday(d.year, 11)
+    if d.month <= 3:
+        return d < _second_sunday(d.year, 3)
+    return False
+
+
+def _is_dst_myt_datetime(ts_local: datetime) -> bool:
+    return _is_dst_myt_date(ts_local.date())
+
+
+def _mode_for_local(ts_local: datetime, mode: str) -> str:
+    raw = str(mode or "").strip().lower()
+    if raw in {"standard", "dst"}:
+        return raw
+    return "dst" if _is_dst_myt_datetime(ts_local) else "standard"
+
+
+def _market_open_hour_myt(ts_local: datetime) -> int:
+    # DST -> 07:00 open, non-DST -> 06:00 open.
+    return 7 if _is_dst_myt_datetime(ts_local) else 6
+
+
+def _market_close_hour_myt(ts_local: datetime) -> int:
+    # DST -> 06:00 close, non-DST -> 05:00 close.
+    return 6 if _is_dst_myt_datetime(ts_local) else 5
+
+
+def _daily_session_start_hour_for_date(d: date, mode: str) -> int:
+    raw = str(mode or "").strip().lower()
+    if raw == "dst":
+        return 6
+    if raw == "standard":
+        return 7
+    # auto
+    return 7 if _is_dst_myt_date(d) else 6
+
+
+def is_market_closed_myt(ts_utc: datetime) -> bool:
+    myt = ts_utc.astimezone(ZoneInfo("Asia/Kuala_Lumpur"))
+    wd = myt.weekday()  # Mon=0 ... Sun=6
+    mins = myt.hour * 60 + myt.minute
+    sat_close_mins = _market_close_hour_myt(myt) * 60
+    mon_open_mins = _market_open_hour_myt(myt) * 60
+    if wd == 5 and mins >= sat_close_mins:
+        return True
+    if wd == 6:  # Sun
+        return True
+    if wd == 0 and mins < mon_open_mins:
+        return True
+    return False
+
+
+def filter_open_market_rows(timeframe: str, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    tf = str(timeframe or "").strip().lower()
+    if tf in {"w1", "mn1"}:
+        return rows
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        raw_ts = row.get("ts")
+        if not isinstance(raw_ts, str):
+            continue
+        try:
+            ts = parse_iso_utc(raw_ts)
+        except ValueError:
+            continue
+        if is_market_closed_myt(ts):
+            continue
+        out.append(row)
+    return out
+
+
 def parse_hhmm(value: str, fallback_hour: int = 6, fallback_minute: int = 30) -> tuple[int, int]:
     try:
         raw = value.strip()
@@ -154,20 +258,116 @@ def parse_hhmm(value: str, fallback_hour: int = 6, fallback_minute: int = 30) ->
         return fallback_hour, fallback_minute
 
 
-def d1_slot_date(ts_local: datetime, fetch_hour: int, fetch_minute: int) -> datetime.date:
-    cutoff = ts_local.replace(hour=fetch_hour, minute=fetch_minute, second=0, microsecond=0)
-    if ts_local < cutoff:
+def parse_hhmmss(
+    value: str,
+    fallback_hour: int = 6,
+    fallback_minute: int = 0,
+    fallback_second: int = 15,
+) -> tuple[int, int, int]:
+    try:
+        raw = value.strip()
+        parts = raw.split(":")
+        if len(parts) == 2:
+            hh, mm = parts
+            ss = "0"
+        elif len(parts) == 3:
+            hh, mm, ss = parts
+        else:
+            return fallback_hour, fallback_minute, fallback_second
+        hour = max(0, min(23, int(hh)))
+        minute = max(0, min(59, int(mm)))
+        second = max(0, min(59, int(ss)))
+        return hour, minute, second
+    except (ValueError, AttributeError):
+        return fallback_hour, fallback_minute, fallback_second
+
+
+def session_date_for_hour(ts_local: datetime, start_hour: int) -> datetime.date:
+    if ts_local.hour < start_hour:
         return (ts_local - timedelta(days=1)).date()
     return ts_local.date()
 
 
-def w1_slot_key(slot_date: datetime.date) -> tuple[int, int]:
-    iso = slot_date.isocalendar()
-    return iso.year, iso.week
+def build_local_datetime(base_date: datetime.date, hour: int, minute: int, second: int, tz: ZoneInfo) -> datetime:
+    return datetime(base_date.year, base_date.month, base_date.day, hour, minute, second, tzinfo=tz)
 
 
-def mn1_slot_key(slot_date: datetime.date) -> tuple[int, int]:
-    return slot_date.year, slot_date.month
+def current_m5_slot_time(ts_local: datetime, cfg: Config, tz: ZoneInfo) -> datetime | None:
+    _, start_minute = parse_hhmm(cfg.m5_session_start_myt, 7, 0)
+    start_hour = _market_open_hour_myt(ts_local)
+    base_date = session_date_for_hour(ts_local, start_hour)
+    session_start = build_local_datetime(base_date, start_hour, start_minute, 0, tz)
+    first_fetch = session_start + timedelta(minutes=5, seconds=cfg.m5_fetch_delay_sec)
+    if ts_local < first_fetch:
+        return None
+    elapsed_sec = int((ts_local - first_fetch).total_seconds())
+    slot_count = elapsed_sec // 300
+    return first_fetch + timedelta(minutes=slot_count * 5)
+
+
+def next_m5_slot_time(ts_local: datetime, cfg: Config, tz: ZoneInfo) -> datetime:
+    _, start_minute = parse_hhmm(cfg.m5_session_start_myt, 7, 0)
+    start_hour = _market_open_hour_myt(ts_local)
+    base_date = session_date_for_hour(ts_local, start_hour)
+    session_start = build_local_datetime(base_date, start_hour, start_minute, 0, tz)
+    first_fetch = session_start + timedelta(minutes=5, seconds=cfg.m5_fetch_delay_sec)
+    if ts_local < first_fetch:
+        return first_fetch
+    elapsed_sec = int((ts_local - first_fetch).total_seconds())
+    slot_count = (elapsed_sec // 300) + 1
+    return first_fetch + timedelta(minutes=slot_count * 5)
+
+
+def h1_slot_times_for_session(base_date: datetime.date, cfg: Config, tz: ZoneInfo) -> list[datetime]:
+    _, start_minute = parse_hhmm(cfg.h1_session_start_myt, 7, 0)
+    start_hour = 7 if _is_dst_myt_date(base_date) else 6
+    base = datetime(base_date.year, base_date.month, base_date.day, start_hour, start_minute, 0, tzinfo=tz)
+    # H1 closes 08:00..06:00 next day (23 closes from 07:00 session start).
+    close_offsets = range(1, 24)
+    return [base + timedelta(hours=offset, seconds=cfg.h1_fetch_delay_sec) for offset in close_offsets]
+
+
+def current_h1_slot_time(ts_local: datetime, cfg: Config, tz: ZoneInfo) -> datetime | None:
+    start_hour = _market_open_hour_myt(ts_local)
+    base_date = session_date_for_hour(ts_local, start_hour)
+    slots = h1_slot_times_for_session(base_date, cfg, tz)
+    eligible = [slot for slot in slots if slot <= ts_local]
+    if eligible:
+        return eligible[-1]
+    prev_slots = h1_slot_times_for_session(base_date - timedelta(days=1), cfg, tz)
+    prev_eligible = [slot for slot in prev_slots if slot <= ts_local]
+    return prev_eligible[-1] if prev_eligible else None
+
+
+def next_h1_slot_time(ts_local: datetime, cfg: Config, tz: ZoneInfo) -> datetime:
+    start_hour = _market_open_hour_myt(ts_local)
+    base_date = session_date_for_hour(ts_local, start_hour)
+    slots = h1_slot_times_for_session(base_date, cfg, tz)
+    for slot in slots:
+        if slot > ts_local:
+            return slot
+    next_slots = h1_slot_times_for_session(base_date + timedelta(days=1), cfg, tz)
+    return next_slots[0]
+
+
+def _daily_fetch_datetime_for_date(base_date: date, cfg: Config, tz: ZoneInfo) -> datetime:
+    _, fetch_minute, fetch_second = parse_hhmmss(cfg.direct_fetch_daily_time_myt, 6, 0, 15)
+    fetch_hour = 6 if _is_dst_myt_date(base_date) else 5
+    return datetime(base_date.year, base_date.month, base_date.day, fetch_hour, fetch_minute, fetch_second, tzinfo=tz)
+
+
+def current_daily_htf_slot_time(ts_local: datetime, cfg: Config, tz: ZoneInfo) -> datetime:
+    today_slot = _daily_fetch_datetime_for_date(ts_local.date(), cfg, tz)
+    if ts_local >= today_slot:
+        return today_slot
+    return _daily_fetch_datetime_for_date(ts_local.date() - timedelta(days=1), cfg, tz)
+
+
+def next_daily_htf_slot_time(ts_local: datetime, cfg: Config, tz: ZoneInfo) -> datetime:
+    today_slot = _daily_fetch_datetime_for_date(ts_local.date(), cfg, tz)
+    if ts_local < today_slot:
+        return today_slot
+    return _daily_fetch_datetime_for_date(ts_local.date() + timedelta(days=1), cfg, tz)
 
 
 class Storage:
@@ -218,9 +418,10 @@ class Storage:
         return [dict(row) for row in rows]
 
     def save_series(self, name: str, rows: list[dict[str, Any]]) -> None:
+        clean_rows = filter_open_market_rows(name, rows)
         with self._connect() as conn:
             conn.execute("DELETE FROM candles WHERE timeframe = ?", (name,))
-            if rows:
+            if clean_rows:
                 conn.executemany(
                     """
                     INSERT INTO candles (timeframe, ts, open, high, low, close, volume)
@@ -236,7 +437,7 @@ class Storage:
                             row["close"],
                             row.get("volume", 0.0),
                         )
-                        for row in rows
+                        for row in clean_rows
                     ],
                 )
 
@@ -413,7 +614,8 @@ def h4_session_window_local(ts_local: datetime, mode: str) -> tuple[datetime, da
     # 07-11, 11-15, 15-19, 19-23, 23-03, 03-06
     # dst mode windows (MYT):
     # 06-10, 10-14, 14-18, 18-22, 22-02, 02-05
-    if mode == "dst":
+    active_mode = _mode_for_local(ts_local, mode)
+    if active_mode == "dst":
         start_offsets = [6, 10, 14, 18, 22, 26]
         end_offsets = [10, 14, 18, 22, 26, 29]
         day_cutoff = 6
@@ -487,6 +689,179 @@ def resample_h4_session(
     return aggregated
 
 
+def _daily_session_start_hour(mode: str) -> int:
+    return _daily_session_start_hour_for_date(
+        datetime.now(ZoneInfo("Asia/Kuala_Lumpur")).date(),
+        mode,
+    )
+
+
+def resample_d1_session(
+    rows: list[dict[str, Any]],
+    timezone_name: str,
+    mode: str,
+    include_incomplete: bool,
+) -> list[dict[str, Any]]:
+    if not rows:
+        return []
+
+    try:
+        local_tz = ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError:
+        local_tz = ZoneInfo("Asia/Kuala_Lumpur")
+
+    normalized_mode = str(mode or "").strip().lower()
+    groups: dict[str, dict[str, Any]] = {}
+    now_utc = datetime.now(UTC)
+
+    for row in rows:
+        ts_utc = parse_iso_utc(row["ts"])
+        ts_local = ts_utc.astimezone(local_tz)
+        start_hour = _daily_session_start_hour_for_date(ts_local.date(), normalized_mode)
+        slot_date = ts_local.date()
+        if ts_local.hour < start_hour:
+            slot_date = (ts_local - timedelta(days=1)).date()
+        slot_start_hour = _daily_session_start_hour_for_date(slot_date, normalized_mode)
+        next_slot_date = slot_date + timedelta(days=1)
+        next_start_hour = _daily_session_start_hour_for_date(next_slot_date, normalized_mode)
+        start_local = datetime(slot_date.year, slot_date.month, slot_date.day, slot_start_hour, 0, 0, tzinfo=local_tz)
+        end_local = datetime(next_slot_date.year, next_slot_date.month, next_slot_date.day, next_start_hour, 0, 0, tzinfo=local_tz)
+        start_utc = start_local.astimezone(UTC)
+        end_utc = end_local.astimezone(UTC)
+        key = to_iso_utc(start_utc)
+        bucket = groups.setdefault(key, {"rows": [], "end_utc": end_utc})
+        bucket["rows"].append(row)
+
+    out: list[dict[str, Any]] = []
+    for key in sorted(groups):
+        bucket = groups[key]
+        end_utc = bucket["end_utc"]
+        if not include_incomplete and end_utc > now_utc:
+            continue
+        values = bucket["rows"]
+        values.sort(key=lambda item: item["ts"])
+        out.append(
+            {
+                "ts": key,
+                "open": values[0]["open"],
+                "high": max(v["high"] for v in values),
+                "low": min(v["low"] for v in values),
+                "close": values[-1]["close"],
+                "volume": sum(v.get("volume", 0.0) for v in values),
+            }
+        )
+    return out
+
+
+def resample_w1_from_d1(
+    rows: list[dict[str, Any]],
+    timezone_name: str,
+    mode: str,
+) -> list[dict[str, Any]]:
+    if not rows:
+        return []
+    try:
+        local_tz = ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError:
+        local_tz = ZoneInfo("Asia/Kuala_Lumpur")
+    normalized_mode = str(mode or "").strip().lower()
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        ts_local = parse_iso_utc(row["ts"]).astimezone(local_tz)
+        monday = ts_local.date() - timedelta(days=ts_local.weekday())
+        start_hour = _daily_session_start_hour_for_date(monday, normalized_mode)
+        start_local = datetime(monday.year, monday.month, monday.day, start_hour, 0, 0, tzinfo=local_tz)
+        key = to_iso_utc(start_local.astimezone(UTC))
+        groups.setdefault(key, []).append(row)
+
+    out: list[dict[str, Any]] = []
+    for key in sorted(groups):
+        values = sorted(groups[key], key=lambda item: item["ts"])
+        out.append(
+            {
+                "ts": key,
+                "open": values[0]["open"],
+                "high": max(v["high"] for v in values),
+                "low": min(v["low"] for v in values),
+                "close": values[-1]["close"],
+                "volume": sum(v.get("volume", 0.0) for v in values),
+            }
+        )
+    return out
+
+
+def resample_mn1_from_d1(
+    rows: list[dict[str, Any]],
+    timezone_name: str,
+    mode: str,
+) -> list[dict[str, Any]]:
+    if not rows:
+        return []
+    try:
+        local_tz = ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError:
+        local_tz = ZoneInfo("Asia/Kuala_Lumpur")
+    normalized_mode = str(mode or "").strip().lower()
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        ts_local = parse_iso_utc(row["ts"]).astimezone(local_tz)
+        first = ts_local.replace(day=1)
+        start_hour = _daily_session_start_hour_for_date(first.date(), normalized_mode)
+        start_local = datetime(first.year, first.month, first.day, start_hour, 0, 0, tzinfo=local_tz)
+        key = to_iso_utc(start_local.astimezone(UTC))
+        groups.setdefault(key, []).append(row)
+
+    out: list[dict[str, Any]] = []
+    for key in sorted(groups):
+        values = sorted(groups[key], key=lambda item: item["ts"])
+        out.append(
+            {
+                "ts": key,
+                "open": values[0]["open"],
+                "high": max(v["high"] for v in values),
+                "low": min(v["low"] for v in values),
+                "close": values[-1]["close"],
+                "volume": sum(v.get("volume", 0.0) for v in values),
+            }
+        )
+    return out
+
+
+def align_rows_to_session_start(
+    rows: list[dict[str, Any]],
+    timezone_name: str,
+    mode: str,
+) -> list[dict[str, Any]]:
+    """Align candle timestamps to MYT session start hour (07:00 standard / 06:00 dst)."""
+    if not rows:
+        return rows
+    try:
+        local_tz = ZoneInfo(timezone_name)
+    except ZoneInfoNotFoundError:
+        local_tz = ZoneInfo("Asia/Kuala_Lumpur")
+    normalized_mode = str(mode or "").strip().lower()
+
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        ts_local = parse_iso_utc(row["ts"]).astimezone(local_tz)
+        start_hour = _daily_session_start_hour_for_date(ts_local.date(), normalized_mode)
+        aligned_local = datetime(
+            ts_local.year,
+            ts_local.month,
+            ts_local.day,
+            start_hour,
+            0,
+            0,
+            tzinfo=local_tz,
+        )
+        copied = dict(row)
+        copied["ts"] = to_iso_utc(aligned_local.astimezone(UTC))
+        out.append(copied)
+
+    out.sort(key=lambda item: item["ts"])
+    return out
+
+
 def find_swings(rows: list[dict[str, Any]], lookback: int = 2) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     highs: list[dict[str, Any]] = []
     lows: list[dict[str, Any]] = []
@@ -558,8 +933,11 @@ def compute_fib_extension(rows: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def m5_pipeline(client: TwelveDataClient, store: Storage, cfg: Config) -> list[dict[str, Any]]:
+def m5_pipeline(client: TwelveDataClient, store: Storage, cfg: Config, *, do_fetch: bool) -> list[dict[str, Any]]:
     existing = store.load_series("m5")
+    if not do_fetch:
+        LOGGER.info("m5 candles reused=%s fetched=0", len(existing))
+        return existing
     outputsize = cfg.incremental_m5_points if existing else cfg.bootstrap_m5_points
     fetched = normalize_rows(client.fetch(interval="5min", outputsize=outputsize))
 
@@ -570,98 +948,121 @@ def m5_pipeline(client: TwelveDataClient, store: Storage, cfg: Config) -> list[d
     return merged
 
 
-def build_derived_timeframes(store: Storage, m5_rows: list[dict[str, Any]], cfg: Config) -> dict[str, list[dict[str, Any]]]:
+def h1_pipeline(client: TwelveDataClient, store: Storage, cfg: Config, *, do_fetch: bool) -> list[dict[str, Any]]:
+    existing = store.load_series("h1")
+    if not do_fetch:
+        LOGGER.info("h1 candles reused=%s fetched=0", len(existing))
+        return existing
+    need_bootstrap = len(existing) < cfg.bootstrap_h1_points
+    outputsize = cfg.bootstrap_h1_points if need_bootstrap else cfg.incremental_h1_points
+    fetched = normalize_rows(client.fetch(interval="1h", outputsize=outputsize))
+
+    merged = merge_incremental(existing, fetched)
+    merged = prune_by_window(merged, RETENTION_WINDOWS["h1"])
+    store.save_series("h1", merged)
+    LOGGER.info(
+        "h1 candles saved=%s fetched=%s outputsize=%s bootstrap=%s",
+        len(merged),
+        len(fetched),
+        outputsize,
+        "yes" if need_bootstrap else "no",
+    )
+    return merged
+
+
+def build_derived_timeframes(
+    store: Storage,
+    m5_rows: list[dict[str, Any]],
+    h1_rows: list[dict[str, Any]],
+    cfg: Config,
+) -> dict[str, list[dict[str, Any]]]:
     data: dict[str, list[dict[str, Any]]] = {}
-    for key, mins in (("m15", 15), ("m30", 30), ("h1", 60)):
+    for key, mins in (("m15", 15), ("m30", 30)):
         built = resample(m5_rows, mins)
         pruned = prune_by_window(built, RETENTION_WINDOWS[key])
         store.save_series(key, pruned)
         data[key] = pruned
         LOGGER.info("%s candles saved=%s", key, len(pruned))
+    data["h1"] = h1_rows
 
-    h4_live_built = resample_h4_session(
-        m5_rows,
-        cfg.display_timezone,
-        cfg.h4_session_mode,
-        include_incomplete=True,
-    )
-    h4_live_pruned = prune_by_window(h4_live_built, RETENTION_WINDOWS["h4"])
-    store.save_series("h4_live", h4_live_pruned)
-    data["h4_live"] = h4_live_pruned
-
-    h4_closed_built = resample_h4_session(
-        m5_rows,
+    h4_built = resample_h4_session(
+        h1_rows,
         cfg.display_timezone,
         cfg.h4_session_mode,
         include_incomplete=False,
     )
-    h4_closed_pruned = prune_by_window(h4_closed_built, RETENTION_WINDOWS["h4"])
-    store.save_series("h4", h4_closed_pruned)
-    data["h4"] = h4_closed_pruned
-    LOGGER.info(
-        "h4 candles saved_closed=%s saved_live=%s mode=%s tz=%s",
-        len(h4_closed_pruned),
-        len(h4_live_pruned),
-        cfg.h4_session_mode,
-        cfg.display_timezone,
-    )
+    h4_pruned = prune_by_window(h4_built, RETENTION_WINDOWS["h4"])
+    store.save_series("h4", h4_pruned)
+    store.save_series("h4_live", h4_pruned)
+    data["h4"] = h4_pruned
+    data["h4_live"] = h4_pruned
+    LOGGER.info("h4 candles rebuilt_from_h1=%s mode=%s tz=%s", len(h4_pruned), cfg.h4_session_mode, cfg.display_timezone)
     return data
 
 
-def fetch_direct_higher_tfs(client: TwelveDataClient, store: Storage, cfg: Config) -> dict[str, list[dict[str, Any]]]:
+def fetch_daily_higher_tfs(
+    client: TwelveDataClient,
+    store: Storage,
+    cfg: Config,
+    *,
+    daily_due: bool,
+) -> tuple[dict[str, list[dict[str, Any]]], dict[str, bool]]:
     direct_map = {
         "d1": "1day",
         "w1": "1week",
         "mn1": "1month",
     }
-    schedule_seconds = {
-        "d1": cfg.direct_fetch_d1_sec,
-        "w1": cfg.direct_fetch_w1_sec,
-        "mn1": cfg.direct_fetch_mn1_sec,
+    bootstrap_rows = {
+        "d1": cfg.bootstrap_d1_points,
+        "w1": cfg.bootstrap_w1_points,
+        "mn1": cfg.bootstrap_mn1_points,
     }
     state = store.load_snapshot("direct_fetch_state")
     now = datetime.now(UTC)
-    myt = ZoneInfo("Asia/Kuala_Lumpur")
-    d1_hour, d1_minute = parse_hhmm(cfg.direct_fetch_d1_time_myt)
     out: dict[str, list[dict[str, Any]]] = {}
-    current_slot_date = d1_slot_date(now.astimezone(myt), d1_hour, d1_minute)
+    status: dict[str, bool] = {}
     for key, interval in direct_map.items():
-        should_fetch = True
-        last_fetch_raw = str(state.get(key) or "")
-        if last_fetch_raw:
-            try:
-                last_fetch = datetime.fromisoformat(last_fetch_raw)
-                if last_fetch.tzinfo is None:
-                    last_fetch = last_fetch.replace(tzinfo=UTC)
-                if key == "d1":
-                    last_slot = d1_slot_date(last_fetch.astimezone(myt), d1_hour, d1_minute)
-                    should_fetch = last_slot < current_slot_date
-                elif key == "w1":
-                    last_slot = d1_slot_date(last_fetch.astimezone(myt), d1_hour, d1_minute)
-                    should_fetch = last_slot < current_slot_date
-                elif key == "mn1":
-                    last_slot = d1_slot_date(last_fetch.astimezone(myt), d1_hour, d1_minute)
-                    should_fetch = last_slot < current_slot_date
-                else:
-                    elapsed = (now - last_fetch).total_seconds()
-                    if elapsed < schedule_seconds[key]:
-                        should_fetch = False
-            except ValueError:
-                should_fetch = True
+        existing_rows = store.load_series(key)
+        min_rows = bootstrap_rows[key]
+        need_bootstrap = len(existing_rows) < min_rows
+        should_fetch = daily_due or need_bootstrap
 
         if should_fetch:
-            rows = normalize_rows(client.fetch(interval=interval, outputsize=cfg.direct_points))
-            store.save_series(key, rows)
-            state[key] = now.isoformat()
-            out[key] = rows
-            LOGGER.info("%s candles saved=%s fetched=1", key, len(rows))
+            outputsize = max(cfg.direct_points, min_rows)
+            try:
+                rows = normalize_rows(client.fetch(interval=interval, outputsize=outputsize))
+                rows = align_rows_to_session_start(rows, cfg.display_timezone, cfg.h4_session_mode)
+                rows = prune_by_window(rows, RETENTION_WINDOWS[key])
+                store.save_series(key, rows)
+                state[key] = now.isoformat()
+                out[key] = rows
+                LOGGER.info(
+                    "%s candles saved=%s fetched=1 outputsize=%s bootstrap=%s",
+                    key,
+                    len(rows),
+                    outputsize,
+                    "yes" if need_bootstrap else "no",
+                )
+                status[key] = True
+            except Exception as exc:  # noqa: BLE001
+                rows = align_rows_to_session_start(existing_rows, cfg.display_timezone, cfg.h4_session_mode)
+                if rows != existing_rows:
+                    store.save_series(key, rows)
+                out[key] = rows
+                LOGGER.warning("%s fetch failed, reused/aligned=%s (%s)", key, len(rows), exc)
+                status[key] = False
         else:
-            rows = store.load_series(key)
+            rows = existing_rows
+            aligned = align_rows_to_session_start(rows, cfg.display_timezone, cfg.h4_session_mode)
+            if aligned != rows:
+                rows = aligned
+                store.save_series(key, rows)
             out[key] = rows
             LOGGER.info("%s candles reused=%s fetched=0", key, len(rows))
+            status[key] = True
 
     store.save_snapshot("direct_fetch_state", state)
-    return out
+    return out, status
 
 
 def build_signal_payload(
@@ -803,18 +1204,33 @@ def maybe_send_telegram_alert(cfg: Config, store: Storage, payload: dict[str, An
     LOGGER.info("Telegram alert sent signal=%s", signal)
 
 
-def run_cycle(cfg: Config) -> None:
+def run_cycle(cfg: Config, *, fetch_m5: bool, fetch_h1: bool, fetch_daily_htf: bool) -> dict[str, bool]:
     store = Storage(cfg.state_dir, cfg.db_path)
     client = TwelveDataClient(cfg)
 
-    m5_rows = m5_pipeline(client, store, cfg)
-    derived = build_derived_timeframes(store, m5_rows, cfg)
-    direct = fetch_direct_higher_tfs(client, store, cfg)
+    try:
+        m5_rows = m5_pipeline(client, store, cfg, do_fetch=fetch_m5)
+    except Exception as exc:  # noqa: BLE001
+        m5_rows = store.load_series("m5")
+        if not m5_rows:
+            raise
+        LOGGER.warning("m5 fetch failed, using cached m5 rows=%s (%s)", len(m5_rows), exc)
+    try:
+        h1_rows = h1_pipeline(client, store, cfg, do_fetch=fetch_h1)
+    except Exception as exc:  # noqa: BLE001
+        h1_rows = store.load_series("h1")
+        if not h1_rows:
+            raise
+        LOGGER.warning("h1 fetch failed, using cached h1 rows=%s (%s)", len(h1_rows), exc)
+    derived = build_derived_timeframes(store, m5_rows, h1_rows, cfg)
+    direct, daily_status = fetch_daily_higher_tfs(client, store, cfg, daily_due=fetch_daily_htf)
+    rows_for_signal = dict(derived)
+    rows_for_signal.update(direct)
 
     signal_payload = build_signal_payload(
         cfg.symbol,
         cfg.analysis_timeframe,
-        derived,
+        rows_for_signal,
         direct,
         cfg.display_timezone,
     )
@@ -828,6 +1244,7 @@ def run_cycle(cfg: Config) -> None:
         asdict(cfg) | {"state_dir": str(cfg.state_dir), "db_path": str(cfg.db_path)},
     )
     LOGGER.info("Signal updated: %s", signal_payload.get("signal"))
+    return daily_status
 
 
 def main() -> None:
@@ -846,15 +1263,116 @@ def main() -> None:
         cfg.db_path,
     )
 
-    while True:
+    try:
+        schedule_tz = ZoneInfo(cfg.display_timezone)
+    except ZoneInfoNotFoundError:
+        schedule_tz = ZoneInfo("Asia/Kuala_Lumpur")
+
+    schedule_store = Storage(cfg.state_dir, cfg.db_path)
+
+    if cfg.run_once:
         try:
-            run_cycle(cfg)
+            run_cycle(cfg, fetch_m5=True, fetch_h1=True, fetch_daily_htf=True)
         except Exception as exc:  # noqa: BLE001
             LOGGER.exception("Cycle failed: %s", exc)
-        if cfg.run_once:
-            LOGGER.info("RUN_ONCE=1 detected, exiting after one cycle")
-            break
-        time.sleep(cfg.poll_interval_sec)
+        LOGGER.info("RUN_ONCE=1 detected, exiting after one cycle")
+        return
+
+    while True:
+        now_utc = datetime.now(UTC)
+        now_local = now_utc.astimezone(schedule_tz)
+        state = schedule_store.load_snapshot("schedule_state")
+        last_m5_slot = str(state.get("m5_slot") or "")
+        last_h1_slot = str(state.get("h1_slot") or "")
+        last_daily_htf_slot = str(state.get("daily_htf_slot") or "")
+        retry_slot = str(state.get("daily_retry_slot") or "")
+        retry_count = int(state.get("daily_retry_count") or 0)
+        retry_next_raw = str(state.get("daily_retry_next_at") or "")
+        retry_next_at: datetime | None = None
+        if retry_next_raw:
+            try:
+                retry_next_at = datetime.fromisoformat(retry_next_raw)
+                if retry_next_at.tzinfo is None:
+                    retry_next_at = retry_next_at.replace(tzinfo=schedule_tz)
+            except ValueError:
+                retry_next_at = None
+
+        m5_slot = current_m5_slot_time(now_local, cfg, schedule_tz)
+        h1_slot = current_h1_slot_time(now_local, cfg, schedule_tz)
+        daily_htf_slot = current_daily_htf_slot_time(now_local, cfg, schedule_tz)
+        daily_slot_id = daily_htf_slot.isoformat() if daily_htf_slot else ""
+
+        m5_due = bool(m5_slot and m5_slot.isoformat() != last_m5_slot)
+        h1_due = bool(h1_slot and h1_slot.isoformat() != last_h1_slot)
+        daily_htf_due = bool(daily_htf_slot and daily_slot_id != last_daily_htf_slot)
+        retry_due = bool(
+            retry_slot
+            and daily_slot_id
+            and retry_slot == daily_slot_id
+            and 0 < retry_count < 6
+            and retry_next_at is not None
+            and now_local >= retry_next_at
+        )
+        fetch_daily_now = daily_htf_due or retry_due
+
+        if not (m5_due or h1_due or fetch_daily_now):
+            next_m5 = next_m5_slot_time(now_local, cfg, schedule_tz).astimezone(UTC)
+            next_h1 = next_h1_slot_time(now_local, cfg, schedule_tz).astimezone(UTC)
+            next_daily_htf = next_daily_htf_slot_time(now_local, cfg, schedule_tz).astimezone(UTC)
+            if (
+                retry_slot
+                and daily_slot_id
+                and retry_slot == daily_slot_id
+                and 0 < retry_count < 6
+                and retry_next_at is not None
+            ):
+                next_daily_htf = min(next_daily_htf, retry_next_at.astimezone(UTC))
+            next_due = min(next_m5, next_h1, next_daily_htf)
+            sleep_for = max(0.2, (next_due - now_utc).total_seconds())
+            time.sleep(min(sleep_for, 60))
+            continue
+
+        try:
+            daily_status = run_cycle(cfg, fetch_m5=m5_due, fetch_h1=h1_due, fetch_daily_htf=fetch_daily_now)
+            if m5_due and m5_slot is not None:
+                state["m5_slot"] = m5_slot.isoformat()
+            if h1_due and h1_slot is not None:
+                state["h1_slot"] = h1_slot.isoformat()
+            if daily_htf_due and daily_htf_slot is not None:
+                # Mark slot as attempted so we don't spam every loop;
+                # retries are controlled via daily_retry_* fields.
+                state["daily_htf_slot"] = daily_slot_id
+                state["daily_retry_slot"] = daily_slot_id
+                state["daily_retry_count"] = 0
+                state["daily_retry_next_at"] = ""
+            if fetch_daily_now and daily_htf_slot is not None:
+                ok = all(daily_status.get(k, False) for k in ("d1", "w1", "mn1"))
+                if ok:
+                    state["daily_retry_slot"] = ""
+                    state["daily_retry_count"] = 0
+                    state["daily_retry_next_at"] = ""
+                else:
+                    count = int(state.get("daily_retry_count") or 0) + 1
+                    if count < 6:
+                        next_retry = now_local + timedelta(minutes=10)
+                        state["daily_retry_slot"] = daily_slot_id
+                        state["daily_retry_count"] = count
+                        state["daily_retry_next_at"] = next_retry.isoformat()
+                        LOGGER.warning(
+                            "Daily HTF retry scheduled slot=%s attempt=%s/6 next=%s",
+                            daily_slot_id,
+                            count,
+                            next_retry.isoformat(),
+                        )
+                    else:
+                        state["daily_retry_slot"] = ""
+                        state["daily_retry_count"] = 0
+                        state["daily_retry_next_at"] = ""
+                        LOGGER.error("Daily HTF retries exhausted for slot=%s", daily_slot_id)
+            schedule_store.save_snapshot("schedule_state", state)
+        except Exception as exc:  # noqa: BLE001
+            LOGGER.exception("Cycle failed: %s", exc)
+            time.sleep(2)
 
 
 if __name__ == "__main__":

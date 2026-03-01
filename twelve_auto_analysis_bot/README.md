@@ -3,16 +3,16 @@
 Bot berasingan untuk:
 - Fetch data XAUUSD dari Twelve Data
 - Simpan candle dalam SQLite (`candles.db`)
-- Resample M5 -> M15/M30/H1/H4 (UTC boundary) + retention:
+- Resample ikut flow rasmi:
+  - `m15/m30` dibina dari `m5`
+  - `h4` dibina dari `h1` ikut sesi MYT
+  - `d1/w1/mn1` direct fetch harian
+- Retention:
   - M5: 30 hari
   - M15: 30 hari
   - M30: 90 hari
   - H1: 90 hari
   - H4: 365 hari
-- Request D1/W1/MN1 secara direct (request berasingan)
-  - D1 fetch: sekali sehari (slot MYT)
-  - W1 fetch: sekali sehari (slot MYT, untuk update high/low semasa)
-  - MN1 fetch: sekali sehari (slot MYT, untuk update high/low semasa)
 - Hasilkan `latest_signal.json` dengan stub DBO Market Structure + Fibo Extension
 - Optional: hantar alert ke Telegram bila signal berubah / ikut cooldown
 
@@ -42,14 +42,17 @@ Set dalam `.env`:
 ## Direct TF schedule
 
 Set dalam `.env` kalau nak ubah kekerapan:
-- `DIRECT_FETCH_D1_SEC=86400`
-- `DIRECT_FETCH_D1_TIME_MYT=06:30` (daily fetch ikut jam tetap MYT)
+- `DIRECT_FETCH_DAILY_TIME_MYT=06:00:15` (slot harian D1/W1/MN1)
 - `DIRECT_FETCH_W1_SEC=604800`
 - `DIRECT_FETCH_MN1_SEC=2592000`
+- `H1_SESSION_START_MYT=07:00`
+- `H1_FETCH_DELAY_SEC=15`
+- `M5_SESSION_START_MYT=07:00`
+- `M5_FETCH_DELAY_SEC=5`
 
 Nota:
-- `D1/W1/MN1` semua guna slot masa `DIRECT_FETCH_D1_TIME_MYT`.
-- `W1/MN1` dikemaskini harian pada slot yang sama untuk capture perubahan candle semasa.
+- `D1/W1/MN1` guna slot harian yang sama.
+- Bila fetch harian gagal, bot retry setiap 10 minit (max 6 kali).
 
 ## Timezone paparan
 
@@ -60,18 +63,15 @@ Nota:
 ## H4 Session Mode (Malaysia)
 
 `H4` guna sesi khas (bukan bucket UTC biasa) ikut waktu Malaysia:
-- `H4_SESSION_MODE=standard`
+- `H4_SESSION_MODE=auto` (default, ikut kalendar DST)
+- `H4_SESSION_MODE=standard` (paksa manual)
   - 07-11, 11-15, 15-19, 19-23, 23-03, 03-06
-- `H4_SESSION_MODE=dst`
+- `H4_SESSION_MODE=dst` (paksa manual)
   - 06-10, 10-14, 14-18, 18-22, 22-02, 02-05
 
-Bila masuk tempoh DST, tukar ke `dst`.
+Mode `auto` ikut rule DST: Ahad pertama November hingga Ahad kedua Mac.
 
-`H4` disimpan dalam 2 mode:
-- `h4` = confirmed candles sahaja (hanya selepas candle tutup)
-- `h4_live` = floating candle (in-progress) untuk monitoring
-
-Signal utama guna `h4` confirmed (elak repaint).
+`h4` dibina dari `h1` dan disimpan sebagai candle confirmed.
 
 ## Output files
 
@@ -80,7 +80,7 @@ Default disimpan di `/root/mmhelper/db/twelve_data_bot`:
 - `latest_signal.json`
 - `bot_state.json`
 
-## Check bootstrap + visual chart
+## Check bootstrap + preview rasmi
 
 Semak count/range setiap timeframe:
 ```bash
@@ -96,14 +96,14 @@ con.close()
 PY
 ```
 
-Generate chart HTML (candlestick):
+Generate preview rasmi:
 ```bash
 cd /root/mmhelper/twelve_auto_analysis_bot
-python3 export_chart.py --tf m5 --limit 300
+python3 export_multi_chart.py
 ```
 
-Output akan jadi:
-- `/root/mmhelper/db/twelve_data_bot/chart_m5.html`
+Output rasmi:
+- `/root/mmhelper/twelve_auto_analysis_bot/chart_multi.html`
 
 ## Notes penting
 
