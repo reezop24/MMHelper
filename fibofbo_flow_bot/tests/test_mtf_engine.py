@@ -46,6 +46,25 @@ def make_bullish_points(start: float = 100.0) -> list[float]:
     ]
 
 
+def make_bullish_points_strong(start: float = 100.0) -> list[float]:
+    return [
+        start,
+        start + 8,
+        start + 2.0,
+        start + 14,
+        start + 5,
+        start + 20,
+        start + 10,
+        start + 28,
+        start + 14,
+        start + 36,
+        start + 18,
+        start + 44,
+        start + 22,
+        start + 54,
+    ]
+
+
 def make_bearish_points(start: float = 120.0) -> list[float]:
     return [
         start,
@@ -101,7 +120,7 @@ class TestMTFEngine(unittest.TestCase):
         data = build_dataset(
             make_bullish_points(1800),
             make_bullish_points(1900),
-            make_bullish_points(2000),
+            make_bullish_points_strong(2000),
             make_bullish_points(2050),
             make_bullish_points(2060),
             make_bullish_points(2070),
@@ -122,7 +141,7 @@ class TestMTFEngine(unittest.TestCase):
         data = build_dataset(
             make_bullish_points(1800),
             make_bearish_points(2100),
-            make_bullish_points(2000),
+            make_bullish_points_strong(2000),
             make_bullish_points(2050),
             make_bullish_points(2060),
             make_bullish_points(2070),
@@ -152,7 +171,7 @@ class TestMTFEngine(unittest.TestCase):
         cfg = MTFConfig(score_min=7, swing_lookback=1, trend_swings_n=3)
         res = evaluateMTF("XAUUSD", data, datetime(2026, 2, 23, 16, 30), cfg)
         self.assertFalse(res["score_state"]["trade_ready"])
-        self.assertEqual(res["score_state"]["hard_reject_reason"], "H4_RANGE")
+        self.assertEqual(res["score_state"]["hard_reject_reason"], "NO_DIRECTION")
 
 
 if __name__ == "__main__":

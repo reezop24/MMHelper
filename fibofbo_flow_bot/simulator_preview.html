@@ -1,0 +1,724 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FiboFBO Simulator Preview</title>
+  <style>
+    :root {
+      --bg: #081a30;
+      --panel: #102744;
+      --line: #1a3a62;
+      --text: #edf3fd;
+      --muted: #9fb4d1;
+      --ok: #15b77a;
+      --warn: #f4c430;
+      --bad: #ef5350;
+      --accent: #49a9ff;
+    }
+    body {
+      margin: 0;
+      color: var(--text);
+      font-family: "Segoe UI", Tahoma, sans-serif;
+      background: radial-gradient(circle at 20% -10%, #153a6e 0%, var(--bg) 58%);
+    }
+    .wrap {
+      max-width: 1300px;
+      margin: 0 auto;
+      padding: 14px;
+    }
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .toolbar .block {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 6px 8px;
+      background: rgba(9, 28, 49, 0.55);
+    }
+    select, button {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 7px 10px;
+    }
+    input[type="datetime-local"] {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--text);
+      border-radius: 10px;
+      padding: 7px 10px;
+    }
+    button { cursor: pointer; }
+    .status {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel);
+      color: var(--muted);
+      padding: 7px 10px;
+      font-size: 13px;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 1.8fr 1fr;
+      gap: 12px;
+    }
+    .chart-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .chart-card {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(8, 24, 46, 0.6);
+      overflow: hidden;
+    }
+    .chart-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .chart-slot {
+      height: 330px;
+    }
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(12, 31, 54, 0.75);
+      padding: 10px;
+    }
+    .panel h3 {
+      margin: 0 0 10px 0;
+      font-size: 15px;
+      color: var(--accent);
+    }
+    .box {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px;
+      margin-bottom: 8px;
+      background: rgba(8, 25, 47, 0.65);
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--muted);
+      white-space: pre-wrap;
+    }
+    .ok { color: var(--ok); font-weight: 600; }
+    .warn { color: var(--warn); font-weight: 600; }
+    .bad { color: var(--bad); font-weight: 600; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    @media (max-width: 980px) {
+      .layout { grid-template-columns: 1fr; }
+      .chart-grid { grid-template-columns: 1fr; }
+      .chart-slot { height: 260px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="toolbar">
+      <div class="block">
+        <label>Charts:</label>
+        <select id="tf1">
+          <option value="m5">M5</option>
+          <option value="m15">M15</option>
+          <option value="m30">M30</option>
+          <option value="h1" selected>H1</option>
+          <option value="h4">H4</option>
+          <option value="d1">D1</option>
+          <option value="w1">W1</option>
+        </select>
+        <select id="tf2">
+          <option value="m5">M5</option>
+          <option value="m15">M15</option>
+          <option value="m30">M30</option>
+          <option value="h1">H1</option>
+          <option value="h4" selected>H4</option>
+          <option value="d1">D1</option>
+          <option value="w1">W1</option>
+        </select>
+        <select id="tf3">
+          <option value="m5" selected>M5</option>
+          <option value="m15">M15</option>
+          <option value="m30">M30</option>
+          <option value="h1">H1</option>
+          <option value="h4">H4</option>
+          <option value="d1">D1</option>
+          <option value="w1">W1</option>
+        </select>
+        <select id="tf4">
+          <option value="m5">M5</option>
+          <option value="m15" selected>M15</option>
+          <option value="m30">M30</option>
+          <option value="h1">H1</option>
+          <option value="h4">H4</option>
+          <option value="d1">D1</option>
+          <option value="w1">W1</option>
+        </select>
+        <label for="limit">Candles:</label>
+        <select id="limit">
+          <option value="200">200</option>
+          <option value="300" selected>300</option>
+          <option value="500">500</option>
+          <option value="800">800</option>
+        </select>
+        <button id="reloadBtn">Reload</button>
+      </div>
+      <div class="block">
+        <label for="simStart">Start:</label>
+        <input id="simStart" type="datetime-local" />
+        <label for="simEnd">End:</label>
+        <input id="simEnd" type="datetime-local" />
+        <label for="replayTf">Replay Base TF:</label>
+        <select id="replayTf">
+          <option value="h4" selected>H4</option>
+          <option value="h1">H1</option>
+          <option value="m30">M30</option>
+          <option value="m15">M15</option>
+          <option value="m5">M5</option>
+          <option value="d1">D1</option>
+          <option value="w1">W1</option>
+        </select>
+        <label for="speed">Speed:</label>
+        <select id="speed">
+          <option value="2000">0.5x</option>
+          <option value="1200">1x</option>
+          <option value="700">2x</option>
+          <option value="350">5x</option>
+          <option value="180">10x</option>
+        </select>
+        <button id="prepareBtn">Prepare</button>
+        <button id="playBtn">Play</button>
+        <button id="pauseBtn">Pause</button>
+        <button id="stopBtn">Stop</button>
+      </div>
+      <div id="status" class="status">Waiting...</div>
+    </div>
+
+    <div class="layout">
+      <div class="chart-grid">
+        <div class="chart-card">
+          <div class="chart-head"><span>Chart 1</span><span id="meta1">-</span></div>
+          <div id="chart1" class="chart-slot"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-head"><span>Chart 2</span><span id="meta2">-</span></div>
+          <div id="chart2" class="chart-slot"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-head"><span>Chart 3</span><span id="meta3">-</span></div>
+          <div id="chart3" class="chart-slot"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-head"><span>Chart 4</span><span id="meta4">-</span></div>
+          <div id="chart4" class="chart-slot"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Engine State</h3>
+        <div id="summary" class="box mono">-</div>
+        <div id="mtf" class="box">MTF: -</div>
+        <div id="impulse" class="box">Impulse: -</div>
+        <div id="active" class="box">Active Leg: -</div>
+        <div id="retrace" class="box">Retrace: -</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+  <script>
+    const BUILD_TAG = "SWING-OVERLAY-2026-03-01-01";
+    const limitSel = document.getElementById("limit");
+    const reloadBtn = document.getElementById("reloadBtn");
+    const simStartEl = document.getElementById("simStart");
+    const simEndEl = document.getElementById("simEnd");
+    const replayTfEl = document.getElementById("replayTf");
+    const speedEl = document.getElementById("speed");
+    const prepareBtn = document.getElementById("prepareBtn");
+    const playBtn = document.getElementById("playBtn");
+    const pauseBtn = document.getElementById("pauseBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const statusEl = document.getElementById("status");
+    const summaryEl = document.getElementById("summary");
+    const mtfEl = document.getElementById("mtf");
+    const impulseEl = document.getElementById("impulse");
+    const activeEl = document.getElementById("active");
+    const retraceEl = document.getElementById("retrace");
+    const MYT_OFFSET_SEC = 8 * 60 * 60;
+
+    const chartSlots = [
+      { key: "c1", sel: document.getElementById("tf1"), meta: document.getElementById("meta1"), container: document.getElementById("chart1"), chart: null, series: null, rows: [], lastRange: null, restoreRange: false, swingLines: [] },
+      { key: "c2", sel: document.getElementById("tf2"), meta: document.getElementById("meta2"), container: document.getElementById("chart2"), chart: null, series: null, rows: [], lastRange: null, restoreRange: false, swingLines: [] },
+      { key: "c3", sel: document.getElementById("tf3"), meta: document.getElementById("meta3"), container: document.getElementById("chart3"), chart: null, series: null, rows: [], lastRange: null, restoreRange: false, swingLines: [] },
+      { key: "c4", sel: document.getElementById("tf4"), meta: document.getElementById("meta4"), container: document.getElementById("chart4"), chart: null, series: null, rows: [], lastRange: null, restoreRange: false, swingLines: [] },
+    ];
+    let liveTimer = null;
+    let replayTimer = null;
+    let replayRows = [];
+    let replayIndex = 0;
+    let isReplayMode = false;
+    let lastChartRows = [];
+    let replayRangeTouched = false;
+    let lastTfForDefaultRange = "";
+    const qs = new URLSearchParams(window.location.search);
+    const apiFromQuery = qs.get("api");
+    const defaultApi =
+      (window.location.port === "5500" || window.location.protocol === "file:")
+        ? "http://127.0.0.1:8766"
+        : window.location.origin;
+    const API_BASE = (apiFromQuery && apiFromQuery.trim()) ? apiFromQuery.trim().replace(/\/+$/, "") : defaultApi;
+
+    function parseUtcDate(ts) {
+      const s = String(ts || "").trim().replace(" ", "T");
+      const iso = s.endsWith("Z") ? s : `${s}Z`;
+      return new Date(iso);
+    }
+
+    function toEpoch(ts) {
+      const d = parseUtcDate(ts);
+      return Math.floor(d.getTime() / 1000) + MYT_OFFSET_SEC;
+    }
+    function toEpochUTC(ts) {
+      const d = parseUtcDate(ts);
+      return Math.floor(d.getTime() / 1000);
+    }
+    function toDatetimeLocalValue(ts) {
+      const d = parseUtcDate(ts);
+      const dMyt = new Date(d.getTime() + MYT_OFFSET_SEC * 1000);
+      const yyyy = dMyt.getUTCFullYear();
+      const mm = String(dMyt.getUTCMonth() + 1).padStart(2, "0");
+      const dd = String(dMyt.getUTCDate()).padStart(2, "0");
+      const hh = String(dMyt.getUTCHours()).padStart(2, "0");
+      const mi = String(dMyt.getUTCMinutes()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+    }
+    function fromDatetimeLocalToUtcInput(v) {
+      if (!v) return "";
+      const [datePart, timePart] = String(v).split("T");
+      if (!datePart || !timePart) return "";
+      const [y, m, d] = datePart.split("-").map(Number);
+      const [hh, mm] = timePart.split(":").map(Number);
+      if (![y, m, d, hh, mm].every(Number.isFinite)) return "";
+      // datetime-local is MYT (UTC+8); convert to UTC text used by DB.
+      const ms = Date.UTC(y, m - 1, d, hh - 8, mm, 0);
+      const dt = new Date(ms);
+      const yy = dt.getUTCFullYear();
+      const mo = String(dt.getUTCMonth() + 1).padStart(2, "0");
+      const dd = String(dt.getUTCDate()).padStart(2, "0");
+      const h = String(dt.getUTCHours()).padStart(2, "0");
+      const mi = String(dt.getUTCMinutes()).padStart(2, "0");
+      const ss = String(dt.getUTCSeconds()).padStart(2, "0");
+      return `${yy}-${mo}-${dd} ${h}:${mi}:${ss}`;
+    }
+
+    function initChart() {
+      chartSlots.forEach((slot) => {
+        if (slot.chart) slot.chart.remove();
+        slot.chart = LightweightCharts.createChart(slot.container, {
+          layout: { background: { color: "transparent" }, textColor: "#edf3fd" },
+          grid: { vertLines: { color: "#1a3a62" }, horzLines: { color: "#1a3a62" } },
+          timeScale: { timeVisible: true, secondsVisible: false, borderColor: "#1a3a62" },
+          rightPriceScale: { borderColor: "#1a3a62" },
+        });
+        slot.series = slot.chart.addCandlestickSeries({
+          upColor: "#22c55e",
+          downColor: "#ef4444",
+          borderUpColor: "#22c55e",
+          borderDownColor: "#ef4444",
+          wickUpColor: "#22c55e",
+          wickDownColor: "#ef4444",
+          priceLineColor: "#ffffff",
+        });
+        slot.swingLines = [];
+        slot.chart.applyOptions({ width: slot.container.clientWidth, height: slot.container.clientHeight });
+        slot.chart.timeScale().subscribeVisibleTimeRangeChange((range) => {
+          if (!range) return;
+          slot.lastRange = range;
+          slot.restoreRange = true;
+        });
+      });
+      window.addEventListener("resize", () => {
+        chartSlots.forEach((slot) => {
+          slot.chart.applyOptions({ width: slot.container.clientWidth, height: slot.container.clientHeight });
+        });
+      });
+    }
+
+    function setStatus(txt, klass = "") {
+      statusEl.innerHTML = `<span class="${klass}">${txt}</span>`;
+    }
+
+    function fmtBool(v) {
+      return v ? "YES" : "NO";
+    }
+
+    async function fetchJson(url) {
+      const res = await fetch(url, { cache: "no-store" });
+      const text = await res.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (_) {
+        throw new Error(`API response bukan JSON. Semak API_BASE=${API_BASE}`);
+      }
+      if (!res.ok) {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      return data;
+    }
+
+    async function loadCandlesFor(slot) {
+      const tf = slot.sel.value;
+      const limit = limitSel.value;
+      const startUtc = fromDatetimeLocalToUtcInput(simStartEl.value);
+      const endUtc = fromDatetimeLocalToUtcInput(simEndEl.value);
+      let url = `${API_BASE}/api/candles?tf=${encodeURIComponent(tf)}&limit=${encodeURIComponent(limit)}&t=${Date.now()}`;
+      // Apply start/end window only while replay is running.
+      // Live mode should always show last N candles for full context.
+      if (isReplayMode && startUtc && endUtc) {
+        url += `&start=${encodeURIComponent(startUtc)}&end=${encodeURIComponent(endUtc)}`;
+      }
+      const data = await fetchJson(url);
+      if (!data.ok) throw new Error(data.error || "candles fetch failed");
+      const rows = (data.candles || []).map((c) => ({
+        time: toEpoch(c.time),
+        open: Number(c.open),
+        high: Number(c.high),
+        low: Number(c.low),
+        close: Number(c.close),
+        srcTs: c.time,
+        utcEpoch: toEpochUTC(c.time),
+      }));
+      slot.rows = rows;
+      slot.series.setData(rows);
+      const prevRange = slot.restoreRange ? slot.lastRange : null;
+      if (prevRange && Number.isFinite(prevRange.from) && Number.isFinite(prevRange.to)) {
+        slot.chart.timeScale().setVisibleRange(prevRange);
+      } else {
+        slot.chart.timeScale().fitContent();
+      }
+      slot.meta.textContent = `${tf.toUpperCase()} | ${rows.length}`;
+      if (slot === chartSlots[0]) {
+        lastChartRows = rows;
+      }
+      if (slot === chartSlots[0] && rows.length > 0 && (!replayRangeTouched || lastTfForDefaultRange !== slot.sel.value)) {
+        const startIdx = Math.max(0, rows.length - 80);
+        simStartEl.value = toDatetimeLocalValue(rows[startIdx].srcTs);
+        simEndEl.value = toDatetimeLocalValue(rows[rows.length - 1].srcTs);
+        lastTfForDefaultRange = slot.sel.value;
+      }
+      return data;
+    }
+
+    async function loadAllCandles() {
+      const all = await Promise.all(chartSlots.map((slot) => loadCandlesFor(slot)));
+      return all;
+    }
+
+    async function loadState() {
+      const data = await fetchJson(`${API_BASE}/api/state?anchor_tf=${encodeURIComponent(replayTfEl.value)}&t=${Date.now()}`);
+      if (!data.ok) throw new Error(data.error || "state fetch failed");
+      return data;
+    }
+
+    async function loadStateAt(ts) {
+      const data = await fetchJson(
+        `${API_BASE}/api/state_at?anchor_tf=${encodeURIComponent(replayTfEl.value)}&ts=${encodeURIComponent(ts)}&t=${Date.now()}`
+      );
+      if (!data.ok) throw new Error(data.error || "state fetch failed");
+      return data;
+    }
+
+    async function loadReplaySourceRows() {
+      const tf = replayTfEl.value;
+      const startUtc = fromDatetimeLocalToUtcInput(simStartEl.value);
+      const endUtc = fromDatetimeLocalToUtcInput(simEndEl.value);
+      const limit = Math.max(3000, Number(limitSel.value || 300));
+      let url = `${API_BASE}/api/candles?tf=${encodeURIComponent(tf)}&limit=${encodeURIComponent(limit)}&t=${Date.now()}`;
+      if (startUtc && endUtc) {
+        url += `&start=${encodeURIComponent(startUtc)}&end=${encodeURIComponent(endUtc)}`;
+      }
+      const data = await fetchJson(url);
+      if (!data.ok) throw new Error(data.error || "replay source fetch failed");
+      return (data.candles || []).map((c) => ({
+        time: toEpoch(c.time),
+        open: Number(c.open),
+        high: Number(c.high),
+        low: Number(c.low),
+        close: Number(c.close),
+        srcTs: c.time,
+        utcEpoch: toEpochUTC(c.time),
+      }));
+    }
+
+    function renderEngineState(candleResps, stateResp, modeLabel = "LIVE") {
+      const u = stateResp.unified || {};
+      const s = u.summary || {};
+      const tfInfo = (candleResps || []).map((x) => `${String(x.timeframe || "-").toUpperCase()}:${x.count || 0}`).join(" | ");
+      setStatus(`${modeLabel} | ${tfInfo}`, modeLabel === "LIVE" ? "ok" : "warn");
+
+      summaryEl.textContent =
+        `[${u.candle_index ?? "-"}] ` +
+        `H4=${s.bias ?? "-"} | ` +
+        `Score=${s.mtf_score ?? 0} | ` +
+        `TradeReady=${fmtBool(!!s.trade_ready)}\n` +
+        `Active=${s.active_tf ?? "-"}/${s.leg_state ?? "-"} | ` +
+        `Action=${s.leg_action ?? "-"}\n` +
+        `Retrace=${s.retrace_status ?? "-"}/${s.retrace_depth ?? "-"} | ` +
+        `ReadyForSetup=${fmtBool(!!s.ready_for_setup)}\n` +
+        `TS=${u.timestamp ?? "-"}`;
+
+      const mtfScore = (stateResp.mtf || {}).score_state || {};
+      mtfEl.innerHTML =
+        `<b>MTF</b>\n` +
+        `score: ${mtfScore.score ?? 0}\n` +
+        `trade_ready: <span class="${mtfScore.trade_ready ? "ok" : "bad"}">${fmtBool(!!mtfScore.trade_ready)}</span>\n` +
+        `reject: ${mtfScore.hard_reject_reason || "-"}`;
+
+      const imp = stateResp.impulse || {};
+      impulseEl.innerHTML =
+        `<b>Impulse</b>\n` +
+        `H4: ${(imp.H4 || {}).phase || "-"} / ${(imp.H4 || {}).direction || "-"}\n` +
+        `H1: ${(imp.H1 || {}).phase || "-"} / ${(imp.H1 || {}).direction || "-"}\n` +
+        `M30: ${(imp.M30 || {}).phase || "-"} / ${(imp.M30 || {}).direction || "-"}\n` +
+        `M15: ${(imp.M15 || {}).phase || "-"} / ${(imp.M15 || {}).direction || "-"}`;
+
+      const active = stateResp.active || {};
+      activeEl.innerHTML =
+        `<b>Active Leg</b>\n` +
+        `tf: ${active.active_tf || "-"}\n` +
+        `direction: ${active.direction || "-"}\n` +
+        `state: ${active.state || "-"}\n` +
+        `action: ${active.action || "-"}`;
+
+      const r = stateResp.retrace || {};
+      retraceEl.innerHTML =
+        `<b>Retrace</b>\n` +
+        `ratio: ${r.retrace_ratio ?? 0}\n` +
+        `depth: ${r.depth_type || "-"}\n` +
+        `status: ${r.status || "-"}\n` +
+        `structure_intact: <span class="${r.structure_intact ? "ok" : "bad"}">${fmtBool(!!r.structure_intact)}</span>\n` +
+        `sweep: ${fmtBool(!!r.sweep_detected)}\n` +
+        `ready_for_setup: <span class="${r.ready_for_setup ? "ok" : "warn"}">${fmtBool(!!r.ready_for_setup)}</span>`;
+
+      applySwingOverlays(stateResp.swing || {});
+    }
+
+    function tfKeyFromChartTf(tf) {
+      const t = String(tf || "").toLowerCase();
+      if (t === "w1") return "W1";
+      if (t === "d1") return "D1";
+      if (t === "h4") return "H4";
+      return null;
+    }
+
+    function tfLabelPrefix(tfKey) {
+      if (tfKey === "W1") return "W";
+      if (tfKey === "D1") return "D";
+      if (tfKey === "H4") return "H4";
+      return "";
+    }
+
+    function clearSwingLines(slot) {
+      if (!slot || !slot.series || !Array.isArray(slot.swingLines)) return;
+      for (const ln of slot.swingLines) {
+        try { slot.series.removePriceLine(ln); } catch (_) {}
+      }
+      slot.swingLines = [];
+    }
+
+    function addSwingLine(slot, price, title, color) {
+      if (!slot || !slot.series) return;
+      if (price === null || price === undefined || price === "") return;
+      if (!Number.isFinite(Number(price))) return;
+      const ln = slot.series.createPriceLine({
+        price: Number(price),
+        color: color,
+        lineWidth: 1,
+        lineStyle: LightweightCharts.LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: title,
+      });
+      slot.swingLines.push(ln);
+    }
+
+    function applySwingOverlays(swingState) {
+      chartSlots.forEach((slot) => {
+        clearSwingLines(slot);
+        const tfKey = tfKeyFromChartTf(slot.sel.value);
+        if (!tfKey) return;
+        const tfSwing = (swingState || {})[tfKey] || {};
+        const ext = tfSwing.external || {};
+        const itn = tfSwing.internal || {};
+        const p = tfLabelPrefix(tfKey);
+
+        addSwingLine(slot, ext.external_swing_high, `${p}ext H`, "#f4c430");
+        addSwingLine(slot, ext.external_swing_low, `${p}ext L`, "#f4c430");
+        addSwingLine(slot, itn.internal_swing_high, `${p}int H`, "#49a9ff");
+        addSwingLine(slot, itn.internal_swing_low, `${p}int L`, "#49a9ff");
+      });
+    }
+
+    function placeReplayMarker(row) {
+      if (!row) return;
+      chartSlots.forEach((slot) => {
+        slot.series.setMarkers([{
+          time: toEpoch(row.srcTs),
+          position: "aboveBar",
+          color: "#f4c430",
+          shape: "circle",
+          text: "SIM",
+        }]);
+      });
+    }
+
+    function clearReplayMarker() {
+      chartSlots.forEach((slot) => slot.series.setMarkers([]));
+    }
+
+    async function prepareReplayRange() {
+      const startUtc = fromDatetimeLocalToUtcInput(simStartEl.value);
+      const endUtc = fromDatetimeLocalToUtcInput(simEndEl.value);
+      const startDt = parseUtcDate(startUtc);
+      const endDt = parseUtcDate(endUtc);
+      if (!(startDt instanceof Date) || Number.isNaN(startDt.getTime())) {
+        throw new Error("Start datetime tak sah");
+      }
+      if (!(endDt instanceof Date) || Number.isNaN(endDt.getTime())) {
+        throw new Error("End datetime tak sah");
+      }
+      if (startDt.getTime() > endDt.getTime()) {
+        throw new Error("Start mesti <= End");
+      }
+      const sourceRows = await loadReplaySourceRows();
+      if (!sourceRows.length) {
+        throw new Error(`Tiada candle ${replayTfEl.value.toUpperCase()} dalam range ini`);
+      }
+      const s = Math.floor(startDt.getTime() / 1000);
+      const e = Math.floor(endDt.getTime() / 1000);
+      replayRows = sourceRows.filter((r) => r.utcEpoch >= s && r.utcEpoch <= e);
+      replayIndex = 0;
+      if (!replayRows.length) {
+        throw new Error(`Range replay kosong pada ${replayTfEl.value.toUpperCase()}. Tukar Start/End.`);
+      }
+      setStatus(`REPLAY READY | base=${replayTfEl.value.toUpperCase()} | steps=${replayRows.length}`, "warn");
+    }
+
+    async function stepReplay() {
+      if (!replayRows.length) {
+        await prepareReplayRange();
+      }
+      if (replayIndex >= replayRows.length) {
+        pauseReplay();
+        setStatus("REPLAY DONE", "ok");
+        return;
+      }
+      const row = replayRows[replayIndex];
+      const state = await loadStateAt(row.srcTs);
+      placeReplayMarker(row);
+      const infos = chartSlots.map((slot) => ({ timeframe: slot.sel.value, count: slot.rows.length }));
+      renderEngineState(infos, state, "REPLAY");
+      replayIndex += 1;
+    }
+
+    function playReplay() {
+      if (isReplayMode && replayTimer) return;
+      prepareReplayRange().then(() => {
+        isReplayMode = true;
+        if (liveTimer) {
+          clearInterval(liveTimer);
+          liveTimer = null;
+        }
+        if (replayTimer) clearInterval(replayTimer);
+        const speedMs = Math.max(60, Number(speedEl.value || 1200));
+        replayTimer = setInterval(() => {
+          stepReplay().catch((err) => setStatus(`ERROR: ${err.message}`, "bad"));
+        }, speedMs);
+        stepReplay().catch((err) => setStatus(`ERROR: ${err.message}`, "bad"));
+      }).catch((err) => {
+        setStatus(`ERROR: ${err.message}`, "bad");
+      });
+    }
+
+    function pauseReplay() {
+      if (replayTimer) {
+        clearInterval(replayTimer);
+        replayTimer = null;
+      }
+      if (isReplayMode) {
+        setStatus("REPLAY PAUSED", "warn");
+      }
+    }
+
+    function stopReplay() {
+      pauseReplay();
+      isReplayMode = false;
+      replayRows = [];
+      replayIndex = 0;
+      clearReplayMarker();
+      replayRangeTouched = true;
+      refreshAll();
+        if (!liveTimer) {
+        liveTimer = setInterval(refreshAll, 2000);
+      }
+    }
+
+    async function refreshAll() {
+      try {
+        if (isReplayMode) return;
+        const [candleResps, stateResp] = await Promise.all([loadAllCandles(), loadState()]);
+        renderEngineState(candleResps, stateResp, "LIVE");
+      } catch (err) {
+        setStatus(`ERROR: ${err.message}`, "bad");
+      }
+    }
+
+    initChart();
+    setStatus(`BUILD=${BUILD_TAG} | API=${API_BASE}`, "warn");
+    refreshAll();
+    liveTimer = setInterval(refreshAll, 2000);
+    reloadBtn.addEventListener("click", refreshAll);
+    chartSlots.forEach((slot, idx) => slot.sel.addEventListener("change", () => {
+      slot.restoreRange = false;
+      slot.lastRange = null;
+      if (idx === 0) {
+        replayRangeTouched = false;
+      }
+      refreshAll();
+    }));
+    limitSel.addEventListener("change", refreshAll);
+    simStartEl.addEventListener("input", () => { replayRangeTouched = true; });
+    simEndEl.addEventListener("input", () => { replayRangeTouched = true; });
+    replayTfEl.addEventListener("change", () => { replayRangeTouched = true; });
+    prepareBtn.addEventListener("click", () => {
+      prepareReplayRange().catch((err) => {
+        setStatus(`ERROR: ${err.message}`, "bad");
+      });
+    });
+    playBtn.addEventListener("click", playReplay);
+    pauseBtn.addEventListener("click", pauseReplay);
+    stopBtn.addEventListener("click", stopReplay);
+    speedEl.addEventListener("change", () => {
+      if (replayTimer) {
+        pauseReplay();
+        playReplay();
+      }
+    });
+  </script>
+</body>
+</html>

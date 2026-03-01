@@ -1,8 +1,12 @@
-# FiboFBO Flow Bot (Baseline + MTF Scoring Foundation)
+# FiboFBO Flow Bot (Clean Baseline)
 
-Bot ini sekarang ada 2 layer asas:
-- Chart engine feeder/checker
-- MTF Bias + Scoring Engine foundation (modular, explainable)
+Bot ini dalam clean state untuk foundation engine:
+- MTF Bias + Scoring
+- Impulse phase sensor
+- Active leg decision layer
+- Retrace context layer
+
+Bot ini tidak execute trade. Ia hanya context + readiness output.
 
 ## Setup
 ```bash
@@ -19,8 +23,11 @@ python3 -m pip install -r requirements.txt
 - `/signal` - baca signal feeder semasa
 - `/engine [tf]` - status data chart engine untuk TF
 - `/candles [tf] [limit]` - preview candle terakhir
+- `/mtf` - run MTF Bias + Scoring (XAUUSD)
+- `/impulse` - run impulse phase sensor (H4/H1/M30/M15)
+- `/activeleg` - run active leg evaluation
+- `/retrace` - run retrace evaluation
 - `/dbo` - notis logic lama telah direset
-- `/mtf` - run MTF Bias + Scoring (XAUUSD) dan papar explain ringkas
 
 ## Env
 - `FIBOFBO_FLOW_BOT_TOKEN` - token BotFather
@@ -33,23 +40,22 @@ python3 -m pip install -r requirements.txt
 - `FIBOFBO_FLOW_WEEKLY_CONFLICT_MODE` - `soft|ignore`
 - `FIBOFBO_FLOW_MTF_SWING_LOOKBACK` - fractal lookback (default `2`)
 - `FIBOFBO_FLOW_MTF_TREND_SWINGS_N` - min swings for trend (default `4`)
+- `FIBOFBO_FLOW_IMPULSE_SWING_LOOKBACK` - impulse swing lookback (default `2`)
+- `FIBOFBO_FLOW_ACTIVELEG_H1_OVEREXT` - H1 overextension multiplier (default `1.2`)
+- `FIBOFBO_FLOW_ACTIVELEG_M30_OVEREXT` - M30 overextension multiplier (default `1.5`)
+- `FIBOFBO_FLOW_RETRACE_ENABLE_SWEEP` - enable sweep logic (`1|0`)
+- `FIBOFBO_FLOW_RETRACE_SWEEP_READY_DIRECT` - sweep direct ready (`1|0`)
+- `FIBOFBO_FLOW_RETRACE_SWEEP_REQUIRE_MICRO_CONFIRM` - require M15 micro confirm (`1|0`)
+- `FIBOFBO_FLOW_RETRACE_SWEEP_MAX_RECLAIM_CANDLES` - max reclaim candles (default `3`)
+- `FIBOFBO_FLOW_RETRACE_SWEEP_TRIGGER_RATIO` - sweep trigger ratio (default `0.9`)
 - `LOG_LEVEL` - default `INFO`
-
-## Core API (for next modules)
-Dalam `mtf_engine.py`:
-- `evaluateMTF(symbol, candlesByTF, nowTimestamp, config, open_position_session=None)`
-- `explainMTF(result)`
-
-Modul ini direka supaya detector lain (Impulse/Retrace/FE/Risk) boleh plug-in pada result JSON yang sama.
 
 ## Unit Tests
 ```bash
 cd /root/mmhelper/fibofbo_flow_bot
-python3 -m unittest tests/test_mtf_engine.py -v
+python3 -m unittest \
+  tests/test_mtf_engine.py \
+  tests/test_impulse_engine.py \
+  tests/test_active_leg_engine.py \
+  tests/test_retrace_engine.py -v
 ```
-
-## Export Preview
-```bash
-python3 export_live_preview.py --tf h1 --limit 500
-```
-Output JSON ditulis ke `debug_live_<tf>.json`.

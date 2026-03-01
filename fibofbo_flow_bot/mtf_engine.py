@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+from candle_filter import analyzeCandleQualityWithConfig
+from impulse_engine import ImpulseConfig, analyzeImpulse
 
 TF_ORDER = ["W1", "D1", "H4", "H1", "M30", "M15", "M5"]
 
@@ -47,6 +49,10 @@ class MTFConfig:
             SessionWindow("NEW_YORK", 21 * 60, 5 * 60 + 59),
         ]
     )
+    anomaly_filter_enabled: bool = True
+    anomaly_range_multiplier: float = 4.0
+    anomaly_wick_multiplier: float = 2.0
+    anomaly_micro_range_ratio: float = 0.25
 
 
 def _to_float(value: Any, default: float = 0.0) -> float:
@@ -74,13 +80,14 @@ def _norm_candles(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def _detect_swings(candles: list[dict[str, Any]], lookback: int) -> list[dict[str, Any]]:
     swings: list[dict[str, Any]] = []
-    if len(candles) < (lookback * 2 + 1):
+    clean = [c for c in candles if not bool(c.get("is_anomaly"))]
+    if len(clean) < (lookback * 2 + 1):
         return swings
 
-    for i in range(lookback, len(candles) - lookback):
-        center = candles[i]
-        left = candles[i - lookback : i]
-        right = candles[i + 1 : i + lookback + 1]
+    for i in range(lookback, len(clean) - lookback):
+        center = clean[i]
+        left = clean[i - lookback : i]
+        right = clean[i + 1 : i + lookback + 1]
         others = left + right
         if not others:
             continue
@@ -89,9 +96,9 @@ def _detect_swings(candles: list[dict[str, Any]], lookback: int) -> list[dict[st
         is_low = all(center["low"] < x["low"] for x in others)
 
         if is_high:
-            swings.append({"idx": i, "ts": center["ts"], "kind": "H", "price": center["high"]})
+            swings.append({"idx": int(center["idx"]), "ts": center["ts"], "kind": "H", "price": center["high"]})
         elif is_low:
-            swings.append({"idx": i, "ts": center["ts"], "kind": "L", "price": center["low"]})
+            swings.append({"idx": int(center["idx"]), "ts": center["ts"], "kind": "L", "price": center["low"]})
 
     # compress same-kind contiguous picks
     compressed: list[dict[str, Any]] = []
@@ -123,6 +130,8 @@ def _last_bos(candles: list[dict[str, Any]], swings: list[dict[str, Any]]) -> st
     up_idx = -1
     dn_idx = -1
     for i, c in enumerate(candles):
+        if bool(c.get("is_anomaly")):
+            continue
         close = c["close"]
         if close > ref_high:
             up_idx = i
@@ -162,8 +171,55 @@ def _phase_from_bias(candles: list[dict[str, Any]], bias: str, last_high: dict[s
     return "PULLBACK" if retrace > 0.22 else "EXPANSION"
 
 
+def _true_range(curr: dict[str, Any], prev_close: float | None) -> float:
+    h = float(curr["high"])
+    l = float(curr["low"])
+    if prev_close is None:
+        return max(h - l, 0.0)
+    return max(h - l, abs(h - prev_close), abs(l - prev_close))
+
+
+def _atr(candles: list[dict[str, Any]], period: int = 14) -> list[float]:
+    if not candles:
+        return []
+    out: list[float] = []
+    trs: list[float] = []
+    prev_close: float | None = None
+    for c in candles:
+        tr = _true_range(c, prev_close)
+        trs.append(tr)
+        prev_close = float(c["close"])
+        if len(trs) < period:
+            out.append(sum(trs) / max(1, len(trs)))
+        else:
+            out.append(sum(trs[-period:]) / period)
+    return out
+
+
+def _overlap_ratio(candles: list[dict[str, Any]]) -> float:
+    if len(candles) < 2:
+        return 0.0
+    cnt = 0
+    for i in range(1, len(candles)):
+        a = candles[i - 1]
+        b = candles[i]
+        lo = max(float(a["low"]), float(b["low"]))
+        hi = min(float(a["high"]), float(b["high"]))
+        if hi > lo:
+            cnt += 1
+    return cnt / (len(candles) - 1)
+
+
 def analyze_tf(tf: str, candles_raw: list[dict[str, Any]], cfg: MTFConfig) -> dict[str, Any]:
     candles = _norm_candles(candles_raw)
+    candles = analyzeCandleQualityWithConfig(
+        candles,
+        atr_period=14,
+        enabled=cfg.anomaly_filter_enabled,
+        range_multiplier=cfg.anomaly_range_multiplier,
+        wick_multiplier=cfg.anomaly_wick_multiplier,
+        micro_range_ratio=cfg.anomaly_micro_range_ratio,
+    )
     swings = _detect_swings(candles, cfg.swing_lookback)
     highs = [s for s in swings if s["kind"] == "H"]
     lows = [s for s in swings if s["kind"] == "L"]
@@ -188,10 +244,11 @@ def analyze_tf(tf: str, candles_raw: list[dict[str, Any]], cfg: MTFConfig) -> di
             if last_bos == "NONE":
                 last_bos = "DOWN"
 
-    if len(swings) < max(cfg.trend_swings_n, 4):
-        bias = "RANGE"
-
     phase = _phase_from_bias(candles, bias, last_high, last_low)
+    atrs = _atr(candles, period=14)
+    atr_now = atrs[-1] if atrs else 0.0
+    atr_base = (sum(atrs[-50:]) / max(1, min(len(atrs), 50))) if atrs else 0.0
+    recent_overlap = _overlap_ratio(candles[-12:]) if candles else 0.0
     return {
         "tf": tf,
         "bias": bias,
@@ -200,8 +257,12 @@ def analyze_tf(tf: str, candles_raw: list[dict[str, Any]], cfg: MTFConfig) -> di
         "lastSwingLow": last_low,
         "phase": phase,
         "swings": swings,
+        "candles": candles,
         "candles_count": len(candles),
         "last_close": candles[-1]["close"] if candles else None,
+        "atr_now": atr_now,
+        "atr_base": atr_base,
+        "recent_overlap": recent_overlap,
     }
 
 
@@ -355,16 +416,98 @@ def evaluateMTF(
     m15 = tf_states["M15"]
     m5 = tf_states["M5"]
 
+    # H4 lock gate from impulse strength (BOS + displacement + ATR threshold)
+    h4_last_bos = str(h4.get("lastBOS") or "NONE")
+    h4_impulse = analyzeImpulse(
+        "H4",
+        candlesByTF.get("H4", []),
+        ImpulseConfig(
+            anomaly_filter_enabled=cfg.anomaly_filter_enabled,
+            anomaly_range_multiplier=cfg.anomaly_range_multiplier,
+            anomaly_wick_multiplier=cfg.anomaly_wick_multiplier,
+            anomaly_micro_range_ratio=cfg.anomaly_micro_range_ratio,
+        ),
+    )
+    h4_impulse_atr_ratio = _to_float(h4_impulse.get("atr_ratio"), 0.0)
+    h4_displacement_ok = any("Displacement: YES" in str(n) for n in (h4_impulse.get("notes") or []))
+    # Fallback for short datasets where impulse module cannot form a valid leg.
+    # Use equivalent H4 context signal instead of forcing lock failure.
+    if h4_impulse_atr_ratio <= 0.0:
+        h4_atr_now = _to_float(h4.get("atr_now"), 0.0)
+        h4_atr_base = _to_float(h4.get("atr_base"), 0.0)
+        if h4_atr_base > 0:
+            h4_impulse_atr_ratio = h4_atr_now / h4_atr_base
+    if not h4_displacement_ok:
+        h4_displacement_ok = str(h4.get("phase") or "") == "EXPANSION" and h4_last_bos in {"UP", "DOWN"}
+    h4_lock_gate = h4_impulse_atr_ratio >= 1.4 and h4_displacement_ok
+
+    # Sticky H4 direction context:
+    # lock directional bias until opposite BOS (CHOCH) invalidates it.
+    h4_detected_bias = str(h4.get("bias") or "RANGE")
+    h4_bias_locked: str | None = None
+    h4_invalidated = False
+    h4_last_close = _to_float(h4.get("last_close"))
+    h4_last_high = _to_float((h4.get("lastSwingHigh") or {}).get("price"), default=float("nan"))
+    h4_last_low = _to_float((h4.get("lastSwingLow") or {}).get("price"), default=float("nan"))
+
+    if h4_last_bos == "UP" and h4_lock_gate:
+        h4_bias_locked = "BULL"
+    elif h4_last_bos == "DOWN" and h4_lock_gate:
+        h4_bias_locked = "BEAR"
+
+    if h4_bias_locked == "BULL" and h4_last_low == h4_last_low and h4_last_close < h4_last_low:
+        h4_invalidated = True
+        h4_bias_locked = None
+    elif h4_bias_locked == "BEAR" and h4_last_high == h4_last_high and h4_last_close > h4_last_high:
+        h4_invalidated = True
+        h4_bias_locked = None
+
+    h4_phase = str(h4.get("phase") or "UNKNOWN")
+    if h4_bias_locked in {"BULL", "BEAR"} and not h4_invalidated:
+        atr_now = _to_float(h4.get("atr_now"), 0.0)
+        atr_base = _to_float(h4.get("atr_base"), 0.0)
+        recent_overlap = _to_float(h4.get("recent_overlap"), 0.0)
+        atr_contraction = atr_base > 0 and atr_now < (atr_base * 0.80)
+        high_overlap = recent_overlap >= 0.70
+        if h4_phase != "EXPANSION" and (atr_contraction or high_overlap):
+            h4_phase = "COMPRESSION_IN_TREND"
+    elif h4_bias_locked is None:
+        if h4_last_bos == "NONE" and h4_detected_bias == "RANGE":
+            h4_phase = "RANGE"
+
+    h4_for_context = dict(h4)
+    h4_for_context["bias"] = h4_bias_locked or "RANGE"
+    h4_for_context["phase"] = h4_phase
+    h4_for_context["invalidated"] = bool(h4_invalidated)
+    h4_for_context["DEBUG_lastBOS"] = h4_last_bos
+    h4_for_context["DEBUG_lastSwingHigh_price"] = (
+        (h4.get("lastSwingHigh") or {}).get("price")
+        if isinstance(h4.get("lastSwingHigh"), dict)
+        else None
+    )
+    h4_for_context["DEBUG_lastSwingLow_price"] = (
+        (h4.get("lastSwingLow") or {}).get("price")
+        if isinstance(h4.get("lastSwingLow"), dict)
+        else None
+    )
+    h4_for_context["DEBUG_last_close"] = h4.get("last_close")
+    h4_for_context["DEBUG_bias_locked"] = h4_bias_locked
+    h4_for_context["DEBUG_invalidated"] = bool(h4_invalidated)
+    h4_for_context["DEBUG_phase"] = h4_phase
+    h4_for_context["DEBUG_impulse_atr_ratio"] = h4_impulse_atr_ratio
+    h4_for_context["DEBUG_impulse_displacement_ok"] = bool(h4_displacement_ok)
+    h4_for_context["DEBUG_lock_gate"] = bool(h4_lock_gate)
+
     session = _session_state(nowTimestamp, cfg, open_position_session=open_position_session)
-    bridge = _bridge_state(h4.get("bias", "RANGE"), h1, m30)
-    execution = _execution_state(h4.get("bias", "RANGE"), m15, m5)
+    bridge = _bridge_state(h4_for_context.get("bias", "RANGE"), h1, m30)
+    execution = _execution_state(h4_for_context.get("bias", "RANGE"), m15, m5)
 
     w = cfg.score_weights
     breakdown = {"h4": 0, "daily": 0, "weekly": 0, "bridge": 0, "execution": 0, "session": 0}
     conflicts: list[str] = []
     notes: list[str] = []
 
-    h4_bias = h4.get("bias")
+    h4_bias = h4_for_context.get("bias")
     if h4_bias in {"BULL", "BEAR"}:
         breakdown["h4"] = int(w.get("h4", 3))
     else:
@@ -414,9 +557,11 @@ def evaluateMTF(
 
     score = int(sum(breakdown.values()))
 
+    direction_ready = h4_bias in {"BULL", "BEAR"} and not h4_invalidated
+
     hard_reject_reason = None
-    if h4_bias == "RANGE":
-        hard_reject_reason = "H4_RANGE"
+    if not direction_ready:
+        hard_reject_reason = "NO_DIRECTION"
     elif not bridge.get("bridge_ok"):
         hard_reject_reason = "BRIDGE_FAIL"
     elif not session.get("can_trade"):
@@ -424,20 +569,21 @@ def evaluateMTF(
 
     trade_ready = (
         score >= cfg.score_min
-        and h4_bias in {"BULL", "BEAR"}
+        and direction_ready
         and bool(bridge.get("bridge_ok"))
         and bool(session.get("can_trade"))
     )
 
     mtf_state = {
         "symbol": symbol,
-        "context": {"W1": w1, "D1": d1, "H4": h4},
+        "context": {"W1": w1, "D1": d1, "H4": h4_for_context},
         "bridge": {"H1": h1, "M30": m30, "state": bridge},
         "execution": {"M15": m15, "M5": m5, "state": execution},
         "session": session,
     }
     score_state = {
         "score": score,
+        "direction_ready": bool(direction_ready),
         "trade_ready": bool(trade_ready),
         "hard_reject_reason": hard_reject_reason,
         "breakdown": breakdown,
@@ -490,6 +636,19 @@ def explainMTF(result: dict[str, Any]) -> str:
     total = int(score_state.get("score") or 0)
     ready = bool(score_state.get("trade_ready"))
     lines.append(f"TOTAL: {total}/10 => {'TRADE READY ✅' if ready else 'NOT READY ❌'}")
+    lines.append(
+        "H4 DEBUG: "
+        f"lastBOS={h4.get('DEBUG_lastBOS')} | "
+        f"lastSH={h4.get('DEBUG_lastSwingHigh_price')} | "
+        f"lastSL={h4.get('DEBUG_lastSwingLow_price')} | "
+        f"lastClose={h4.get('DEBUG_last_close')} | "
+        f"biasLocked={h4.get('DEBUG_bias_locked')} | "
+        f"invalidated={h4.get('DEBUG_invalidated')} | "
+        f"phase={h4.get('DEBUG_phase')} | "
+        f"impAtr={h4.get('DEBUG_impulse_atr_ratio')} | "
+        f"impDisp={h4.get('DEBUG_impulse_displacement_ok')} | "
+        f"lockGate={h4.get('DEBUG_lock_gate')}"
+    )
 
     conflicts = score_state.get("conflicts") or []
     if conflicts:

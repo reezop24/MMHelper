@@ -3,8 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from candle_filter import analyzeCandleQualityWithConfig
 
 TARGET_TFS = ("H4", "H1", "M30", "M15")
+SUPPORTED_TFS = ("W1", "D1", "H4", "H1", "M30", "M15")
 
 
 @dataclass
@@ -27,12 +29,18 @@ class ImpulseConfig:
     retrace_guard_max: float = 0.50
     atr_multiplier_by_tf: dict[str, float] = field(
         default_factory=lambda: {
+            "W1": 1.4,
+            "D1": 1.5,
             "H4": 1.5,
             "H1": 1.6,
             "M30": 1.7,
             "M15": 1.8,
         }
     )
+    anomaly_filter_enabled: bool = True
+    anomaly_range_multiplier: float = 4.0
+    anomaly_wick_multiplier: float = 2.0
+    anomaly_micro_range_ratio: float = 0.25
 
 
 def _to_float(x: Any, default: float = 0.0) -> float:
@@ -59,16 +67,17 @@ def _norm_candles(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _detect_swings(candles: list[dict[str, Any]], lookback: int) -> list[dict[str, Any]]:
-    if len(candles) < (lookback * 2 + 1):
+    clean = [c for c in candles if not bool(c.get("is_anomaly"))]
+    if len(clean) < (lookback * 2 + 1):
         return []
     raw: list[dict[str, Any]] = []
-    for i in range(lookback, len(candles) - lookback):
-        c = candles[i]
-        others = candles[i - lookback : i] + candles[i + 1 : i + lookback + 1]
+    for i in range(lookback, len(clean) - lookback):
+        c = clean[i]
+        others = clean[i - lookback : i] + clean[i + 1 : i + lookback + 1]
         if all(c["high"] > x["high"] for x in others):
-            raw.append({"idx": i, "ts": c["ts"], "kind": "H", "price": c["high"]})
+            raw.append({"idx": int(c["idx"]), "ts": c["ts"], "kind": "H", "price": c["high"]})
         elif all(c["low"] < x["low"] for x in others):
-            raw.append({"idx": i, "ts": c["ts"], "kind": "L", "price": c["low"]})
+            raw.append({"idx": int(c["idx"]), "ts": c["ts"], "kind": "L", "price": c["low"]})
 
     # compress repeated same-kind swings
     out: list[dict[str, Any]] = []
@@ -99,16 +108,17 @@ def _atr(candles: list[dict[str, Any]], period: int) -> list[float]:
     if not candles:
         return []
     out: list[float] = []
-    trs: list[float] = []
+    trs_clean: list[float] = []
     prev_close: float | None = None
     for c in candles:
         tr = _true_range(c, prev_close)
-        trs.append(tr)
+        if not bool(c.get("is_anomaly")):
+            trs_clean.append(tr)
         prev_close = float(c["close"])
-        if len(trs) < period:
-            out.append(sum(trs) / max(1, len(trs)))
+        if len(trs_clean) < period:
+            out.append(sum(trs_clean) / max(1, len(trs_clean)))
         else:
-            window = trs[-period:]
+            window = trs_clean[-period:]
             out.append(sum(window) / period)
     return out
 
@@ -230,8 +240,11 @@ def _recent_leg_from_price(candles: list[dict[str, Any]], window: int = 14) -> d
     n = max(3, min(window, len(candles)))
     off = len(candles) - n
     seg = candles[-n:]
-    lows = [(i, float(c["low"])) for i, c in enumerate(seg)]
-    highs = [(i, float(c["high"])) for i, c in enumerate(seg)]
+    clean = [(i, c) for i, c in enumerate(seg) if not bool(c.get("is_anomaly"))]
+    if len(clean) < 2:
+        return None
+    lows = [(i, float(c["low"])) for i, c in clean]
+    highs = [(i, float(c["high"])) for i, c in clean]
     low_i, low_v = min(lows, key=lambda x: x[1])
     high_i, high_v = max(highs, key=lambda x: x[1])
 
@@ -281,12 +294,18 @@ def _detect_bos(candles: list[dict[str, Any]], swings: list[dict[str, Any]], leg
             if not prev_hs:
                 return False
             level = max(float(s["price"]) for s in prev_hs)
-            return any(float(c["close"]) > level for c in candles[leg["start_idx"] : leg["end_idx"] + 1])
+            return any(
+                (not bool(c.get("is_anomaly"))) and float(c["close"]) > level
+                for c in candles[leg["start_idx"] : leg["end_idx"] + 1]
+            )
         prev_ls = [s for s in swings if s["kind"] == "L" and int(s["idx"]) < int(leg["start_idx"])]
         if not prev_ls:
             return False
         level = min(float(s["price"]) for s in prev_ls)
-        return any(float(c["close"]) < level for c in candles[leg["start_idx"] : leg["end_idx"] + 1])
+        return any(
+            (not bool(c.get("is_anomaly"))) and float(c["close"]) < level
+            for c in candles[leg["start_idx"] : leg["end_idx"] + 1]
+        )
 
     if leg["direction"] == "BULL":
         prev_h = _find_prev_same_swing(swings, end_pos, "H")
@@ -294,6 +313,8 @@ def _detect_bos(candles: list[dict[str, Any]], swings: list[dict[str, Any]], leg
             return False
         level = float(prev_h["price"])
         for c in candles[leg["start_idx"] : leg["end_idx"] + 1]:
+            if bool(c.get("is_anomaly")):
+                continue
             if float(c["close"]) > level:
                 return True
         return False
@@ -303,6 +324,8 @@ def _detect_bos(candles: list[dict[str, Any]], swings: list[dict[str, Any]], leg
         return False
     level = float(prev_l["price"])
     for c in candles[leg["start_idx"] : leg["end_idx"] + 1]:
+        if bool(c.get("is_anomaly")):
+            continue
         if float(c["close"]) < level:
             return True
     return False
@@ -422,17 +445,186 @@ def _find_prev_impulse_leg(swings: list[dict[str, Any]], candles: list[dict[str,
     return None
 
 
+def _is_consolidation_window(
+    win: list[dict[str, Any]],
+    atrs: list[float],
+    idx_start: int,
+    idx_end: int,
+    cfg: ImpulseConfig,
+) -> bool:
+    if len(win) < cfg.compression_min_candles:
+        return False
+    overlap = _overlap_ratio(win)
+    wick_dom = _wick_dominance(win)
+    win_range = max(float(c["high"]) for c in win) - min(float(c["low"]) for c in win)
+    atr_now = sum(atrs[idx_start : idx_end + 1]) / max(1, (idx_end - idx_start + 1))
+    if atr_now <= 0:
+        return False
+    avg_body = _avg_body(win)
+    body_to_range = avg_body / max(win_range, 1e-9)
+    tight_range = win_range <= (atr_now * cfg.compression_range_atr_mult * 1.8)
+    return bool(
+        tight_range
+        and overlap >= max(0.50, cfg.correction_overlap_min)
+        and wick_dom >= max(0.40, cfg.compression_wick_dom_min * 0.7)
+        and body_to_range <= 0.45
+    )
+
+
+def _find_latest_cycle(
+    rows: list[dict[str, Any]],
+    atrs: list[float],
+    cfg: ImpulseConfig,
+    tf_threshold: float,
+) -> dict[str, Any] | None:
+    n = min(max(cfg.compression_window, cfg.compression_min_candles), cfg.compression_max_candles)
+    if len(rows) < (n + 2):
+        return None
+
+    rest_candidate: dict[str, Any] | None = None
+    # Scan from latest backward; pick the nearest valid consolidation->breakout cycle.
+    for cons_end in range(len(rows) - 2, n - 1, -1):
+        cons_start = cons_end - n + 1
+        win = rows[cons_start : cons_end + 1]
+        if not _is_consolidation_window(win, atrs, cons_start, cons_end, cfg):
+            continue
+
+        cons_high = max(float(c["high"]) for c in win)
+        cons_low = min(float(c["low"]) for c in win)
+
+        breakout_idx = -1
+        breakout_dir: str | None = None
+        displacement = False
+        strong_body_count = 0
+        for i in range(cons_end + 1, len(rows)):
+            c = rows[i]
+            close = float(c["close"])
+            candle_range = max(float(c["high"]) - float(c["low"]), 0.0)
+            atr_ref = atrs[i] if i < len(atrs) else (atrs[-1] if atrs else 0.0)
+            if atr_ref <= 0:
+                continue
+
+            body = abs(float(c["close"]) - float(c["open"]))
+            body_ratio = body / max(candle_range, 1e-9)
+            if body_ratio >= cfg.body_dominance_ratio:
+                strong_body_count += 1
+            prev20_start = max(0, i - 20)
+            prev20 = rows[prev20_start:i]
+            avg_prev_body = _avg_body(prev20) if prev20 else 0.0
+            body_expansion_ok = avg_prev_body > 0 and body >= (avg_prev_body * cfg.displacement_body_avg_mult)
+            atr_expansion_ok = candle_range >= (atr_ref * max(1.1, tf_threshold * 0.75))
+            displacement_now = atr_expansion_ok or body_expansion_ok
+
+            if close > cons_high:
+                breakout_idx = i
+                breakout_dir = "BULL"
+                displacement = displacement_now
+                break
+            if close < cons_low:
+                breakout_idx = i
+                breakout_dir = "BEAR"
+                displacement = displacement_now
+                break
+
+        if breakout_idx < 0 or breakout_dir not in {"BULL", "BEAR"}:
+            # Save latest REST candidate, but keep scanning older windows
+            # to find a completed/active breakout cycle if it exists.
+            if rest_candidate is None:
+                rest_candidate = {
+                "phase": "REST",
+                "cons_start": cons_start,
+                "cons_end": cons_end,
+                "cons_high": cons_high,
+                "cons_low": cons_low,
+                "breakout_idx": -1,
+                "breakout_dir": None,
+                "displacement": False,
+                "strong_body_count": 0,
+                }
+            continue
+
+        # Build current impulse cycle from breakout forward.
+        tail = rows[breakout_idx:]
+        if breakout_dir == "BULL":
+            extreme_px = max(float(c["high"]) for c in tail)
+            extreme_idx = breakout_idx + max(range(len(tail)), key=lambda j: float(tail[j]["high"]))
+            origin_px = cons_low
+        else:
+            extreme_px = min(float(c["low"]) for c in tail)
+            extreme_idx = breakout_idx + min(range(len(tail)), key=lambda j: float(tail[j]["low"]))
+            origin_px = cons_high
+
+        # Reset trigger: detect new consolidation after breakout.
+        has_new_consolidation = False
+        if len(rows) - breakout_idx > n:
+            for end2 in range(max(breakout_idx + n - 1, n - 1), len(rows)):
+                start2 = end2 - n + 1
+                if start2 <= breakout_idx:
+                    continue
+                win2 = rows[start2 : end2 + 1]
+                if _is_consolidation_window(win2, atrs, start2, end2, cfg):
+                    has_new_consolidation = True
+                    break
+
+        # Soft cycle completion: post-breakout correction behavior
+        # (without relying on historical extreme extension).
+        soft_complete = False
+        leg_range = max(abs(extreme_px - origin_px), 1e-9)
+        last_close = float(rows[-1]["close"])
+        if breakout_dir == "BULL":
+            retrace_ratio = (extreme_px - last_close) / leg_range
+        else:
+            retrace_ratio = (last_close - extreme_px) / leg_range
+        recent_n = min(8, len(rows))
+        recent = rows[-recent_n:]
+        recent_overlap = _overlap_ratio(recent)
+        atr_last = atrs[-1] if atrs else 0.0
+        atr_ext = atrs[extreme_idx] if 0 <= extreme_idx < len(atrs) else atr_last
+        atr_contracted = atr_ext > 0 and atr_last <= (atr_ext * cfg.correction_atr_ratio_max)
+        if retrace_ratio >= cfg.correction_retrace_min and (recent_overlap >= cfg.correction_overlap_min or atr_contracted):
+            soft_complete = True
+
+        return {
+            "phase": "COMPLETE" if (has_new_consolidation or soft_complete) else "EXPANSION",
+            "cons_start": cons_start,
+            "cons_end": cons_end,
+            "cons_high": cons_high,
+            "cons_low": cons_low,
+            "breakout_idx": breakout_idx,
+            "breakout_dir": breakout_dir,
+            "displacement": displacement,
+            "strong_body_count": strong_body_count,
+            "impulse_origin": origin_px,
+            "impulse_extreme": extreme_px,
+            "impulse_extreme_idx": extreme_idx,
+        }
+    return rest_candidate
+
+
 def analyzeImpulse(tf_name: str, candles: list[dict[str, Any]], config: ImpulseConfig | None = None) -> dict[str, Any]:
     cfg = config or ImpulseConfig()
     tf = str(tf_name or "").upper()
-    if tf not in TARGET_TFS:
+    if tf not in SUPPORTED_TFS:
         raise ValueError(f"Unsupported tf: {tf}")
 
     rows = _norm_candles(candles)
+    rows = analyzeCandleQualityWithConfig(
+        rows,
+        atr_period=cfg.atr_period,
+        enabled=cfg.anomaly_filter_enabled,
+        range_multiplier=cfg.anomaly_range_multiplier,
+        wick_multiplier=cfg.anomaly_wick_multiplier,
+        micro_range_ratio=cfg.anomaly_micro_range_ratio,
+    )
     if len(rows) < 30:
         return {
             "timeframe": tf,
             "phase": "COMPRESSION",
+            "impulse_phase": "REST",
+            "impulse_origin": None,
+            "impulse_extreme": None,
+            "impulse_direction": None,
+            "impulse_active": False,
             "direction": None,
             "valid_impulse": False,
             "strength_score": 0,
@@ -444,46 +636,48 @@ def analyzeImpulse(tf_name: str, candles: list[dict[str, Any]], config: ImpulseC
             "notes": ["Not enough candles"],
         }
 
-    swings = _detect_swings(rows, cfg.swing_lookback)
     atrs = _atr(rows, cfg.atr_period)
-    leg = _pick_effective_leg(swings, rows, atrs)
     tf_threshold = float(cfg.atr_multiplier_by_tf.get(tf, 1.6))
-    compression = _latest_compression(rows, atrs, cfg, atr_ratio=0.0, tf_threshold=tf_threshold)
-
-    if not leg:
-        notes = ["No clear leg from swings"]
-        if compression.get("is_compression"):
-            notes.append("Compression detected")
+    cycle = _find_latest_cycle(rows, atrs, cfg, tf_threshold)
+    if cycle is None:
         return {
             "timeframe": tf,
-            "phase": "COMPRESSION" if compression.get("is_compression") else "CORRECTION",
+            "phase": "COMPRESSION",
+            "impulse_phase": "REST",
+            "impulse_origin": None,
+            "impulse_extreme": None,
+            "impulse_direction": None,
+            "impulse_active": False,
             "direction": None,
             "valid_impulse": False,
             "strength_score": 0,
             "bos": False,
             "atr_ratio": 0.0,
             "range": 0.0,
-            "start_index": int(compression.get("start_index", 0)),
-            "end_index": int(compression.get("end_index", len(rows) - 1)),
-            "notes": notes,
+            "start_index": 0,
+            "end_index": len(rows) - 1,
+            "notes": ["No valid consolidation-breakout cycle"],
         }
 
-    s_idx = int(leg["start_idx"])
-    e_idx = int(leg["end_idx"])
-    seg = rows[s_idx : e_idx + 1]
+    impulse_phase = str(cycle.get("phase") or "REST")
+    direction = cycle.get("breakout_dir")
+    bos = bool(direction in {"BULL", "BEAR"} and int(cycle.get("breakout_idx", -1)) >= 0)
+    impulse_origin = _to_float(cycle.get("impulse_origin"))
+    impulse_extreme = _to_float(cycle.get("impulse_extreme"))
+    impulse_active = impulse_phase == "EXPANSION"
 
-    atr_ref = atrs[e_idx] if e_idx < len(atrs) else atrs[-1]
-    atr_ratio = (float(leg["range"]) / atr_ref) if atr_ref > 0 else 0.0
-    compression = _latest_compression(rows, atrs, cfg, atr_ratio=atr_ratio, tf_threshold=tf_threshold)
-
-    body_dom_ok, strong_body_count = _body_dominance(seg, cfg.body_dominance_ratio)
-    bos = _detect_bos(rows, swings, leg)
-    spike_pen = _spike_penalty(seg)
-
-    displacement = (
-        atr_ratio >= tf_threshold
-        and strong_body_count >= cfg.body_dominance_min_count
+    rng = (
+        abs(impulse_extreme - impulse_origin)
+        if (bos and impulse_origin is not None and impulse_extreme is not None)
+        else 0.0
     )
+    e_idx = int(cycle.get("impulse_extreme_idx", cycle.get("cons_end", len(rows) - 1)))
+    s_idx = int(cycle.get("breakout_idx", cycle.get("cons_start", 0)))
+    atr_ref = atrs[e_idx] if (0 <= e_idx < len(atrs)) else (atrs[-1] if atrs else 0.0)
+    atr_ratio = (rng / atr_ref) if atr_ref > 0 else 0.0
+    displacement = bool(cycle.get("displacement"))
+    strong_body_count = int(cycle.get("strong_body_count") or 0)
+    body_dom_ok = strong_body_count >= cfg.body_dominance_min_count
 
     score = 0
     notes: list[str] = []
@@ -492,84 +686,65 @@ def analyzeImpulse(tf_name: str, candles: list[dict[str, Any]], config: ImpulseC
         notes.append("BOS: YES")
     else:
         notes.append("BOS: NO")
-
     if atr_ratio >= tf_threshold:
         score += 2
         notes.append(f"ATR ratio {atr_ratio:.2f} >= {tf_threshold:.2f}")
     else:
         notes.append(f"ATR ratio {atr_ratio:.2f} < {tf_threshold:.2f}")
-
     if displacement:
         score += 1
         notes.append("Displacement: YES")
     else:
         notes.append("Displacement: NO")
-
     if body_dom_ok:
         score += 2
         notes.append("Body dominance: YES")
     else:
         notes.append("Body dominance: NO")
-
-    if spike_pen:
-        score -= 2
-        notes.append("Spike penalty applied")
-
-    compression_breakout_bonus = 0
-    if compression.get("is_compression") and displacement and bos:
-        compression_breakout_bonus = 1
+    if impulse_phase == "EXPANSION" and bos and displacement:
         score += 1
-        notes.append("Compression breakout bonus")
+        notes.append("Cycle expansion active")
+    if impulse_phase == "COMPLETE":
+        notes.append("Cycle complete: new consolidation detected")
+    if impulse_phase == "REST":
+        notes.append("Cycle rest: waiting breakout")
 
-    prev_impulse = _find_prev_impulse_leg(swings, rows, atrs, tf_threshold, cfg)
-    overlap_seg = _overlap_ratio(seg)
-
-    # Priority-based classification:
-    # 1) IMPULSE, 2) COMPRESSION(low ATR), 3) CORRECTION-like, 4) fallback CORRECTION.
-    phase = "CORRECTION"
-    correction_like = False
-    if bos and atr_ratio >= tf_threshold:
+    # Compatibility for downstream engines:
+    # - EXPANSION -> IMPULSE
+    # - REST -> COMPRESSION
+    # - COMPLETE -> CORRECTION
+    if impulse_phase == "EXPANSION":
         phase = "IMPULSE"
-    elif compression.get("is_compression") and atr_ratio < tf_threshold:
+    elif impulse_phase == "REST":
         phase = "COMPRESSION"
     else:
-        correction_retrace = None
-        if prev_impulse is not None:
-            prev_range = max(float(prev_impulse.get("range", 0.0)), 1e-9)
-            if prev_impulse["direction"] == "BULL":
-                correction_retrace = (float(prev_impulse["end"]["price"]) - float(leg["end"]["price"])) / prev_range
-            else:
-                correction_retrace = (float(leg["end"]["price"]) - float(prev_impulse["end"]["price"])) / prev_range
-
-        correction_like = (
-            atr_ratio < cfg.correction_atr_ratio_max
-            and overlap_seg >= cfg.correction_overlap_min
-        )
-        if correction_retrace is not None:
-            correction_like = correction_like and (cfg.correction_retrace_min <= correction_retrace <= cfg.correction_retrace_max)
-
-        if correction_like:
-            phase = "CORRECTION"
-        else:
-            phase = "CORRECTION"
+        phase = "CORRECTION"
 
     valid_impulse = bool(phase == "IMPULSE" and score >= 6)
-
-    direction: str | None = None
-    if phase in {"IMPULSE", "CORRECTION"}:
-        direction = str(leg["direction"])
-
+    out_direction: str | None = str(direction) if direction in {"BULL", "BEAR"} else None
+    if phase == "CORRECTION" and out_direction in {"BULL", "BEAR"}:
+        ref_close = float(rows[e_idx]["close"]) if 0 <= e_idx < len(rows) else float(rows[-1]["close"])
+        last_close = float(rows[-1]["close"])
+        if out_direction == "BULL" and last_close < ref_close:
+            out_direction = "BEAR"
+        elif out_direction == "BEAR" and last_close > ref_close:
+            out_direction = "BULL"
     return {
         "timeframe": tf,
         "phase": phase,
-        "direction": direction,
+        "impulse_phase": impulse_phase,
+        "impulse_origin": impulse_origin if bos else None,
+        "impulse_extreme": impulse_extreme if bos else None,
+        "impulse_direction": (str(direction) if direction in {"BULL", "BEAR"} else None),
+        "impulse_active": bool(impulse_active),
+        "direction": out_direction,
         "valid_impulse": valid_impulse,
         "strength_score": max(0, min(10, int(score))),
         "bos": bool(bos),
         "atr_ratio": float(round(atr_ratio, 4)),
-        "range": float(round(float(leg["range"]), 4)),
-        "start_index": s_idx if phase != "COMPRESSION" else int(compression.get("start_index", s_idx)),
-        "end_index": e_idx if phase != "COMPRESSION" else int(compression.get("end_index", e_idx)),
+        "range": float(round(rng, 4)),
+        "start_index": int(s_idx),
+        "end_index": int(e_idx),
         "notes": notes,
     }
 
@@ -591,9 +766,15 @@ def explainImpulse(result: dict[str, Any]) -> str:
     atr_ratio = float(result.get("atr_ratio") or 0.0)
     bos = "YES" if bool(result.get("bos")) else "NO"
     displacement = "YES" if any("Displacement: YES" in str(n) for n in (result.get("notes") or [])) else "NO"
+    impulse_phase = str(result.get("impulse_phase") or "-")
+    impulse_origin = result.get("impulse_origin")
+    impulse_extreme = result.get("impulse_extreme")
+    impulse_active = "YES" if bool(result.get("impulse_active")) else "NO"
 
     lines = [
         f"{tf} -> {phase} {direction} (score {score})",
+        f"Impulse phase: {impulse_phase} | active: {impulse_active}",
+        f"Impulse origin/extreme: {impulse_origin} / {impulse_extreme}",
         f"Range: {rng:.2f}",
         f"ATR ratio: {atr_ratio:.2f}",
         f"BOS: {bos}",
