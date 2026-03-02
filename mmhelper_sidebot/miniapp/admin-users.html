@@ -105,7 +105,20 @@
     .renew-actions {
       display: flex;
       gap: 6px;
-      flex-wrap: wrap;
+      align-items: center;
+      flex-wrap: nowrap;
+    }
+
+    .renew-select {
+      flex: 1 1 auto;
+      min-width: 110px;
+      border: 1px solid #8d4d54;
+      background: rgba(56, 24, 29, 0.86);
+      color: #ffeef1;
+      border-radius: 9px;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 8px;
     }
 
     .renew-btn {
@@ -117,6 +130,7 @@
       font-weight: 700;
       padding: 6px 10px;
       cursor: pointer;
+      white-space: nowrap;
     }
   </style>
 </head>
@@ -182,13 +196,17 @@
         var username = item.telegram_username ? "@" + item.telegram_username : "-";
         var renewBlock = "";
         if (isNextMember) {
+          var selectedDays = String(item.subscription_days || 45);
           renewBlock = (
             '<div class="renew-wrap">' +
               '<p class="renew-label">Renew Subscription:</p>' +
               '<div class="renew-actions">' +
-                '<button class="renew-btn" data-user-id="' + (item.user_id || "") + '" data-days="15" type="button">15 hari</button>' +
-                '<button class="renew-btn" data-user-id="' + (item.user_id || "") + '" data-days="30" type="button">30 hari</button>' +
-                '<button class="renew-btn" data-user-id="' + (item.user_id || "") + '" data-days="45" type="button">45 hari</button>' +
+                '<select class="renew-select" data-user-id="' + (item.user_id || "") + '">' +
+                  '<option value="15"' + (selectedDays === "15" ? " selected" : "") + '>15 hari</option>' +
+                  '<option value="30"' + (selectedDays === "30" ? " selected" : "") + '>30 hari</option>' +
+                  '<option value="45"' + (selectedDays === "45" ? " selected" : "") + '>45 hari</option>' +
+                '</select>' +
+                '<button class="renew-btn" data-user-id="' + (item.user_id || "") + '" type="button">Save</button>' +
               "</div>" +
             "</div>"
           );
@@ -252,7 +270,9 @@
         var target = evt.target;
         if (!target || !target.classList || !target.classList.contains("renew-btn")) return;
         var userId = target.getAttribute("data-user-id");
-        var days = target.getAttribute("data-days");
+        var select = listEl.querySelector('.renew-select[data-user-id="' + userId + '"]');
+        if (!select) return;
+        var days = String(select.value || "");
         sendRenew(userId, days);
       });
       render();

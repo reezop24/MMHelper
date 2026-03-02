@@ -793,6 +793,7 @@ def _admin_users_payload() -> str:
             continue
         vip2_row = vip2_users.get(user_id)
         expiry = _vip2_expiry_from_row(vip2_row)
+        user_item["subscription_days"] = str(_vip2_subscription_days_from_row(vip2_row))
         user_item["expiry_date"] = _format_dt_display(expiry.isoformat()) if isinstance(expiry, datetime) else "-"
         user_item["remaining_days"] = str(_vip2_remaining_days_from_row(vip2_row))
         seen_next.add(user_id)
