@@ -7,11 +7,12 @@ import logging
 import os
 import sqlite3
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from uuid import uuid4
 from urllib.parse import quote, urlencode, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
+from zoneinfo import ZoneInfo
 
 from telegram import (
     InlineKeyboardButton,
@@ -51,6 +52,9 @@ CB_USER_DEPOSIT_DONE = "USER_DEPOSIT_DONE"
 CB_USER_DEPOSIT_CANCEL = "USER_DEPOSIT_CANCEL"
 CB_USER_IB_DONE = "USER_IB_DONE"
 CB_USER_IB_CANCEL = "USER_IB_CANCEL"
+CB_USER_RENEW_DEPOSIT_DONE = "USER_RENEW_DEPOSIT_DONE"
+CB_ADMIN_RENEW_APPROVE = "ADMIN_RENEW_APPROVE"
+CB_ADMIN_RENEW_REQUEST_DEPOSIT = "ADMIN_RENEW_REQUEST_DEPOSIT"
 
 ADMIN_USER_IDS = {627116869}
 STATE_PATH = Path(__file__).with_name("sidebot_state.json")
@@ -58,6 +62,9 @@ VIP_WHITELIST_PATH = Path(__file__).with_name("sidebot_vip_whitelist.json")
 DEFAULT_SHARED_DB_PATH = Path(__file__).resolve().parent.parent / "db" / "mmhelper_shared.db"
 KV_STATE_LEGACY_KEY = "sidebot_state"
 KV_STATE_SNAPSHOT_KEY = "sidebot_state_snapshot"
+KV_VIP2_RENEW_REMINDER_KEY = "vip2_renew_reminder_state"
+VIP2_SUBSCRIPTION_DAYS = 45
+VIP2_REMINDER_DAYS_BEFORE = 7
 
 MENU_DAFTAR_NEXT_MEMBER = "🚀 Daftar NEXTexclusive"
 MENU_BELI_EVIDEO26 = "🎬 One Time Purchase NEXT eVideo26"
@@ -113,11 +120,17 @@ def _ensure_whitelist_table(conn: sqlite3.Connection) -> None:
             wallet_id TEXT NOT NULL DEFAULT '',
             source_submission_id TEXT NOT NULL DEFAULT '',
             added_at TEXT NOT NULL DEFAULT '',
+            subscription_days INTEGER NOT NULL DEFAULT 45,
             status TEXT NOT NULL DEFAULT 'active',
             PRIMARY KEY (tier, user_id)
         )
         """
     )
+    # Backward-compatible migration for existing DBs.
+    try:
+        conn.execute("ALTER TABLE vip_whitelist ADD COLUMN subscription_days INTEGER NOT NULL DEFAULT 45")
+    except sqlite3.OperationalError:
+        pass
 
 
 def _json_whitelist_fallback() -> dict:
@@ -149,8 +162,8 @@ def _migrate_json_whitelist_if_needed(conn: sqlite3.Connection) -> None:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO vip_whitelist
-                (tier, user_id, telegram_username, full_name, wallet_id, source_submission_id, added_at, status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (tier, user_id, telegram_username, full_name, wallet_id, source_submission_id, added_at, subscription_days, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     str(tier),
@@ -160,6 +173,7 @@ def _migrate_json_whitelist_if_needed(conn: sqlite3.Connection) -> None:
                     str(row.get("wallet_id") or ""),
                     str(row.get("source_submission_id") or ""),
                     str(row.get("added_at") or ""),
+                    int(row.get("subscription_days") or 45),
                     str(row.get("status") or "active"),
                 ),
             )
@@ -169,7 +183,7 @@ def _read_whitelist_from_db(conn: sqlite3.Connection) -> dict:
     out: dict = {"vip1": {"users": {}}, "vip2": {"users": {}}, "vip3": {"users": {}}}
     rows = conn.execute(
         """
-        SELECT tier, user_id, telegram_username, full_name, wallet_id, source_submission_id, added_at, status
+        SELECT tier, user_id, telegram_username, full_name, wallet_id, source_submission_id, added_at, subscription_days, status
         FROM vip_whitelist
         ORDER BY tier, user_id
         """
@@ -186,6 +200,7 @@ def _read_whitelist_from_db(conn: sqlite3.Connection) -> dict:
             "wallet_id": str(row["wallet_id"] or ""),
             "source_submission_id": str(row["source_submission_id"] or ""),
             "added_at": str(row["added_at"] or ""),
+            "subscription_days": int(row["subscription_days"] or 45),
             "status": str(row["status"] or "active"),
         }
     return out
@@ -626,6 +641,27 @@ def _write_state_legacy_kv(conn: sqlite3.Connection, data: dict) -> None:
     )
 
 
+def _read_generic_kv_json(conn: sqlite3.Connection, key: str, default: dict | None = None) -> dict:
+    row = conn.execute("SELECT value_json FROM sidebot_kv_state WHERE key = ?", (key,)).fetchone()
+    if row is None:
+        return dict(default or {})
+    raw = str(row["value_json"] or "").strip()
+    if not raw:
+        return dict(default or {})
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return dict(default or {})
+    return data if isinstance(data, dict) else dict(default or {})
+
+
+def _write_generic_kv_json(conn: sqlite3.Connection, key: str, data: dict) -> None:
+    conn.execute(
+        "INSERT OR REPLACE INTO sidebot_kv_state (key, value_json) VALUES (?, ?)",
+        (key, json.dumps(data, ensure_ascii=False)),
+    )
+
+
 def get_token() -> str:
     load_local_env()
     token = (os.getenv("SIDEBOT_TOKEN") or "").strip()
@@ -703,7 +739,10 @@ def _format_dt_display(value: str) -> str:
         dt = datetime.fromisoformat(raw)
     except ValueError:
         return raw
-    return dt.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    my_tz = ZoneInfo("Asia/Kuala_Lumpur")
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(my_tz).strftime("%Y-%m-%d %H:%M MYT")
 
 
 def _admin_users_payload() -> str:
@@ -722,6 +761,13 @@ def _admin_users_payload() -> str:
     except sqlite3.Error:
         logger.warning("Failed to build admin users payload from DB", exc_info=True)
         return json.dumps(out, ensure_ascii=False)
+
+    whitelist = load_vip_whitelist()
+    vip2_users = {}
+    if isinstance(whitelist.get("vip2"), dict):
+        maybe_users = whitelist.get("vip2", {}).get("users")
+        if isinstance(maybe_users, dict):
+            vip2_users = maybe_users
 
     seen_next: set[str] = set()
     seen_evideo: set[str] = set()
@@ -745,6 +791,10 @@ def _admin_users_payload() -> str:
             continue
         if user_id in seen_next:
             continue
+        vip2_row = vip2_users.get(user_id)
+        expiry = _vip2_expiry_from_row(vip2_row)
+        user_item["expiry_date"] = _format_dt_display(expiry.isoformat()) if isinstance(expiry, datetime) else "-"
+        user_item["remaining_days"] = str(_vip2_remaining_days_from_row(vip2_row))
         seen_next.add(user_id)
         out["next_member"].append(user_item)
 
@@ -1073,8 +1123,8 @@ def save_vip_whitelist(data: dict) -> None:
                     conn.execute(
                         """
                         INSERT OR REPLACE INTO vip_whitelist
-                        (tier, user_id, telegram_username, full_name, wallet_id, source_submission_id, added_at, status)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        (tier, user_id, telegram_username, full_name, wallet_id, source_submission_id, added_at, subscription_days, status)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
                         (
                             str(tier),
@@ -1084,6 +1134,7 @@ def save_vip_whitelist(data: dict) -> None:
                             str(row.get("wallet_id") or ""),
                             str(row.get("source_submission_id") or ""),
                             str(row.get("added_at") or ""),
+                            int(row.get("subscription_days") or 45),
                             str(row.get("status") or "active"),
                         ),
                     )
@@ -1108,6 +1159,7 @@ def add_user_to_vip_tier(item: dict, tier: str) -> None:
         "wallet_id": item.get("wallet_id") or "",
         "source_submission_id": item.get("submission_id"),
         "added_at": datetime.now(timezone.utc).isoformat(),
+        "subscription_days": VIP2_SUBSCRIPTION_DAYS if tier_key == "vip2" else 0,
         "status": "active",
     }
     save_vip_whitelist(data)
@@ -1126,6 +1178,86 @@ def remove_user_from_vip_tier(user_id: int, tier: str) -> bool:
 
 def _tier_for_registration_flow(registration_flow: str) -> str:
     return "vip3" if str(registration_flow or "").strip().lower() == "one_time_purchase" else "vip2"
+
+
+def _parse_iso_datetime(value: str) -> datetime | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    if raw.endswith("Z"):
+        raw = raw[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def _vip2_expiry_from_added_at(added_at: str) -> datetime | None:
+    approved_at = _parse_iso_datetime(added_at)
+    if approved_at is None:
+        return None
+    return approved_at + timedelta(days=VIP2_SUBSCRIPTION_DAYS)
+
+
+def _vip2_subscription_days_from_row(row: dict | None) -> int:
+    if not isinstance(row, dict):
+        return VIP2_SUBSCRIPTION_DAYS
+    try:
+        days = int(row.get("subscription_days") or VIP2_SUBSCRIPTION_DAYS)
+    except (TypeError, ValueError):
+        days = VIP2_SUBSCRIPTION_DAYS
+    if days <= 0:
+        days = VIP2_SUBSCRIPTION_DAYS
+    return days
+
+
+def _vip2_expiry_from_row(row: dict | None) -> datetime | None:
+    if not isinstance(row, dict):
+        return None
+    approved_at = _parse_iso_datetime(str(row.get("added_at") or ""))
+    if approved_at is None:
+        return None
+    return approved_at + timedelta(days=_vip2_subscription_days_from_row(row))
+
+
+def _vip2_remaining_days(added_at: str, now_utc: datetime | None = None) -> int:
+    now_dt = now_utc or datetime.now(timezone.utc)
+    expiry = _vip2_expiry_from_added_at(added_at)
+    if expiry is None:
+        return 0
+    if now_dt >= expiry:
+        return 0
+    remaining_seconds = (expiry - now_dt).total_seconds()
+    return max(1, int(remaining_seconds // 86400) + (1 if remaining_seconds % 86400 else 0))
+
+
+def _vip2_remaining_days_from_row(row: dict | None, now_utc: datetime | None = None) -> int:
+    now_dt = now_utc or datetime.now(timezone.utc)
+    expiry = _vip2_expiry_from_row(row)
+    if expiry is None:
+        return 0
+    if now_dt >= expiry:
+        return 0
+    remaining_seconds = (expiry - now_dt).total_seconds()
+    return max(1, int(remaining_seconds // 86400) + (1 if remaining_seconds % 86400 else 0))
+
+
+def _user_renew_deposit_keyboard(submission_id: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [[InlineKeyboardButton("Saya dah buat deposit semula", callback_data=f"{CB_USER_RENEW_DEPOSIT_DONE}:{submission_id}")]]
+    )
+
+
+def _admin_renew_action_keyboard(user_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton("✅ Renew Subscription", callback_data=f"{CB_ADMIN_RENEW_APPROVE}:{user_id}")],
+            [InlineKeyboardButton("💳 Request New Deposit", callback_data=f"{CB_ADMIN_RENEW_REQUEST_DEPOSIT}:{user_id}")],
+        ]
+    )
 
 
 def get_required_deposit_amount(registration_flow: str) -> int:
@@ -1527,6 +1659,74 @@ def update_submission_fields(submission_id: str, fields: dict) -> dict | None:
     return db_item
 
 
+def _find_latest_next_submission_by_user(user_id: int) -> dict | None:
+    try:
+        with _connect_shared_db() as conn:
+            _ensure_submissions_table(conn)
+            row = conn.execute(
+                """
+                SELECT submission_id
+                FROM sidebot_submissions
+                WHERE user_id = ?
+                  AND LOWER(COALESCE(registration_flow, '')) != 'one_time_purchase'
+                ORDER BY submitted_at DESC, submission_id DESC
+                LIMIT 1
+                """,
+                (str(user_id),),
+            ).fetchone()
+            if row is None:
+                return None
+            return get_submission(str(row["submission_id"]))
+    except sqlite3.Error:
+        logger.warning("Failed to lookup latest NEXT submission for user_id=%s", user_id, exc_info=True)
+        return None
+
+
+def _find_vip2_user_row(user_id: int) -> dict | None:
+    data = load_vip_whitelist()
+    vip2 = data.get("vip2", {})
+    if not isinstance(vip2, dict):
+        return None
+    users = vip2.get("users", {})
+    if not isinstance(users, dict):
+        return None
+    row = users.get(str(user_id))
+    if not isinstance(row, dict):
+        return None
+    return row
+
+
+def _load_vip2_reminder_state() -> dict:
+    default = {"sent_reminder": {}, "sent_expired": {}}
+    try:
+        with _connect_shared_db() as conn:
+            _ensure_state_table(conn)
+            data = _read_generic_kv_json(conn, KV_VIP2_RENEW_REMINDER_KEY, default)
+            # Backward-compat: migrate old {"sent": {...}} layout if exists.
+            legacy_sent = data.get("sent")
+            if isinstance(legacy_sent, dict) and "sent_reminder" not in data:
+                data["sent_reminder"] = dict(legacy_sent)
+            sent_reminder = data.get("sent_reminder")
+            sent_expired = data.get("sent_expired")
+            if not isinstance(sent_reminder, dict):
+                data["sent_reminder"] = {}
+            if not isinstance(sent_expired, dict):
+                data["sent_expired"] = {}
+            return data
+    except sqlite3.Error:
+        logger.warning("Failed to load VIP2 reminder state; fallback default", exc_info=True)
+        return default
+
+
+def _save_vip2_reminder_state(data: dict) -> None:
+    try:
+        with _connect_shared_db() as conn:
+            _ensure_state_table(conn)
+            _write_generic_kv_json(conn, KV_VIP2_RENEW_REMINDER_KEY, data)
+    except sqlite3.Error:
+        logger.warning("Failed to save VIP2 reminder state", exc_info=True)
+
+
 def render_admin_submission_text(item: dict) -> str:
     raw_status = str(item.get("status") or "pending").lower()
     status_text = {
@@ -1671,6 +1871,103 @@ async def refresh_admin_submission_message(context: ContextTypes.DEFAULT_TYPE, s
     await send_submission_to_admin_group(context, item)
 
 
+async def vip2_renewal_reminder_worker(context: ContextTypes.DEFAULT_TYPE) -> None:
+    data = load_vip_whitelist()
+    vip2 = data.get("vip2", {})
+    users = vip2.get("users", {}) if isinstance(vip2, dict) else {}
+    if not isinstance(users, dict) or not users:
+        return
+
+    reminder_state = _load_vip2_reminder_state()
+    sent_reminder = reminder_state.get("sent_reminder")
+    sent_expired = reminder_state.get("sent_expired")
+    if not isinstance(sent_reminder, dict):
+        sent_reminder = {}
+        reminder_state["sent_reminder"] = sent_reminder
+    if not isinstance(sent_expired, dict):
+        sent_expired = {}
+        reminder_state["sent_expired"] = sent_expired
+
+    now_utc = datetime.now(timezone.utc)
+    active_keys: set[str] = set()
+    changed = False
+
+    for user_key, row in users.items():
+        if not isinstance(row, dict):
+            continue
+        status = str(row.get("status") or "active").strip().lower()
+        if status not in {"", "active"}:
+            continue
+        try:
+            user_id = int(row.get("user_id") or user_key)
+        except (TypeError, ValueError):
+            continue
+        added_at = str(row.get("added_at") or "").strip()
+        if not added_at:
+            continue
+        expiry = _vip2_expiry_from_row(row)
+        if expiry is None:
+            continue
+        key = f"{user_id}|{added_at}|{_vip2_subscription_days_from_row(row)}"
+        active_keys.add(key)
+        remaining_days = _vip2_remaining_days_from_row(row, now_utc=now_utc)
+
+        submission_id = str(row.get("source_submission_id") or "").strip()
+        if not submission_id:
+            continue
+        if now_utc >= expiry:
+            if key in sent_expired:
+                continue
+            try:
+                await context.bot.send_message(
+                    chat_id=user_id,
+                    text=(
+                        "⛔ Subscription NEXTexclusive anda telah tamat.\n\n"
+                        "Untuk renew subscription percuma, anda hanya perlu kekal aktif bersama AMarkets.\n"
+                        "Jika anda sudah deposit semula, tekan butang di bawah untuk semakan admin."
+                    ),
+                    reply_markup=_user_renew_deposit_keyboard(submission_id),
+                )
+                sent_expired[key] = now_utc.isoformat()
+                changed = True
+            except Exception:
+                logger.exception("Failed sending VIP2 expiry notice user_id=%s", user_id)
+            continue
+
+        if remaining_days > VIP2_REMINDER_DAYS_BEFORE:
+            continue
+        if key in sent_reminder:
+            continue
+        try:
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=(
+                    "⏰ Reminder langganan NEXTexclusive\n\n"
+                    f"Baki langganan anda: {remaining_days} hari.\n"
+                    "Untuk renew subscription percuma, kekal aktif bersama AMarkets.\n"
+                    "Jika anda sudah deposit semula, tekan butang di bawah."
+                ),
+                reply_markup=_user_renew_deposit_keyboard(submission_id),
+            )
+            sent_reminder[key] = now_utc.isoformat()
+            changed = True
+        except Exception:
+            logger.exception("Failed sending VIP2 renewal reminder user_id=%s", user_id)
+
+    stale_reminder = [k for k in sent_reminder.keys() if k not in active_keys]
+    stale_expired = [k for k in sent_expired.keys() if k not in active_keys]
+    stale = stale_reminder + stale_expired
+    if stale:
+        for k in stale_reminder:
+            sent_reminder.pop(k, None)
+        for k in stale_expired:
+            sent_expired.pop(k, None)
+        changed = True
+
+    if changed:
+        _save_vip2_reminder_state(reminder_state)
+
+
 async def send_user_deposit_request_message(
     context: ContextTypes.DEFAULT_TYPE, submission_id: str, item: dict
 ) -> None:
@@ -1776,10 +2073,15 @@ def main_menu_keyboard(user_id: int | None) -> ReplyKeyboardMarkup:
 
 
 def admin_panel_keyboard() -> ReplyKeyboardMarkup:
+    admin_users_url = get_admin_users_webapp_url()
+    if admin_users_url:
+        admin_users_button = KeyboardButton(MENU_ADMIN_USERS, web_app=WebAppInfo(url=admin_users_url))
+    else:
+        admin_users_button = KeyboardButton(MENU_ADMIN_USERS)
     return ReplyKeyboardMarkup(
         [
             [KeyboardButton(MENU_CHECK_UNDER_IB)],
-            [KeyboardButton(MENU_ADMIN_USERS)],
+            [admin_users_button],
             [KeyboardButton(MENU_BETA_RESET)],
             [KeyboardButton(MENU_BACK_MAIN)],
         ],
@@ -1892,6 +2194,97 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
             CB_VERIF_PENDING: "pending",
             CB_VERIF_REJECT: "rejected",
         }
+        if action == CB_ADMIN_RENEW_APPROVE:
+            try:
+                target_user_id = int(submission_id)
+            except ValueError:
+                await _reply_to_query_message(query, "❌ User ID renew tak sah.")
+                return
+            data = load_vip_whitelist()
+            vip2 = data.get("vip2", {})
+            users = vip2.get("users", {}) if isinstance(vip2, dict) else {}
+            row = users.get(str(target_user_id)) if isinstance(users, dict) else None
+            if not isinstance(row, dict):
+                await _reply_to_query_message(query, "❌ User VIP2 tidak ditemui.")
+                return
+
+            now_iso = datetime.now(timezone.utc).isoformat()
+            row["added_at"] = now_iso
+            row["status"] = "active"
+            save_vip_whitelist(data)
+
+            source_submission_id = str(row.get("source_submission_id") or "").strip()
+            if source_submission_id:
+                update_submission_fields(
+                    source_submission_id,
+                    {
+                        "status": "approved",
+                        "reviewed_at": now_iso,
+                        "reviewed_by": query.from_user.id,
+                    },
+                )
+            try:
+                await context.bot.send_message(
+                    chat_id=target_user_id,
+                    text=(
+                        "✅ Subscription NEXTexclusive anda telah diperbaharui.\n"
+                        f"Baki subscription anda: {VIP2_SUBSCRIPTION_DAYS} hari."
+                    ),
+                )
+            except Exception:
+                logger.exception("Failed to notify user after VIP2 renew approve user_id=%s", target_user_id)
+
+            try:
+                await query.edit_message_reply_markup(reply_markup=None)
+            except Exception:
+                pass
+            await _reply_to_query_message(
+                query,
+                f"✅ Renew subscription berjaya untuk user {target_user_id} (45 hari).",
+            )
+            return
+
+        if action == CB_ADMIN_RENEW_REQUEST_DEPOSIT:
+            try:
+                target_user_id = int(submission_id)
+            except ValueError:
+                await _reply_to_query_message(query, "❌ User ID renew tak sah.")
+                return
+            latest = _find_latest_next_submission_by_user(target_user_id)
+            if not isinstance(latest, dict):
+                await _reply_to_query_message(query, "❌ Rekod submission NEXT user tidak ditemui.")
+                return
+            renew_submission_id = str(latest.get("submission_id") or "").strip()
+            if not renew_submission_id:
+                await _reply_to_query_message(query, "❌ Submission ID renew tak sah.")
+                return
+            updated = update_submission_fields(
+                renew_submission_id,
+                {
+                    "status": "request_deposit",
+                    "has_deposit_100": False,
+                    "reviewed_at": datetime.now(timezone.utc).isoformat(),
+                    "reviewed_by": query.from_user.id,
+                },
+            )
+            if not isinstance(updated, dict):
+                await _reply_to_query_message(query, "❌ Gagal kemaskini submission renew.")
+                return
+            try:
+                await send_user_deposit_request_message(context, renew_submission_id, updated)
+            except Exception:
+                logger.exception("Failed to send renew deposit request message user_id=%s", target_user_id)
+            await refresh_admin_submission_message(context, renew_submission_id)
+            try:
+                await query.edit_message_reply_markup(reply_markup=None)
+            except Exception:
+                pass
+            await _reply_to_query_message(
+                query,
+                f"✅ Request new deposit dihantar kepada user {target_user_id}.",
+            )
+            return
+
         if action == CB_VERIF_REQUEST_DEPOSIT:
             current = get_submission(submission_id)
             registration_flow = str(current.get("registration_flow") or "") if isinstance(current, dict) else ""
@@ -2044,7 +2437,11 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                         "Tahniah! Pembayaran one-time purchase NEXT eVideo26 anda telah diluluskan.\n"
                         "Sila tunggu arahan akses seterusnya daripada admin."
                         if registration_flow == "one_time_purchase"
-                        else "Tahniah! Anda kini boleh menikmati semua keistimewaan/privilege NEXTexclusive."
+                        else (
+                            "Tahniah! Anda kini boleh menikmati semua keistimewaan/privilege NEXTexclusive.\n"
+                            f"Baki subscription anda: {VIP2_SUBSCRIPTION_DAYS} hari.\n"
+                            "Subscription ini sah selama 45 hari dari tarikh approval."
+                        )
                     )
                     await context.bot.send_message(
                         chat_id=target_user_id,
@@ -2130,6 +2527,75 @@ async def handle_user_deposit_callback(update: Update, context: ContextTypes.DEF
             "Permohonan anda dihantar semula kepada admin untuk semakan."
         )
         return
+
+
+async def handle_user_renew_deposit_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    if not query:
+        return
+
+    await query.answer()
+    if ":" not in str(query.data):
+        return
+
+    action, submission_id = str(query.data).split(":", 1)
+    if action != CB_USER_RENEW_DEPOSIT_DONE:
+        return
+
+    item = get_submission(submission_id)
+    if not item:
+        await _reply_to_query_message(query, "❌ Rekod submission tak jumpa.")
+        return
+
+    user_id = item.get("user_id")
+    if query.from_user.id != user_id:
+        await _reply_to_query_message(query, "❌ Butang ini bukan untuk anda.")
+        return
+
+    vip2_row = _find_vip2_user_row(int(user_id))
+    if not isinstance(vip2_row, dict):
+        await _reply_to_query_message(query, "❌ Akaun anda bukan dalam whitelist VIP2 aktif.")
+        return
+
+    admin_group_id = get_admin_group_id()
+    if not admin_group_id:
+        await _reply_to_query_message(query, "⚠️ Admin group belum diset. Sila hubungi admin.")
+        return
+
+    try:
+        await query.edit_message_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+
+    username = str(item.get("telegram_username") or "").strip()
+    username_text = f"@{username}" if username else "-"
+    remaining = _vip2_remaining_days_from_row(vip2_row)
+    notify_text = (
+        "🔔 VIP2 Renewal Request\n\n"
+        f"User ID: {user_id}\n"
+        f"Username: {username_text}\n"
+        f"Nama: {item.get('full_name')}\n"
+        f"Wallet ID: {item.get('wallet_id')}\n"
+        f"Baki subscription semasa: {remaining} hari\n"
+        f"Submission ID: {submission_id}\n\n"
+        "User tekan: Saya dah buat deposit semula"
+    )
+
+    try:
+        await context.bot.send_message(
+            chat_id=admin_group_id,
+            text=notify_text,
+            reply_markup=_admin_renew_action_keyboard(int(user_id)),
+        )
+    except Exception:
+        logger.exception("Failed to send VIP2 renewal request to admin group user_id=%s", user_id)
+        await _reply_to_query_message(query, "❌ Gagal hantar notifikasi ke admin. Cuba lagi.")
+        return
+
+    await _reply_to_query_message(
+        query,
+        "✅ Permintaan renew anda dihantar kepada admin untuk semakan.",
+    )
 
 
 async def handle_user_ib_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -2390,17 +2856,8 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         if not is_admin_user(user.id):
             await message.reply_text("❌ Akses ditolak.", reply_markup=main_menu_keyboard(user.id))
             return
-        admin_users_url = get_admin_users_webapp_url()
-        if not admin_users_url:
-            await message.reply_text("Miniapp URL belum diset. Isi SIDEBOT_ADMIN_USERS_WEBAPP_URL atau SIDEBOT_REGISTER_WEBAPP_URL dalam .env dulu.")
-            return
-        button = KeyboardButton(MENU_ADMIN_USERS, web_app=WebAppInfo(url=admin_users_url))
         await message.reply_text(
-            "Buka miniapp User Directory di bawah.",
-            reply_markup=ReplyKeyboardMarkup(
-                [[button], [KeyboardButton(MENU_ADMIN_PANEL)], [KeyboardButton(MENU_BACK_MAIN)]],
-                resize_keyboard=True,
-            ),
+            "Miniapp URL belum diset. Isi SIDEBOT_ADMIN_USERS_WEBAPP_URL atau SIDEBOT_REGISTER_WEBAPP_URL dalam .env dulu."
         )
         return
 
@@ -2665,6 +3122,53 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         return
 
+    if payload_type == "sidebot_admin_renew_vip2":
+        if not is_admin_user(user.id):
+            await message.reply_text("❌ Akses ditolak.")
+            return
+        user_id_raw = str(payload.get("user_id") or "").strip()
+        days_raw = str(payload.get("days") or "").strip()
+        try:
+            target_user_id = int(user_id_raw)
+            renew_days = int(days_raw)
+        except ValueError:
+            await message.reply_text("❌ Data renew tak sah.")
+            return
+        if renew_days not in {15, 30, 45}:
+            await message.reply_text("❌ Pilihan hari renew tak sah.")
+            return
+
+        data = load_vip_whitelist()
+        vip2 = data.get("vip2", {})
+        users = vip2.get("users", {}) if isinstance(vip2, dict) else {}
+        row = users.get(str(target_user_id)) if isinstance(users, dict) else None
+        if not isinstance(row, dict):
+            await message.reply_text("❌ User tidak ditemui dalam VIP2.")
+            return
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        row["added_at"] = now_iso
+        row["subscription_days"] = renew_days
+        row["status"] = "active"
+        save_vip_whitelist(data)
+
+        try:
+            await context.bot.send_message(
+                chat_id=target_user_id,
+                text=(
+                    "✅ Subscription NEXTexclusive anda telah diperbaharui.\n"
+                    f"Tempoh baru: {renew_days} hari."
+                ),
+            )
+        except Exception:
+            logger.exception("Failed to notify user after admin webapp renew user_id=%s", target_user_id)
+
+        await message.reply_text(
+            f"✅ Renew berjaya untuk user {target_user_id}.\nTempoh baru: {renew_days} hari.",
+            reply_markup=admin_panel_keyboard(),
+        )
+        return
+
     await message.reply_text("ℹ️ Miniapp demo diterima.", reply_markup=main_menu_keyboard(user.id))
 
 
@@ -2680,6 +3184,8 @@ def main() -> None:
         logger.warning("Sidebot storage init failed, continuing with JSON fallback", exc_info=True)
 
     app = ApplicationBuilder().token(get_token()).build()
+    if app.job_queue is not None:
+        app.job_queue.run_repeating(vip2_renewal_reminder_worker, interval=6 * 60 * 60, first=20)
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("groupid", group_id))
     app.add_handler(CommandHandler("dbreport", db_report))
@@ -2688,10 +3194,11 @@ def main() -> None:
     app.add_handler(
         CallbackQueryHandler(
             handle_admin_callback,
-            pattern=f"^({CB_BETA_RESET_CONFIRM}|{CB_BETA_RESET_CANCEL}|{CB_VERIF_APPROVE}|{CB_VERIF_PENDING}|{CB_VERIF_REJECT}|{CB_VERIF_REQUEST_DEPOSIT}|{CB_VERIF_REQUEST_PAYMENT_CUSTOM}|{CB_VERIF_REQUEST_CHANGE_IB}|{CB_VERIF_REVOKE_VIP}).*",
+            pattern=f"^({CB_BETA_RESET_CONFIRM}|{CB_BETA_RESET_CANCEL}|{CB_VERIF_APPROVE}|{CB_VERIF_PENDING}|{CB_VERIF_REJECT}|{CB_VERIF_REQUEST_DEPOSIT}|{CB_VERIF_REQUEST_PAYMENT_CUSTOM}|{CB_VERIF_REQUEST_CHANGE_IB}|{CB_VERIF_REVOKE_VIP}|{CB_ADMIN_RENEW_APPROVE}|{CB_ADMIN_RENEW_REQUEST_DEPOSIT}).*",
         )
     )
     app.add_handler(CallbackQueryHandler(handle_user_deposit_callback, pattern=f"^({CB_USER_DEPOSIT_DONE}|{CB_USER_DEPOSIT_CANCEL}).*"))
+    app.add_handler(CallbackQueryHandler(handle_user_renew_deposit_callback, pattern=f"^({CB_USER_RENEW_DEPOSIT_DONE}).*"))
     app.add_handler(CallbackQueryHandler(handle_user_ib_callback, pattern=f"^({CB_USER_IB_DONE}|{CB_USER_IB_CANCEL}).*"))
     app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp_data))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))

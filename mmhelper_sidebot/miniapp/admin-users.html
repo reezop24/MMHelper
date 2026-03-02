@@ -88,6 +88,36 @@
       text-align: center;
       font-size: 13px;
     }
+
+    .renew-wrap {
+      margin-top: 10px;
+      border-top: 1px dashed #5a3035;
+      padding-top: 9px;
+    }
+
+    .renew-label {
+      margin: 0 0 7px;
+      font-size: 12px;
+      color: #d8c1c6;
+      font-weight: 700;
+    }
+
+    .renew-actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .renew-btn {
+      border: 1px solid #8d4d54;
+      background: rgba(56, 24, 29, 0.86);
+      color: #ffeef1;
+      border-radius: 9px;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body>
@@ -148,8 +178,21 @@
 
       var data = parsePayload();
 
-      function buildCard(item) {
+      function buildCard(item, isNextMember) {
         var username = item.telegram_username ? "@" + item.telegram_username : "-";
+        var renewBlock = "";
+        if (isNextMember) {
+          renewBlock = (
+            '<div class="renew-wrap">' +
+              '<p class="renew-label">Renew Subscription:</p>' +
+              '<div class="renew-actions">' +
+                '<button class="renew-btn" data-user-id="' + (item.user_id || "") + '" data-days="15" type="button">15 hari</button>' +
+                '<button class="renew-btn" data-user-id="' + (item.user_id || "") + '" data-days="30" type="button">30 hari</button>' +
+                '<button class="renew-btn" data-user-id="' + (item.user_id || "") + '" data-days="45" type="button">45 hari</button>' +
+              "</div>" +
+            "</div>"
+          );
+        }
         return (
           '<article class="user-card">' +
             '<p class="user-name">' + (item.name || "-") + "</p>" +
@@ -157,6 +200,9 @@
             '<p class="line"><span class="label">User ID:</span>' + (item.user_id || "-") + "</p>" +
             '<p class="line"><span class="label">Tarikh Pengesahan:</span>' + (item.verification_date || "-") + "</p>" +
             '<p class="line"><span class="label">Tarikh Approval:</span>' + (item.approval_date || "-") + "</p>" +
+            (isNextMember ? '<p class="line"><span class="label">Tarikh Tamat:</span>' + (item.expiry_date || "-") + "</p>" : "") +
+            (isNextMember ? '<p class="line"><span class="label">Baki Hari:</span>' + (item.remaining_days || "0") + "</p>" : "") +
+            renewBlock +
           "</article>"
         );
       }
@@ -172,8 +218,21 @@
           return;
         }
         var html = "";
-        for (var i = 0; i < arr.length; i += 1) html += buildCard(arr[i] || {});
+        var isNext = active === "next_member";
+        for (var i = 0; i < arr.length; i += 1) html += buildCard(arr[i] || {}, isNext);
         listEl.innerHTML = html;
+      }
+
+      function sendRenew(userId, days) {
+        if (!userId || !days) return;
+        var payload = {
+          type: "sidebot_admin_renew_vip2",
+          user_id: String(userId),
+          days: String(days)
+        };
+        if (tg) {
+          tg.sendData(JSON.stringify(payload));
+        }
       }
 
       function backToMainMenu() {
@@ -189,6 +248,13 @@
       tabNext.addEventListener("click", function () { active = "next_member"; render(); });
       tabEvideo.addEventListener("click", function () { active = "evideo_subscriber"; render(); });
       backBtn.addEventListener("click", backToMainMenu);
+      listEl.addEventListener("click", function (evt) {
+        var target = evt.target;
+        if (!target || !target.classList || !target.classList.contains("renew-btn")) return;
+        var userId = target.getAttribute("data-user-id");
+        var days = target.getAttribute("data-days");
+        sendRenew(userId, days);
+      });
       render();
     })();
   </script>

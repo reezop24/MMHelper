@@ -5,14 +5,15 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sqlite3
 import time
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, Update, WebAppInfo
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
+from telegram.ext import ApplicationBuilder, CallbackQueryHandler, CommandHandler, ContextTypes, MessageHandler, filters
 
 from texts import (
     COMING_SOON_FIBO,
@@ -55,7 +56,18 @@ KNOWN_USERS_PATH = Path(__file__).with_name("known_users.json")
 SCHEDULED_NOTIFICATIONS_PATH = Path(__file__).with_name("scheduled_notifications.json")
 AUTO_DELETE_NOTICES_PATH = Path(__file__).with_name("auto_delete_notices.json")
 VIDEO_STATUS_PATH = Path(__file__).with_name("video_status.json")
+SAVED_VIDEOS_PATH = Path(__file__).with_name("saved_videos.json")
 DEFAULT_VIP_WHITELIST_PATH = Path(__file__).resolve().parent.parent / "mmhelper_sidebot" / "sidebot_vip_whitelist.json"
+DEFAULT_SHARED_DB_PATH = Path(__file__).resolve().parent.parent / "db" / "mmhelper_shared.db"
+VIDEO_STATE_TABLE = "video_bot_kv_state"
+VIDEO_STATUS_KEY = "video_status_overrides"
+VIDEO_SENT_LOG_KEY = "video_sent_log"
+VIDEO_KNOWN_USERS_KEY = "video_known_users"
+VIDEO_SCHEDULED_KEY = "video_scheduled_notifications"
+VIDEO_AUTO_DELETE_KEY = "video_auto_delete_notices"
+VIDEO_SAVED_VIDEOS_KEY = "video_saved_videos"
+SAVE_LATER_MAX = 2
+VIP2_SUBSCRIPTION_DAYS = 45
 
 
 def load_local_env() -> None:
@@ -180,6 +192,182 @@ def get_vip_whitelist_path() -> Path:
     return DEFAULT_VIP_WHITELIST_PATH
 
 
+def get_shared_db_path() -> Path:
+    raw = (
+        (os.getenv("VIDEO_SHARED_DB_PATH") or "")
+        or (os.getenv("MMHELPER_SHARED_DB_PATH") or "")
+    ).strip()
+    if raw:
+        return Path(raw).expanduser()
+    return DEFAULT_SHARED_DB_PATH
+
+
+def _connect_shared_db() -> sqlite3.Connection:
+    db_path = get_shared_db_path()
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def _ensure_video_state_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        f"""
+        CREATE TABLE IF NOT EXISTS {VIDEO_STATE_TABLE} (
+            key TEXT PRIMARY KEY,
+            value_json TEXT NOT NULL,
+            updated_at TEXT NOT NULL DEFAULT ''
+        )
+        """
+    )
+
+
+def _read_state_json_from_db(key: str) -> object | None:
+    try:
+        with _connect_shared_db() as con:
+            _ensure_video_state_table(con)
+            row = con.execute(
+                f"SELECT value_json FROM {VIDEO_STATE_TABLE} WHERE key = ?",
+                (key,),
+            ).fetchone()
+            if row is None:
+                return None
+            raw = str(row["value_json"] or "").strip()
+            if not raw:
+                return None
+            try:
+                return json.loads(raw)
+            except json.JSONDecodeError:
+                return None
+    except sqlite3.Error:
+        logger.warning("Video state DB read failed key=%s", key, exc_info=True)
+        return None
+
+
+def _write_state_json_to_db(key: str, value: object) -> None:
+    try:
+        with _connect_shared_db() as con:
+            _ensure_video_state_table(con)
+            con.execute(
+                f"""
+                INSERT OR REPLACE INTO {VIDEO_STATE_TABLE} (key, value_json, updated_at)
+                VALUES (?, ?, ?)
+                """,
+                (key, json.dumps(value, ensure_ascii=False, separators=(",", ":")), datetime.now(timezone.utc).isoformat()),
+            )
+    except sqlite3.Error:
+        logger.warning("Video state DB write failed key=%s", key, exc_info=True)
+
+
+def _bootstrap_state_key_from_file(conn: sqlite3.Connection, key: str, path: Path, default: object) -> None:
+    existing = conn.execute(
+        f"SELECT 1 FROM {VIDEO_STATE_TABLE} WHERE key = ? LIMIT 1",
+        (key,),
+    ).fetchone()
+    if existing is not None:
+        return
+    value: object = default
+    if path.exists():
+        try:
+            loaded = json.loads(path.read_text(encoding="utf-8"))
+            value = loaded
+        except (OSError, json.JSONDecodeError):
+            value = default
+    conn.execute(
+        f"""
+        INSERT OR REPLACE INTO {VIDEO_STATE_TABLE} (key, value_json, updated_at)
+        VALUES (?, ?, ?)
+        """,
+        (key, json.dumps(value, ensure_ascii=False, separators=(",", ":")), datetime.now(timezone.utc).isoformat()),
+    )
+
+
+def init_video_storage() -> None:
+    with _connect_shared_db() as con:
+        _ensure_video_state_table(con)
+        _bootstrap_state_key_from_file(con, VIDEO_STATUS_KEY, VIDEO_STATUS_PATH, {})
+        _bootstrap_state_key_from_file(con, VIDEO_SENT_LOG_KEY, SENT_VIDEO_LOG_PATH, [])
+        _bootstrap_state_key_from_file(con, VIDEO_KNOWN_USERS_KEY, KNOWN_USERS_PATH, [])
+        _bootstrap_state_key_from_file(con, VIDEO_SCHEDULED_KEY, SCHEDULED_NOTIFICATIONS_PATH, [])
+        _bootstrap_state_key_from_file(con, VIDEO_AUTO_DELETE_KEY, AUTO_DELETE_NOTICES_PATH, {})
+
+
+def _parse_iso_datetime(value: str) -> datetime | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def _vip2_days(value: object) -> int:
+    try:
+        days = int(value or VIP2_SUBSCRIPTION_DAYS)
+    except (TypeError, ValueError):
+        days = VIP2_SUBSCRIPTION_DAYS
+    if days <= 0:
+        days = VIP2_SUBSCRIPTION_DAYS
+    return days
+
+
+def _is_vip2_active_from_added_at(added_at: str, subscription_days: object = None) -> bool:
+    approved_at = _parse_iso_datetime(added_at)
+    if approved_at is None:
+        return False
+    expires_at = approved_at + timedelta(days=_vip2_days(subscription_days))
+    return datetime.now(timezone.utc) < expires_at
+
+
+def _is_tier_row_active(tier: str, status: str, added_at: str, subscription_days: object = None) -> bool:
+    normalized_status = str(status or "active").strip().lower()
+    if normalized_status not in {"", "active"}:
+        return False
+    tier_key = str(tier or "").strip().lower()
+    if tier_key == "vip2":
+        return _is_vip2_active_from_added_at(added_at, subscription_days=subscription_days)
+    return True
+
+
+def _has_tier_access_db(user_id: int, tiers: tuple[str, ...]) -> bool:
+    db_path = get_shared_db_path()
+    if not db_path.exists():
+        return False
+    con = sqlite3.connect(db_path)
+    con.row_factory = sqlite3.Row
+    try:
+        placeholders = ",".join("?" for _ in tiers)
+        rows = con.execute(
+            f"""
+            SELECT tier, added_at, subscription_days, status
+            FROM vip_whitelist
+            WHERE user_id = ?
+              AND tier IN ({placeholders})
+            """,
+            (str(user_id), *tiers),
+        ).fetchall()
+        for row in rows:
+            if _is_tier_row_active(
+                tier=str(row["tier"] or ""),
+                status=str(row["status"] or "active"),
+                added_at=str(row["added_at"] or ""),
+                subscription_days=row["subscription_days"],
+            ):
+                return True
+        return False
+    except sqlite3.Error:
+        logger.warning("VIP shared DB read failed; fallback JSON whitelist", exc_info=True)
+        return False
+    finally:
+        con.close()
+
+
 def _load_vip_whitelist_data() -> dict:
     path = get_vip_whitelist_path()
     if not path.exists():
@@ -194,8 +382,13 @@ def _load_vip_whitelist_data() -> dict:
 def has_next_topic_access(user_id: int | None) -> bool:
     if not isinstance(user_id, int):
         return False
+    if is_super_user_id(user_id):
+        return True
     # Admin always has access.
     if get_admin_user_id() == user_id:
+        return True
+
+    if _has_tier_access_db(user_id, ("vip2", "vip3")):
         return True
 
     data = _load_vip_whitelist_data()
@@ -209,8 +402,41 @@ def has_next_topic_access(user_id: int | None) -> bool:
             continue
         row = users.get(user_key)
         if isinstance(row, dict):
-            status = str(row.get("status") or "active").strip().lower()
-            if status in {"", "active"}:
+            if _is_tier_row_active(
+                tier=tier,
+                status=str(row.get("status") or "active"),
+                added_at=str(row.get("added_at") or ""),
+                subscription_days=row.get("subscription_days"),
+            ):
+                return True
+    return False
+
+
+def has_save_later_access(user_id: int | None) -> bool:
+    if not isinstance(user_id, int):
+        return False
+    if is_super_user_id(user_id):
+        return True
+    if _has_tier_access_db(user_id, ("vip2", "vip3")):
+        return True
+
+    data = _load_vip_whitelist_data()
+    user_key = str(user_id)
+    for tier in ("vip2", "vip3"):
+        tier_obj = data.get(tier)
+        if not isinstance(tier_obj, dict):
+            continue
+        users = tier_obj.get("users")
+        if not isinstance(users, dict):
+            continue
+        row = users.get(user_key)
+        if isinstance(row, dict):
+            if _is_tier_row_active(
+                tier=tier,
+                status=str(row.get("status") or "active"),
+                added_at=str(row.get("added_at") or ""),
+                subscription_days=row.get("subscription_days"),
+            ):
                 return True
     return False
 
@@ -232,6 +458,28 @@ def get_admin_user_id() -> int | None:
         return int(raw)
     except ValueError:
         return None
+
+
+def get_super_user_ids() -> set[int]:
+    raw = (os.getenv("VIDEO_SUPER_USER_IDS") or "").strip()
+    out: set[int] = set()
+    if not raw:
+        return out
+    for part in raw.split(","):
+        token = str(part).strip()
+        if not token:
+            continue
+        try:
+            out.add(int(token))
+        except ValueError:
+            continue
+    return out
+
+
+def is_super_user_id(user_id: int | None) -> bool:
+    if not isinstance(user_id, int):
+        return False
+    return int(user_id) in get_super_user_ids()
 
 
 def is_admin_user(update: Update) -> bool:
@@ -256,12 +504,16 @@ def _topic_message_ids_payload() -> str:
 
 
 def _load_video_status_overrides() -> dict[str, dict[str, dict[str, str]]]:
-    if not VIDEO_STATUS_PATH.exists():
-        return {}
-    try:
-        raw = json.loads(VIDEO_STATUS_PATH.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
+    raw = _read_state_json_from_db(VIDEO_STATUS_KEY)
+    if raw is None:
+        if not VIDEO_STATUS_PATH.exists():
+            raw = {}
+        else:
+            try:
+                raw = json.loads(VIDEO_STATUS_PATH.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                raw = {}
+        _write_state_json_to_db(VIDEO_STATUS_KEY, raw)
     if not isinstance(raw, dict):
         return {}
     result: dict[str, dict[str, dict[str, str]]] = {}
@@ -287,6 +539,7 @@ def _load_video_status_overrides() -> dict[str, dict[str, dict[str, str]]]:
 
 
 def _save_video_status_overrides(data: dict[str, dict[str, dict[str, str]]]) -> None:
+    _write_state_json_to_db(VIDEO_STATUS_KEY, data)
     try:
         VIDEO_STATUS_PATH.write_text(
             json.dumps(data, ensure_ascii=True, separators=(",", ":")),
@@ -422,12 +675,16 @@ def _message_link(group_id: int, message_id: int) -> str:
 
 
 def _load_sent_video_log() -> list[dict[str, int]]:
-    if not SENT_VIDEO_LOG_PATH.exists():
-        return []
-    try:
-        raw = json.loads(SENT_VIDEO_LOG_PATH.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return []
+    raw = _read_state_json_from_db(VIDEO_SENT_LOG_KEY)
+    if raw is None:
+        if not SENT_VIDEO_LOG_PATH.exists():
+            raw = []
+        else:
+            try:
+                raw = json.loads(SENT_VIDEO_LOG_PATH.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                raw = []
+        _write_state_json_to_db(VIDEO_SENT_LOG_KEY, raw)
     if not isinstance(raw, list):
         return []
     items: list[dict[str, int]] = []
@@ -447,6 +704,7 @@ def _load_sent_video_log() -> list[dict[str, int]]:
 
 
 def _save_sent_video_log(items: list[dict[str, int]]) -> None:
+    _write_state_json_to_db(VIDEO_SENT_LOG_KEY, items)
     try:
         SENT_VIDEO_LOG_PATH.write_text(
             json.dumps(items, ensure_ascii=True, separators=(",", ":")),
@@ -474,6 +732,14 @@ def _remove_sent_video_log_entry(chat_id: int, message_id: int) -> None:
     ]
     if len(kept) != len(items):
         _save_sent_video_log(kept)
+
+
+def _is_tracked_video_message(chat_id: int, message_id: int) -> bool:
+    items = _load_sent_video_log()
+    for row in items:
+        if int(row.get("chat_id", 0)) == int(chat_id) and int(row.get("message_id", 0)) == int(message_id):
+            return True
+    return False
 
 
 async def _delete_all_tracked_videos(context: ContextTypes.DEFAULT_TYPE) -> tuple[int, int, int]:
@@ -505,12 +771,18 @@ async def _delete_all_tracked_videos(context: ContextTypes.DEFAULT_TYPE) -> tupl
 
 
 def _load_int_list(path: Path) -> list[int]:
-    if not path.exists():
-        return []
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return []
+    key = VIDEO_KNOWN_USERS_KEY if path == KNOWN_USERS_PATH else ""
+    raw: object | None = _read_state_json_from_db(key) if key else None
+    if raw is None:
+        if not path.exists():
+            raw = []
+        else:
+            try:
+                raw = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                raw = []
+        if key:
+            _write_state_json_to_db(key, raw)
     if not isinstance(raw, list):
         return []
     out: list[int] = []
@@ -524,6 +796,8 @@ def _load_int_list(path: Path) -> list[int]:
 
 def _save_int_list(path: Path, items: list[int]) -> None:
     unique = sorted(set(int(x) for x in items))
+    if path == KNOWN_USERS_PATH:
+        _write_state_json_to_db(VIDEO_KNOWN_USERS_KEY, unique)
     try:
         path.write_text(json.dumps(unique, ensure_ascii=True, separators=(",", ":")), encoding="utf-8")
     except OSError:
@@ -545,13 +819,96 @@ def _register_known_user_from_update(update: Update) -> None:
     _save_int_list(KNOWN_USERS_PATH, users)
 
 
-def _load_scheduled_notifications() -> list[dict]:
-    if not SCHEDULED_NOTIFICATIONS_PATH.exists():
-        return []
+def _load_saved_videos_map() -> dict[str, list[dict[str, int | str]]]:
+    raw = _read_state_json_from_db(VIDEO_SAVED_VIDEOS_KEY)
+    if raw is None:
+        if not SAVED_VIDEOS_PATH.exists():
+            raw = {}
+        else:
+            try:
+                raw = json.loads(SAVED_VIDEOS_PATH.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                raw = {}
+        _write_state_json_to_db(VIDEO_SAVED_VIDEOS_KEY, raw)
+    if not isinstance(raw, dict):
+        return {}
+    out: dict[str, list[dict[str, int | str]]] = {}
+    for user_key, items in raw.items():
+        if not isinstance(items, list):
+            continue
+        cleaned: list[dict[str, int | str]] = []
+        for row in items:
+            if not isinstance(row, dict):
+                continue
+            try:
+                chat_id = int(row.get("chat_id") or 0)
+                message_id = int(row.get("message_id") or 0)
+                topic_no = int(row.get("topic_no") or 0)
+                saved_at = int(row.get("saved_at") or 0)
+            except (TypeError, ValueError):
+                continue
+            level = str(row.get("level") or "").strip().lower()
+            if chat_id == 0 or message_id <= 0:
+                continue
+            cleaned.append(
+                {
+                    "chat_id": chat_id,
+                    "message_id": message_id,
+                    "level": level,
+                    "topic_no": topic_no,
+                    "saved_at": saved_at,
+                }
+            )
+        out[str(user_key)] = cleaned
+    return out
+
+
+def _save_saved_videos_map(data: dict[str, list[dict[str, int | str]]]) -> None:
+    _write_state_json_to_db(VIDEO_SAVED_VIDEOS_KEY, data)
     try:
-        raw = json.loads(SCHEDULED_NOTIFICATIONS_PATH.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+        SAVED_VIDEOS_PATH.write_text(
+            json.dumps(data, ensure_ascii=True, separators=(",", ":")),
+            encoding="utf-8",
+        )
+    except OSError:
+        logger.exception("Failed to write saved videos")
+
+
+def _get_saved_videos_for_user(user_id: int) -> list[dict[str, int | str]]:
+    data = _load_saved_videos_map()
+    rows = data.get(str(int(user_id)))
+    if not isinstance(rows, list):
         return []
+    return list(rows)
+
+
+def _set_saved_videos_for_user(user_id: int, rows: list[dict[str, int | str]]) -> None:
+    data = _load_saved_videos_map()
+    data[str(int(user_id))] = list(rows)
+    _save_saved_videos_map(data)
+
+
+def _is_saved_video_for_user(user_id: int | None, chat_id: int, message_id: int) -> bool:
+    if not isinstance(user_id, int):
+        return False
+    rows = _get_saved_videos_for_user(user_id)
+    for row in rows:
+        if int(row.get("chat_id") or 0) == int(chat_id) and int(row.get("message_id") or 0) == int(message_id):
+            return True
+    return False
+
+
+def _load_scheduled_notifications() -> list[dict]:
+    raw = _read_state_json_from_db(VIDEO_SCHEDULED_KEY)
+    if raw is None:
+        if not SCHEDULED_NOTIFICATIONS_PATH.exists():
+            raw = []
+        else:
+            try:
+                raw = json.loads(SCHEDULED_NOTIFICATIONS_PATH.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                raw = []
+        _write_state_json_to_db(VIDEO_SCHEDULED_KEY, raw)
     if not isinstance(raw, list):
         return []
     rows: list[dict] = []
@@ -562,6 +919,7 @@ def _load_scheduled_notifications() -> list[dict]:
 
 
 def _save_scheduled_notifications(rows: list[dict]) -> None:
+    _write_state_json_to_db(VIDEO_SCHEDULED_KEY, rows)
     try:
         SCHEDULED_NOTIFICATIONS_PATH.write_text(
             json.dumps(rows, ensure_ascii=True, separators=(",", ":")),
@@ -591,12 +949,16 @@ def _create_scheduled_notification(message: str, send_at_epoch: int, auto_delete
 
 
 def _load_auto_delete_notices() -> dict[str, list[int]]:
-    if not AUTO_DELETE_NOTICES_PATH.exists():
-        return {}
-    try:
-        raw = json.loads(AUTO_DELETE_NOTICES_PATH.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
+    raw = _read_state_json_from_db(VIDEO_AUTO_DELETE_KEY)
+    if raw is None:
+        if not AUTO_DELETE_NOTICES_PATH.exists():
+            raw = {}
+        else:
+            try:
+                raw = json.loads(AUTO_DELETE_NOTICES_PATH.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                raw = {}
+        _write_state_json_to_db(VIDEO_AUTO_DELETE_KEY, raw)
     if not isinstance(raw, dict):
         return {}
     out: dict[str, list[int]] = {}
@@ -617,6 +979,7 @@ def _save_auto_delete_notices(data: dict[str, list[int]]) -> None:
     normalized: dict[str, list[int]] = {}
     for k, v in data.items():
         normalized[str(k)] = sorted(set(int(x) for x in v))
+    _write_state_json_to_db(VIDEO_AUTO_DELETE_KEY, normalized)
     try:
         AUTO_DELETE_NOTICES_PATH.write_text(
             json.dumps(normalized, ensure_ascii=True, separators=(",", ":")),
@@ -733,6 +1096,58 @@ def _find_level_topic(level: str, topic_no: int) -> dict | None:
     return None
 
 
+def save_later_keyboard(message_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        [[InlineKeyboardButton(text="⏸️ Sambung nanti", callback_data=f"save_later|{int(message_id)}")]]
+    )
+
+
+async def _save_video_for_user_with_quota(
+    context: ContextTypes.DEFAULT_TYPE,
+    user_id: int,
+    chat_id: int,
+    message_id: int,
+    level: str,
+    topic_no: int,
+) -> tuple[int, int, bool]:
+    rows = _get_saved_videos_for_user(user_id)
+    before = len(rows)
+
+    for row in rows:
+        if int(row.get("chat_id") or 0) == int(chat_id) and int(row.get("message_id") or 0) == int(message_id):
+            return (before, before, False)
+
+    rows.append(
+        {
+            "chat_id": int(chat_id),
+            "message_id": int(message_id),
+            "level": str(level),
+            "topic_no": int(topic_no),
+            "saved_at": int(time.time()),
+        }
+    )
+
+    replaced = False
+    while len(rows) > SAVE_LATER_MAX:
+        old = rows.pop(0)
+        old_chat_id = int(old.get("chat_id") or 0)
+        old_message_id = int(old.get("message_id") or 0)
+        if old_chat_id and old_message_id > 0:
+            try:
+                await context.bot.delete_message(chat_id=old_chat_id, message_id=old_message_id)
+            except Exception:
+                logger.exception(
+                    "Failed to delete old saved video chat_id=%s message_id=%s",
+                    old_chat_id,
+                    old_message_id,
+                )
+            _remove_sent_video_log_entry(old_chat_id, old_message_id)
+        replaced = True
+
+    _set_saved_videos_for_user(user_id, rows)
+    return (before, len(rows), replaced)
+
+
 async def _send_topic_video(
     context: ContextTypes.DEFAULT_TYPE,
     chat_id: int,
@@ -756,8 +1171,7 @@ async def _send_topic_video(
             chat_id=chat_id,
             text=(
                 "🔒 Topik ini khas untuk NEXT access.\n"
-                "Akses dibuka untuk VIP2 atau VIP3.\n\n"
-                "Sila daftar NEXT untuk unlock kandungan VIP."
+                "Sila daftar NEXT untuk unlock kandungan NEXTexclusive."
             ),
             reply_markup=vip_locked_keyboard(),
         )
@@ -785,11 +1199,12 @@ async def _send_topic_video(
         return
 
     try:
+        protect_content = not is_super_user_id(user_id)
         sent_video = await context.bot.copy_message(
             chat_id=chat_id,
             from_chat_id=group_id,
             message_id=message_id,
-            protect_content=True,
+            protect_content=protect_content,
         )
     except Exception:
         logger.exception("Failed to copy topic video level=%s topic=%s", level, topic_no)
@@ -804,7 +1219,12 @@ async def _send_topic_video(
     # Old video is removed only after a new one is sent successfully.
     old_video_message_id = int(context.user_data.get("last_video_message_id") or 0)
     old_video_chat_id = int(context.user_data.get("last_video_chat_id") or 0)
-    if old_video_message_id > 0 and old_video_chat_id == chat_id and old_video_message_id != int(sent_video.message_id):
+    if (
+        old_video_message_id > 0
+        and old_video_chat_id == chat_id
+        and old_video_message_id != int(sent_video.message_id)
+        and not _is_saved_video_for_user(user_id, old_video_chat_id, old_video_message_id)
+    ):
         try:
             await context.bot.delete_message(chat_id=chat_id, message_id=old_video_message_id)
             _remove_sent_video_log_entry(old_video_chat_id, old_video_message_id)
@@ -821,6 +1241,12 @@ async def _send_topic_video(
         text=f"✅ Topik {topic_no}: {topic_title}",
         reply_markup=topic_navigation_keyboard(user_id),
     )
+    if has_save_later_access(user_id):
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="Jika nak sambung kemudian, tekan butang di bawah.",
+            reply_markup=save_later_keyboard(int(sent_video.message_id)),
+        )
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -1233,8 +1659,28 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
             status_text = "online 🟢"
         if status == "available_on":
             status_text = f"available on: {available_on}"
+        status_message = (
+            f"✅ Status dikemaskini.\n"
+            f"Level: {level.title()}\n"
+            f"Topik: {topic_no}\n"
+            f"Status: {status_text}"
+        )
+
+        sent_count = 0
+        fail_count = 0
+        known_users = _load_int_list(KNOWN_USERS_PATH)
+        source_chat_id = int(message.chat_id) if message.chat_id is not None else 0
+        for chat_id in known_users:
+            if source_chat_id > 0 and int(chat_id) == source_chat_id:
+                continue
+            try:
+                await context.bot.send_message(chat_id=int(chat_id), text=status_message)
+                sent_count += 1
+            except Exception:
+                fail_count += 1
+
         await message.reply_text(
-            f"✅ Status dikemaskini.\nLevel: {level.title()}\nTopik: {topic_no}\nStatus: {status_text}",
+            f"{status_message}\n\nBroadcast user: {sent_count} berjaya, {fail_count} gagal.",
             reply_markup=admin_panel_keyboard(),
         )
         return
@@ -1245,8 +1691,83 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
     )
 
 
+async def handle_callback_query(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    user = update.effective_user
+    chat = update.effective_chat
+    if not query or not user or not chat:
+        return
+
+    data = str(query.data or "")
+    if not data.startswith("save_later|"):
+        return
+
+    parts = data.split("|", 1)
+    if len(parts) != 2:
+        await query.answer("Data tak sah.", show_alert=True)
+        return
+
+    try:
+        message_id = int(parts[1])
+    except ValueError:
+        await query.answer("Message ID tak sah.", show_alert=True)
+        return
+
+    user_id = int(user.id)
+    chat_id = int(chat.id)
+    if not has_save_later_access(user_id):
+        await query.answer("Fungsi ini hanya untuk VIP2/VIP3.", show_alert=True)
+        return
+
+    if not _is_tracked_video_message(chat_id, message_id):
+        await query.answer("Video ini tak lagi available untuk simpan.", show_alert=True)
+        return
+
+    if _is_saved_video_for_user(user_id, chat_id, message_id):
+        current = len(_get_saved_videos_for_user(user_id))
+        await query.answer("Video ini dah disimpan.", show_alert=False)
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=(
+                "✅ Video ini sudah dalam simpanan sambung nanti.\n"
+                f"Kuota simpanan: {current}/{SAVE_LATER_MAX}\n"
+                f"Maksimum simpanan: {SAVE_LATER_MAX}"
+            ),
+        )
+        return
+
+    level = str(context.user_data.get("last_topic_level") or "")
+    topic_no = int(context.user_data.get("last_topic_no") or 0)
+    _, after, replaced = await _save_video_for_user_with_quota(
+        context=context,
+        user_id=user_id,
+        chat_id=chat_id,
+        message_id=message_id,
+        level=level,
+        topic_no=topic_no,
+    )
+
+    await query.answer("Disimpan untuk sambung nanti.", show_alert=False)
+    if replaced:
+        extra = "Kuota penuh, simpanan paling lama telah diganti."
+    else:
+        extra = "Video disimpan untuk sambung nanti."
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=(
+            f"✅ {extra}\n"
+            f"Kuota simpanan: {after}/{SAVE_LATER_MAX}\n"
+            f"Maksimum simpanan: {SAVE_LATER_MAX}"
+        ),
+    )
+
+
 def main() -> None:
     token = get_token()
+    try:
+        init_video_storage()
+    except sqlite3.Error:
+        logger.warning("Video state storage init failed, continuing with file fallback", exc_info=True)
     app = ApplicationBuilder().token(token).build()
     if app.job_queue is not None:
         app.job_queue.run_repeating(scheduled_notification_worker, interval=10, first=5)
@@ -1255,6 +1776,7 @@ def main() -> None:
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("groupid", groupid))
     app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp_data))
+    app.add_handler(CallbackQueryHandler(handle_callback_query, pattern=r"^save_later\|"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
     logger.info("Video bot started")
     app.run_polling(drop_pending_updates=True)
