@@ -69,6 +69,7 @@ VIDEO_SAVED_VIDEOS_KEY = "video_saved_videos"
 SIDEBOT_STATE_TABLE = "sidebot_kv_state"
 VIDEO_HAPPY_HOUR_RULES_KEY = "video_happy_hour_rules"
 VIDEO_HAPPY_HOUR_RUNTIME_KEY = "video_happy_hour_runtime"
+VIDEO_HAPPY_HOUR_RESET_REQUEST_KEY = "video_happy_hour_reset_request"
 SAVE_LATER_MAX = 2
 VIP2_SUBSCRIPTION_DAYS = 45
 HAPPY_HOUR_FREE_PICK_LIMIT = 2
@@ -267,6 +268,14 @@ def _write_state_json_to_db(key: str, value: object) -> None:
 def _read_sidebot_state_json(key: str) -> object | None:
     try:
         with _connect_shared_db() as con:
+            con.execute(
+                f"""
+                CREATE TABLE IF NOT EXISTS {SIDEBOT_STATE_TABLE} (
+                    key TEXT PRIMARY KEY,
+                    value_json TEXT NOT NULL
+                )
+                """
+            )
             row = con.execute(
                 f"SELECT value_json FROM {SIDEBOT_STATE_TABLE} WHERE key = ?",
                 (key,),
@@ -282,6 +291,28 @@ def _read_sidebot_state_json(key: str) -> object | None:
                 return None
     except sqlite3.Error:
         return None
+
+
+def _write_sidebot_state_json(key: str, value: object) -> None:
+    try:
+        with _connect_shared_db() as con:
+            con.execute(
+                f"""
+                CREATE TABLE IF NOT EXISTS {SIDEBOT_STATE_TABLE} (
+                    key TEXT PRIMARY KEY,
+                    value_json TEXT NOT NULL
+                )
+                """
+            )
+            con.execute(
+                f"""
+                INSERT OR REPLACE INTO {SIDEBOT_STATE_TABLE} (key, value_json)
+                VALUES (?, ?)
+                """,
+                (key, json.dumps(value, ensure_ascii=False, separators=(",", ":"))),
+            )
+    except sqlite3.Error:
+        logger.warning("Sidebot state DB write failed key=%s", key, exc_info=True)
 
 
 def _bootstrap_state_key_from_file(conn: sqlite3.Connection, key: str, path: Path, default: object) -> None:
@@ -1086,11 +1117,93 @@ async def scheduled_notification_worker(context: ContextTypes.DEFAULT_TYPE) -> N
         _save_scheduled_notifications(rows)
 
 
-async def happy_hour_worker(context: ContextTypes.DEFAULT_TYPE) -> None:
+def _pop_pending_happy_hour_reset_request() -> dict | None:
+    payload = _read_state_json_from_db(VIDEO_HAPPY_HOUR_RESET_REQUEST_KEY)
+    if not isinstance(payload, dict):
+        return None
+    pending = payload.get("pending")
+    if not isinstance(pending, dict):
+        return None
+    request_id = str(pending.get("request_id") or "").strip()
+    if not request_id:
+        return None
+    payload["pending"] = None
+    payload["last_processed_request_id"] = request_id
+    payload["last_processed_at"] = datetime.now(timezone.utc).isoformat()
+    _write_state_json_to_db(VIDEO_HAPPY_HOUR_RESET_REQUEST_KEY, payload)
+    return pending
+
+
+async def _delete_all_happy_hour_deliveries(context: ContextTypes.DEFAULT_TYPE, runtime: dict) -> None:
+    sessions = runtime.get("sessions")
+    if not isinstance(sessions, dict):
+        return
+    for session in sessions.values():
+        if not isinstance(session, dict):
+            continue
+        users = session.get("users")
+        if not isinstance(users, dict):
+            continue
+        for user_row in users.values():
+            if not isinstance(user_row, dict):
+                continue
+            deliveries = user_row.get("deliveries")
+            if not isinstance(deliveries, list):
+                continue
+            for item in deliveries:
+                if not isinstance(item, dict):
+                    continue
+                if int(item.get("deleted") or 0) == 1:
+                    continue
+                chat_id = int(item.get("chat_id") or 0)
+                message_id = int(item.get("message_id") or 0)
+                if chat_id == 0 or message_id <= 0:
+                    continue
+                try:
+                    await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
+                except Exception:
+                    pass
+                _remove_sent_video_log_entry(chat_id, message_id)
+
+
+async def _process_happy_hour_reset_request(context: ContextTypes.DEFAULT_TYPE) -> bool:
+    pending = _pop_pending_happy_hour_reset_request()
+    if not isinstance(pending, dict):
+        return False
+
     now = int(time.time())
     entries = _load_happy_hour_entries()
-    if not entries:
-        return
+    active_entries = [
+        e for e in entries
+        if int(e.get("start_ts") or 0) <= now < int(e.get("end_ts") or 0)
+    ]
+    should_notify = any(bool(e.get("notify_user", True)) for e in active_entries)
+
+    if should_notify:
+        known_users = _load_int_list(KNOWN_USERS_PATH)
+        for chat_id in known_users:
+            if has_next_topic_access(chat_id):
+                continue
+            try:
+                await context.bot.send_message(
+                    chat_id=int(chat_id),
+                    text="⏹️ Happy Hour telah tamat. Akses percuma sudah ditutup.",
+                )
+            except Exception:
+                continue
+
+    runtime = _load_happy_hour_runtime()
+    await _delete_all_happy_hour_deliveries(context, runtime)
+
+    _save_happy_hour_runtime({"sessions": {}})
+    _write_sidebot_state_json(VIDEO_HAPPY_HOUR_RULES_KEY, {"entries": []})
+    return True
+
+
+async def happy_hour_worker(context: ContextTypes.DEFAULT_TYPE) -> None:
+    await _process_happy_hour_reset_request(context)
+    now = int(time.time())
+    entries = _load_happy_hour_entries()
 
     runtime = _load_happy_hour_runtime()
     sessions = runtime.setdefault("sessions", {})

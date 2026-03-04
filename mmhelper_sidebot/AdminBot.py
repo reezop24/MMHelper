@@ -63,6 +63,10 @@ DEFAULT_SHARED_DB_PATH = Path(__file__).resolve().parent.parent / "db" / "mmhelp
 KV_STATE_LEGACY_KEY = "sidebot_state"
 KV_STATE_SNAPSHOT_KEY = "sidebot_state_snapshot"
 KV_VIP2_RENEW_REMINDER_KEY = "vip2_renew_reminder_state"
+VIDEO_STATE_TABLE = "video_bot_kv_state"
+VIDEO_HAPPY_HOUR_RULES_KEY = "video_happy_hour_rules"
+VIDEO_HAPPY_HOUR_RUNTIME_KEY = "video_happy_hour_runtime"
+VIDEO_HAPPY_HOUR_RESET_REQUEST_KEY = "video_happy_hour_reset_request"
 VIP2_SUBSCRIPTION_DAYS = 45
 VIP2_REMINDER_DAYS_BEFORE = 7
 
@@ -74,6 +78,7 @@ MENU_ALL_PRODUCT_PREVIEW = "🛍️ All Product Preview (coming soon)"
 MENU_ADMIN_PANEL = "🛡️ Admin Panel"
 MENU_ADMIN_USERS = "👥 User Directory"
 MENU_HAPPY_HOUR = "⏰ Happy Hour"
+MENU_HAPPY_HOUR_STATUS = "📊 Happy Hour Status"
 MENU_BETA_RESET = "🧪 BETA RESET"
 MENU_CHECK_UNDER_IB = "🔎 Check Under IB"
 MENU_BACK_MAIN = "⬅️ Back to Main Menu"
@@ -663,6 +668,41 @@ def _write_generic_kv_json(conn: sqlite3.Connection, key: str, data: dict) -> No
     )
 
 
+def _ensure_video_state_table(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        f"""
+        CREATE TABLE IF NOT EXISTS {VIDEO_STATE_TABLE} (
+            key TEXT PRIMARY KEY,
+            value_json TEXT NOT NULL,
+            updated_at TEXT NOT NULL DEFAULT ''
+        )
+        """
+    )
+
+
+def _read_video_kv_json(conn: sqlite3.Connection, key: str, default: dict | None = None) -> dict:
+    _ensure_video_state_table(conn)
+    row = conn.execute(f"SELECT value_json FROM {VIDEO_STATE_TABLE} WHERE key = ?", (key,)).fetchone()
+    if row is None:
+        return dict(default or {})
+    raw = str(row["value_json"] or "").strip()
+    if not raw:
+        return dict(default or {})
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return dict(default or {})
+    return data if isinstance(data, dict) else dict(default or {})
+
+
+def _write_video_kv_json(conn: sqlite3.Connection, key: str, data: dict) -> None:
+    _ensure_video_state_table(conn)
+    conn.execute(
+        f"INSERT OR REPLACE INTO {VIDEO_STATE_TABLE} (key, value_json, updated_at) VALUES (?, ?, ?)",
+        (key, json.dumps(data, ensure_ascii=False), datetime.now(timezone.utc).isoformat()),
+    )
+
+
 def get_token() -> str:
     load_local_env()
     token = (os.getenv("SIDEBOT_TOKEN") or "").strip()
@@ -757,6 +797,135 @@ def get_happy_hour_webapp_url() -> str:
         if base.endswith(".html"):
             return f"{base.rsplit('/', 1)[0]}/happy-hour.html"
         return f"{base}/happy-hour.html"
+
+
+def get_happy_hour_status_webapp_base_url() -> str:
+    explicit = (os.getenv("SIDEBOT_HAPPY_HOUR_STATUS_WEBAPP_URL") or "").strip()
+    if explicit.lower().startswith("https://"):
+        return explicit
+
+    base = get_register_next_webapp_url()
+    if not base:
+        return ""
+    try:
+        parts = urlsplit(base)
+        path = parts.path or "/"
+        if path.endswith("/"):
+            new_path = f"{path}happy-hour-status.html"
+        elif path.endswith(".html"):
+            parent = path.rsplit("/", 1)[0] if "/" in path else ""
+            new_path = f"{parent}/happy-hour-status.html" if parent else "/happy-hour-status.html"
+        else:
+            new_path = f"{path}/happy-hour-status.html"
+        return urlunsplit((parts.scheme, parts.netloc, new_path, parts.query, parts.fragment))
+    except Exception:
+        if base.endswith("/"):
+            return f"{base}happy-hour-status.html"
+        if base.endswith(".html"):
+            return f"{base.rsplit('/', 1)[0]}/happy-hour-status.html"
+        return f"{base}/happy-hour-status.html"
+
+
+def _parse_iso_dt(value: str) -> datetime | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    try:
+        dt = datetime.fromisoformat(raw)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def _happy_hour_status_payload() -> str:
+    out: dict[str, object] = {"active_sessions": [], "generated_at": _format_dt_display(datetime.now(timezone.utc).isoformat())}
+    try:
+        with _connect_shared_db() as conn:
+            _ensure_state_table(conn)
+            rules = _read_generic_kv_json(conn, VIDEO_HAPPY_HOUR_RULES_KEY, default={"entries": []})
+            runtime = _read_video_kv_json(conn, VIDEO_HAPPY_HOUR_RUNTIME_KEY, default={"sessions": {}})
+    except sqlite3.Error:
+        logger.warning("Failed to build happy hour status payload", exc_info=True)
+        return json.dumps(out, ensure_ascii=False)
+
+    entries = rules.get("entries")
+    sessions_runtime = runtime.get("sessions")
+    if not isinstance(entries, list):
+        entries = []
+    if not isinstance(sessions_runtime, dict):
+        sessions_runtime = {}
+
+    now = datetime.now(timezone.utc)
+    for row in entries:
+        if not isinstance(row, dict):
+            continue
+        session_id = str(row.get("id") or "").strip()
+        if not session_id:
+            continue
+        start_at = _parse_iso_dt(str(row.get("start_at_utc") or ""))
+        end_at = _parse_iso_dt(str(row.get("end_at_utc") or ""))
+        if start_at is None or end_at is None or not (start_at <= now < end_at):
+            continue
+
+        videos = row.get("videos")
+        topics: list[str] = []
+        if isinstance(videos, list):
+            for item in videos:
+                if not isinstance(item, dict):
+                    continue
+                level = str(item.get("level") or "").strip().lower()
+                if level not in {"basic", "intermediate", "advanced"}:
+                    continue
+                topic_no = str(item.get("topic_no") or "").strip()
+                title = str(item.get("title") or "").strip()
+                label = level.title()
+                if title:
+                    topics.append(f"{label} Topik {topic_no}: {title}")
+                else:
+                    topics.append(f"{label} Topik {topic_no}")
+
+        used_users = 0
+        session_runtime = sessions_runtime.get(session_id)
+        if isinstance(session_runtime, dict):
+            users = session_runtime.get("users")
+            if isinstance(users, dict):
+                for user_row in users.values():
+                    if not isinstance(user_row, dict):
+                        continue
+                    counts = user_row.get("topic_counts")
+                    if not isinstance(counts, dict):
+                        continue
+                    total = 0
+                    for value in counts.values():
+                        try:
+                            total += int(value or 0)
+                        except (TypeError, ValueError):
+                            continue
+                    if total > 0:
+                        used_users += 1
+
+        out["active_sessions"].append(
+            {
+                "session_id": session_id,
+                "notify_user": bool(row.get("notify_user", True)),
+                "ends_at": _format_dt_display(end_at.isoformat()),
+                "topics": topics,
+                "free_user_used": used_users,
+            }
+        )
+
+    return json.dumps(out, ensure_ascii=False)
+
+
+def get_happy_hour_status_webapp_url() -> str:
+    base = get_happy_hour_status_webapp_base_url()
+    if not base:
+        return ""
+    payload = quote(_happy_hour_status_payload(), safe="")
+    sep = "&" if "?" in base else "?"
+    return f"{base}{sep}happy_hour_status_payload={payload}"
 
 
 def _format_dt_display(value: str) -> str:
@@ -2112,11 +2281,16 @@ def admin_panel_keyboard() -> ReplyKeyboardMarkup:
         happy_hour_button = KeyboardButton(MENU_HAPPY_HOUR, web_app=WebAppInfo(url=happy_hour_url))
     else:
         happy_hour_button = KeyboardButton(MENU_HAPPY_HOUR)
+    happy_hour_status_url = get_happy_hour_status_webapp_url()
+    if happy_hour_status_url:
+        happy_hour_status_button = KeyboardButton(MENU_HAPPY_HOUR_STATUS, web_app=WebAppInfo(url=happy_hour_status_url))
+    else:
+        happy_hour_status_button = KeyboardButton(MENU_HAPPY_HOUR_STATUS)
     return ReplyKeyboardMarkup(
         [
             [KeyboardButton(MENU_CHECK_UNDER_IB)],
             [admin_users_button],
-            [happy_hour_button],
+            [happy_hour_button, happy_hour_status_button],
             [KeyboardButton(MENU_BETA_RESET)],
             [KeyboardButton(MENU_BACK_MAIN)],
         ],
@@ -2905,6 +3079,15 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         )
         return
 
+    if text == MENU_HAPPY_HOUR_STATUS:
+        if not is_admin_user(user.id):
+            await message.reply_text("❌ Akses ditolak.", reply_markup=main_menu_keyboard(user.id))
+            return
+        await message.reply_text(
+            "Miniapp URL belum diset. Isi SIDEBOT_HAPPY_HOUR_STATUS_WEBAPP_URL atau SIDEBOT_REGISTER_WEBAPP_URL dalam .env dulu."
+        )
+        return
+
     if text == MENU_DAFTAR_NEXT_MEMBER:
         if get_register_next_webapp_url():
             await message.reply_text("Buka miniapp melalui butang web app pada menu.")
@@ -3321,6 +3504,40 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
         await message.reply_text(
             f"✅ Happy Hour disimpan dan notifikasi dihantar ke {sent_to} admin/superuser.",
+            reply_markup=admin_panel_keyboard(),
+        )
+        return
+
+    if payload_type == "sidebot_admin_happy_hour_reset":
+        if not is_admin_user(user.id):
+            await message.reply_text("❌ Akses ditolak.")
+            return
+        confirm = bool(payload.get("confirm"))
+        if not confirm:
+            await message.reply_text("❌ Pengesahan reset tak lengkap.")
+            return
+        request_id = str(uuid4())
+        try:
+            with _connect_shared_db() as conn:
+                _ensure_video_state_table(conn)
+                _write_video_kv_json(
+                    conn,
+                    VIDEO_HAPPY_HOUR_RESET_REQUEST_KEY,
+                    {
+                        "pending": {
+                            "request_id": request_id,
+                            "requested_by": int(user.id),
+                            "requested_at": datetime.now(timezone.utc).isoformat(),
+                        }
+                    },
+                )
+        except sqlite3.Error:
+            logger.exception("Failed to queue Happy Hour reset request")
+            await message.reply_text("❌ Gagal queue reset Happy Hour.")
+            return
+
+        await message.reply_text(
+            "✅ Reset Happy Hour diterima.\nSistem sedang reset semua sesi & setting.",
             reply_markup=admin_panel_keyboard(),
         )
         return
