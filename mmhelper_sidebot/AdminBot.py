@@ -73,6 +73,7 @@ MENU_OPEN_EVIDEO_BOT = "🎥 Buka NEXT eVideo Bot"
 MENU_ALL_PRODUCT_PREVIEW = "🛍️ All Product Preview (coming soon)"
 MENU_ADMIN_PANEL = "🛡️ Admin Panel"
 MENU_ADMIN_USERS = "👥 User Directory"
+MENU_HAPPY_HOUR = "⏰ Happy Hour"
 MENU_BETA_RESET = "🧪 BETA RESET"
 MENU_CHECK_UNDER_IB = "🔎 Check Under IB"
 MENU_BACK_MAIN = "⬅️ Back to Main Menu"
@@ -729,6 +730,33 @@ def get_admin_users_webapp_base_url() -> str:
         if base.endswith(".html"):
             return f"{base.rsplit('/', 1)[0]}/admin-users.html"
         return f"{base}/admin-users.html"
+
+
+def get_happy_hour_webapp_url() -> str:
+    explicit = (os.getenv("SIDEBOT_HAPPY_HOUR_WEBAPP_URL") or "").strip()
+    if explicit.lower().startswith("https://"):
+        return explicit
+
+    base = get_register_next_webapp_url()
+    if not base:
+        return ""
+    try:
+        parts = urlsplit(base)
+        path = parts.path or "/"
+        if path.endswith("/"):
+            new_path = f"{path}happy-hour.html"
+        elif path.endswith(".html"):
+            parent = path.rsplit("/", 1)[0] if "/" in path else ""
+            new_path = f"{parent}/happy-hour.html" if parent else "/happy-hour.html"
+        else:
+            new_path = f"{path}/happy-hour.html"
+        return urlunsplit((parts.scheme, parts.netloc, new_path, parts.query, parts.fragment))
+    except Exception:
+        if base.endswith("/"):
+            return f"{base}happy-hour.html"
+        if base.endswith(".html"):
+            return f"{base.rsplit('/', 1)[0]}/happy-hour.html"
+        return f"{base}/happy-hour.html"
 
 
 def _format_dt_display(value: str) -> str:
@@ -2079,10 +2107,16 @@ def admin_panel_keyboard() -> ReplyKeyboardMarkup:
         admin_users_button = KeyboardButton(MENU_ADMIN_USERS, web_app=WebAppInfo(url=admin_users_url))
     else:
         admin_users_button = KeyboardButton(MENU_ADMIN_USERS)
+    happy_hour_url = get_happy_hour_webapp_url()
+    if happy_hour_url:
+        happy_hour_button = KeyboardButton(MENU_HAPPY_HOUR, web_app=WebAppInfo(url=happy_hour_url))
+    else:
+        happy_hour_button = KeyboardButton(MENU_HAPPY_HOUR)
     return ReplyKeyboardMarkup(
         [
             [KeyboardButton(MENU_CHECK_UNDER_IB)],
             [admin_users_button],
+            [happy_hour_button],
             [KeyboardButton(MENU_BETA_RESET)],
             [KeyboardButton(MENU_BACK_MAIN)],
         ],
@@ -2862,6 +2896,15 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         )
         return
 
+    if text == MENU_HAPPY_HOUR:
+        if not is_admin_user(user.id):
+            await message.reply_text("❌ Akses ditolak.", reply_markup=main_menu_keyboard(user.id))
+            return
+        await message.reply_text(
+            "Miniapp URL belum diset. Isi SIDEBOT_HAPPY_HOUR_WEBAPP_URL atau SIDEBOT_REGISTER_WEBAPP_URL dalam .env dulu."
+        )
+        return
+
     if text == MENU_DAFTAR_NEXT_MEMBER:
         if get_register_next_webapp_url():
             await message.reply_text("Buka miniapp melalui butang web app pada menu.")
@@ -3166,6 +3209,112 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
         await message.reply_text(
             f"✅ Renew berjaya untuk user {target_user_id}.\nTempoh baru: {renew_days} hari.",
+            reply_markup=admin_panel_keyboard(),
+        )
+        return
+
+    if payload_type == "sidebot_admin_happy_hour_save":
+        if not is_admin_user(user.id):
+            await message.reply_text("❌ Akses ditolak.")
+            return
+
+        videos_payload = payload.get("videos")
+        if not isinstance(videos_payload, list) or not videos_payload:
+            await message.reply_text("❌ Pilih sekurang-kurangnya 1 topik video.")
+            return
+
+        start_date = str(payload.get("start_date") or "").strip()
+        start_time = str(payload.get("start_time") or "").strip()
+        duration_raw = str(payload.get("duration_hours") or "").strip()
+        try:
+            duration_hours = int(duration_raw)
+        except ValueError:
+            await message.reply_text("❌ Tempoh Happy Hour tak sah.")
+            return
+        if duration_hours not in {1, 3, 6, 12, 24}:
+            await message.reply_text("❌ Tempoh Happy Hour mesti 1/3/6/12/24 jam.")
+            return
+
+        try:
+            start_local = datetime.strptime(f"{start_date} {start_time}", "%Y-%m-%d %H:%M").replace(
+                tzinfo=ZoneInfo("Asia/Kuala_Lumpur")
+            )
+        except ValueError:
+            await message.reply_text("❌ Tarikh atau masa mula tak sah.")
+            return
+        end_local = start_local + timedelta(hours=duration_hours)
+
+        normalized_videos: list[dict[str, object]] = []
+        for row in videos_payload:
+            if not isinstance(row, dict):
+                continue
+            level = str(row.get("level") or "").strip().lower()
+            if level not in {"basic", "intermediate", "advanced"}:
+                continue
+            topic_no_raw = str(row.get("topic_no") or "").strip()
+            try:
+                topic_no = int(topic_no_raw)
+            except ValueError:
+                continue
+            title = str(row.get("title") or "").strip()
+            normalized_videos.append({"level": level, "topic_no": topic_no, "title": title})
+
+        if not normalized_videos:
+            await message.reply_text("❌ Senarai video unlock tak sah.")
+            return
+
+        try:
+            with _connect_shared_db() as conn:
+                _ensure_state_table(conn)
+                bucket = _read_generic_kv_json(conn, "video_happy_hour_rules", default={"entries": []})
+                entries = bucket.get("entries")
+                if not isinstance(entries, list):
+                    entries = []
+                entry = {
+                    "id": str(uuid4()),
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "created_by": int(user.id),
+                    "videos": normalized_videos,
+                    "start_at_utc": start_local.astimezone(timezone.utc).isoformat(),
+                    "end_at_utc": end_local.astimezone(timezone.utc).isoformat(),
+                    "duration_hours": duration_hours,
+                    "status": "scheduled",
+                }
+                entries.append(entry)
+                bucket["entries"] = entries[-200:]
+                _write_generic_kv_json(conn, "video_happy_hour_rules", bucket)
+        except sqlite3.Error:
+            logger.exception("Failed to save happy hour schedule")
+            await message.reply_text("❌ Gagal simpan Happy Hour ke database.")
+            return
+
+        video_lines = []
+        for item in normalized_videos:
+            label = str(item.get("level") or "").title()
+            topic_no = str(item.get("topic_no") or "-")
+            title = str(item.get("title") or "").strip()
+            if title:
+                video_lines.append(f"- {label} Topik {topic_no}: {title}")
+            else:
+                video_lines.append(f"- {label} Topik {topic_no}")
+        text = (
+            "⏰ Happy Hour Video disimpan.\n\n"
+            "Video unlock:\n"
+            f"{chr(10).join(video_lines)}\n\n"
+            f"Mula: {start_local.strftime('%Y-%m-%d %H:%M MYT')}\n"
+            f"Tamat: {end_local.strftime('%Y-%m-%d %H:%M MYT')}"
+        )
+
+        sent_to = 0
+        for admin_id in sorted(ADMIN_USER_IDS):
+            try:
+                await context.bot.send_message(chat_id=admin_id, text=text)
+                sent_to += 1
+            except Exception:
+                logger.exception("Failed sending happy hour notice to admin_id=%s", admin_id)
+
+        await message.reply_text(
+            f"✅ Happy Hour disimpan dan notifikasi dihantar ke {sent_to} admin/superuser.",
             reply_markup=admin_panel_keyboard(),
         )
         return

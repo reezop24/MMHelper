@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Happy Hour</title>
+  <link rel="stylesheet" href="global.css" />
+  <style>
+    .content-card p {
+      margin: 0;
+      line-height: 1.55;
+      color: #f0dde1;
+      font-size: 14px;
+    }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .tab-btn {
+      margin: 0;
+      width: 100%;
+      border: 1px solid #8d4d54;
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: rgba(56, 24, 29, 0.86);
+      color: #f4e2e6;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.2;
+      text-align: center;
+    }
+
+    .tab-btn.active {
+      background: linear-gradient(90deg, #f59e0b 0%, #f97316 100%);
+      color: #2e1400;
+      border-color: #f59e0b;
+    }
+
+    .panel { margin-top: 12px; }
+    .hidden { display: none; }
+
+    .form-grid {
+      margin-top: 10px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .field-label {
+      font-size: 13px;
+      color: #f0dde1;
+      margin: 0 0 4px;
+      display: block;
+      font-weight: 700;
+    }
+
+    .field-input,
+    .field-select {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid #8d4d54;
+      border-radius: 10px;
+      background: rgba(43, 18, 22, 0.92);
+      color: #fff2f5;
+      padding: 10px 11px;
+      font-size: 14px;
+      outline: none;
+    }
+
+    .row-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .action-btn {
+      margin: 0;
+      border: 1px solid #8d4d54;
+      border-radius: 10px;
+      padding: 9px 11px;
+      background: rgba(56, 24, 29, 0.86);
+      color: #f4e2e6;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.2;
+      cursor: pointer;
+    }
+
+    .action-btn.primary {
+      border-color: #f59e0b;
+      background: linear-gradient(90deg, #f59e0b 0%, #f97316 100%);
+      color: #2e1400;
+    }
+
+    .selected-list {
+      margin-top: 10px;
+      display: grid;
+      gap: 7px;
+    }
+
+    .selected-item {
+      border: 1px solid #5a3035;
+      border-radius: 10px;
+      padding: 8px 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      background: rgba(27, 18, 20, 0.92);
+    }
+
+    .selected-item p {
+      margin: 0;
+      font-size: 13px;
+      color: #ffeef1;
+      line-height: 1.3;
+    }
+
+    .small-btn {
+      border: 1px solid #744147;
+      background: rgba(37, 21, 24, 0.92);
+      color: #f6e7ea;
+      border-radius: 8px;
+      padding: 6px 8px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .status-text {
+      margin-top: 10px;
+      color: #f0dde1;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .placeholder {
+      margin-top: 10px;
+      border: 1px dashed #8d4d54;
+      border-radius: 10px;
+      padding: 11px;
+      background: rgba(43, 18, 22, 0.8);
+      color: #f0dde1;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .save-wrap { margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="top-nav">
+      <button id="backBtn" type="button" class="top-back-btn">← Back</button>
+    </div>
+
+    <header class="hero">
+      <img class="logo" src="logo.png" alt="NEXTexclusive Logo" />
+      <h1>Happy Hour</h1>
+      <p>Admin Panel</p>
+    </header>
+
+    <section class="card content-card">
+      <p>Unlock video sementara mengikut jadual yang anda tetapkan.</p>
+
+      <div class="tabs">
+        <button id="tabVideo" type="button" class="tab-btn active">Video</button>
+        <button id="tabSubscription" type="button" class="tab-btn">Subscription</button>
+      </div>
+
+      <section id="videoPanel" class="panel">
+        <div class="form-grid">
+          <label>
+            <span class="field-label">Kategori</span>
+            <select id="levelSelect" class="field-select">
+              <option value="basic">Basic</option>
+              <option value="intermediate">Intermediate</option>
+              <option value="advanced">Advanced</option>
+            </select>
+          </label>
+
+          <label>
+            <span class="field-label">Topik</span>
+            <select id="topicSelect" class="field-select"></select>
+          </label>
+
+          <div class="row-actions">
+            <button id="addVideoBtn" type="button" class="action-btn">Tambah Video</button>
+          </div>
+
+          <div id="selectedList" class="selected-list"></div>
+
+          <label>
+            <span class="field-label">Tarikh Mula (MYT)</span>
+            <input id="startDate" class="field-input" type="date" />
+          </label>
+
+          <label>
+            <span class="field-label">Masa Mula (MYT)</span>
+            <input id="startTime" class="field-input" type="time" />
+          </label>
+
+          <label>
+            <span class="field-label">Period</span>
+            <select id="periodSelect" class="field-select">
+              <option value="1">1 jam</option>
+              <option value="3">3 jam</option>
+              <option value="6">6 jam</option>
+              <option value="12">12 jam</option>
+              <option value="24">24 jam</option>
+            </select>
+          </label>
+        </div>
+
+        <p id="statusText" class="status-text">Pilih video dan jadual, kemudian tekan Save.</p>
+
+        <div class="save-wrap">
+          <button id="saveBtn" type="button" class="action-btn primary">Save</button>
+        </div>
+      </section>
+
+      <section id="subscriptionPanel" class="panel hidden">
+        <div class="placeholder">
+          Subscription Happy Hour akan ditambah dalam fasa seterusnya.
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    (function () {
+      var tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+      if (tg) {
+        tg.ready();
+        tg.expand();
+      }
+
+      var TOPIC_LIMITS = {
+        basic: 19,
+        intermediate: 21,
+        advanced: 19
+      };
+
+      var tabVideo = document.getElementById("tabVideo");
+      var tabSubscription = document.getElementById("tabSubscription");
+      var videoPanel = document.getElementById("videoPanel");
+      var subscriptionPanel = document.getElementById("subscriptionPanel");
+      var levelSelect = document.getElementById("levelSelect");
+      var topicSelect = document.getElementById("topicSelect");
+      var addVideoBtn = document.getElementById("addVideoBtn");
+      var selectedList = document.getElementById("selectedList");
+      var startDate = document.getElementById("startDate");
+      var startTime = document.getElementById("startTime");
+      var periodSelect = document.getElementById("periodSelect");
+      var saveBtn = document.getElementById("saveBtn");
+      var statusText = document.getElementById("statusText");
+      var backBtn = document.getElementById("backBtn");
+      var activeTab = "video";
+      var selectedVideos = [];
+
+      function pad2(value) {
+        var n = Number(value || 0);
+        return n < 10 ? "0" + n : String(n);
+      }
+
+      function setDefaultDateTime() {
+        var now = new Date();
+        var y = now.getFullYear();
+        var m = pad2(now.getMonth() + 1);
+        var d = pad2(now.getDate());
+        var h = pad2(now.getHours());
+        var mm = pad2(now.getMinutes());
+        startDate.value = y + "-" + m + "-" + d;
+        startTime.value = h + ":" + mm;
+      }
+
+      function toLevelLabel(level) {
+        if (level === "basic") return "Basic";
+        if (level === "intermediate") return "Intermediate";
+        return "Advanced";
+      }
+
+      function buildTopicOptions(level) {
+        var total = Number(TOPIC_LIMITS[level] || 0);
+        var html = "";
+        for (var i = 1; i <= total; i += 1) {
+          html += '<option value="' + i + '">Topik ' + i + "</option>";
+        }
+        topicSelect.innerHTML = html;
+      }
+
+      function switchTab(name) {
+        activeTab = name;
+        var isVideo = name === "video";
+        tabVideo.classList.toggle("active", isVideo);
+        tabSubscription.classList.toggle("active", !isVideo);
+        videoPanel.classList.toggle("hidden", !isVideo);
+        subscriptionPanel.classList.toggle("hidden", isVideo);
+      }
+
+      function renderSelected() {
+        if (!selectedVideos.length) {
+          selectedList.innerHTML = '<div class="placeholder">Belum ada video dipilih.</div>';
+          return;
+        }
+        var html = "";
+        for (var i = 0; i < selectedVideos.length; i += 1) {
+          var item = selectedVideos[i];
+          var key = item.level + "#" + item.topic_no;
+          html += (
+            '<div class="selected-item">' +
+              '<p>' + toLevelLabel(item.level) + " • Topik " + item.topic_no + "</p>" +
+              '<button class="small-btn" data-remove="' + key + '" type="button">Buang</button>' +
+            "</div>"
+          );
+        }
+        selectedList.innerHTML = html;
+      }
+
+      function addSelectedVideo() {
+        var level = String(levelSelect.value || "basic");
+        var topicNo = Number(topicSelect.value || 0);
+        if (!topicNo) {
+          statusText.textContent = "Sila pilih topik dahulu.";
+          return;
+        }
+        for (var i = 0; i < selectedVideos.length; i += 1) {
+          if (selectedVideos[i].level === level && Number(selectedVideos[i].topic_no) === topicNo) {
+            statusText.textContent = "Topik itu sudah ada dalam senarai.";
+            return;
+          }
+        }
+        selectedVideos.push({
+          level: level,
+          topic_no: topicNo,
+          title: ""
+        });
+        statusText.textContent = "Video ditambah ke senarai Happy Hour.";
+        renderSelected();
+      }
+
+      function removeSelectedVideo(key) {
+        var next = [];
+        for (var i = 0; i < selectedVideos.length; i += 1) {
+          var item = selectedVideos[i];
+          if ((item.level + "#" + item.topic_no) !== key) next.push(item);
+        }
+        selectedVideos = next;
+        renderSelected();
+      }
+
+      function sendSave() {
+        if (!selectedVideos.length) {
+          statusText.textContent = "Sila tambah sekurang-kurangnya 1 video.";
+          return;
+        }
+        if (!startDate.value || !startTime.value) {
+          statusText.textContent = "Sila pilih tarikh dan masa mula.";
+          return;
+        }
+        var payload = {
+          type: "sidebot_admin_happy_hour_save",
+          videos: selectedVideos,
+          start_date: String(startDate.value || ""),
+          start_time: String(startTime.value || ""),
+          duration_hours: String(periodSelect.value || "1")
+        };
+
+        if (tg) {
+          tg.sendData(JSON.stringify(payload));
+          tg.close();
+          return;
+        }
+        statusText.textContent = "Preview mode: Save payload dihantar.";
+      }
+
+      function backToMainMenu() {
+        var payload = { type: "sidebot_back_to_main_menu" };
+        if (tg) {
+          tg.sendData(JSON.stringify(payload));
+          tg.close();
+          return;
+        }
+        window.history.back();
+      }
+
+      levelSelect.addEventListener("change", function () {
+        buildTopicOptions(String(levelSelect.value || "basic"));
+      });
+      tabVideo.addEventListener("click", function () { switchTab("video"); });
+      tabSubscription.addEventListener("click", function () { switchTab("subscription"); });
+      addVideoBtn.addEventListener("click", addSelectedVideo);
+      saveBtn.addEventListener("click", sendSave);
+      backBtn.addEventListener("click", backToMainMenu);
+      selectedList.addEventListener("click", function (evt) {
+        var target = evt.target;
+        if (!target) return;
+        var removeKey = target.getAttribute("data-remove");
+        if (!removeKey) return;
+        removeSelectedVideo(String(removeKey));
+      });
+
+      buildTopicOptions("basic");
+      setDefaultDateTime();
+      renderSelected();
+      switchTab("video");
+    })();
+  </script>
+</body>
+</html>
