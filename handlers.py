@@ -16,6 +16,7 @@ from menu import (
     MAIN_MENU_BUTTON_PROJECT_GROW,
     MAIN_MENU_BUTTON_RISK,
     MAIN_MENU_BUTTON_STATISTIC,
+    MAIN_MENU_BUTTON_VIDEO_FULL,
     MAIN_MENU_BUTTON_VIDEO_TUTORIAL,
     SUBMENU_ADMIN_BUTTON_BETA_RESET,
     SUBMENU_ADMIN_BUTTON_NOTIFICATION_SETTING,
@@ -55,6 +56,7 @@ from settings import (
     get_account_summary_webapp_url,
     get_balance_adjustment_webapp_url,
     get_date_override_webapp_url,
+    get_evideo_bot_url,
     get_initial_capital_reset_webapp_url,
     get_notification_setting_webapp_url,
     get_project_grow_mission_webapp_url,
@@ -1396,6 +1398,18 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
             message.chat_id,
             "Coming soon. Feature ni masih dalam pembangunan.",
             reply_markup=main_menu_keyboard(user.id),
+        )
+        return
+
+    if text == MAIN_MENU_BUTTON_VIDEO_FULL:
+        evideo_url = get_evideo_bot_url()
+        await send_screen(
+            context,
+            message.chat_id,
+            "Tekan butang di bawah untuk buka bot video.",
+            reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton(text="Buka NEXT eVideo Bot", url=evideo_url)]]
+            ),
         )
         return
 

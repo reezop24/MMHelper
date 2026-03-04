@@ -20,6 +20,7 @@ MAIN_MENU_BUTTON_EXTRA = "🧰 Trading Tools"
 MAIN_MENU_BUTTON_ADMIN_PANEL = "🛡️ Admin Panel"
 MAIN_MENU_BUTTON_ACTIVITY_HUB = "🧭 Activity Hub"
 MAIN_MENU_BUTTON_VIDEO_TUTORIAL = "🎬 Video Tutorial (coming soon)"
+MAIN_MENU_BUTTON_VIDEO_FULL = "Video penuh belajar trading disini"
 MAIN_MENU_BUTTON_NEXT_EXCLUSIVE = "⭐ NEXTexclusive"
 
 SUBMENU_MM_BUTTON_INITIAL_CAPITAL_RESET = "♻️ Reset All Setting"
@@ -140,6 +141,7 @@ def main_menu_keyboard(user_id: int | None = None) -> ReplyKeyboardMarkup:
         ],
         [MAIN_MENU_BUTTON_EXTRA, MAIN_MENU_BUTTON_MM_SETTING],
         [MAIN_MENU_BUTTON_VIDEO_TUTORIAL],
+        [MAIN_MENU_BUTTON_VIDEO_FULL],
         [next_exclusive_button],
     ]
     if is_admin_user(user_id):

@@ -180,6 +180,13 @@ def get_next_exclusive_webapp_url() -> str:
     return f"{page}?{query}"
 
 
+def get_evideo_bot_url() -> str:
+    evideo_bot_url = (os.getenv("MMHELPER_EVIDEO_BOT_URL") or "").strip()
+    if not evideo_bot_url.startswith("https://t.me/"):
+        evideo_bot_url = "https://t.me/NEXTeVideo_bot"
+    return evideo_bot_url
+
+
 def get_initial_capital_reset_webapp_url(
     name: str,
     initial_capital: float,
