@@ -3226,6 +3226,11 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
         start_date = str(payload.get("start_date") or "").strip()
         start_time = str(payload.get("start_time") or "").strip()
         duration_raw = str(payload.get("duration_hours") or "").strip()
+        notify_raw = payload.get("notify_user", True)
+        if isinstance(notify_raw, bool):
+            notify_user = notify_raw
+        else:
+            notify_user = str(notify_raw).strip().lower() in {"1", "true", "yes", "on"}
         try:
             duration_hours = int(duration_raw)
         except ValueError:
@@ -3278,6 +3283,7 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
                     "start_at_utc": start_local.astimezone(timezone.utc).isoformat(),
                     "end_at_utc": end_local.astimezone(timezone.utc).isoformat(),
                     "duration_hours": duration_hours,
+                    "notify_user": notify_user,
                     "status": "scheduled",
                 }
                 entries.append(entry)

@@ -213,6 +213,14 @@
               <option value="24">24 jam</option>
             </select>
           </label>
+
+          <label>
+            <span class="field-label">Notification</span>
+            <select id="notifySelect" class="field-select">
+              <option value="1" selected>ON</option>
+              <option value="0">OFF</option>
+            </select>
+          </label>
         </div>
 
         <p id="statusText" class="status-text">Pilih video dan jadual, kemudian tekan Save.</p>
@@ -256,6 +264,7 @@
       var startDate = document.getElementById("startDate");
       var startTime = document.getElementById("startTime");
       var periodSelect = document.getElementById("periodSelect");
+      var notifySelect = document.getElementById("notifySelect");
       var saveBtn = document.getElementById("saveBtn");
       var statusText = document.getElementById("statusText");
       var backBtn = document.getElementById("backBtn");
@@ -367,7 +376,8 @@
           videos: selectedVideos,
           start_date: String(startDate.value || ""),
           start_time: String(startTime.value || ""),
-          duration_hours: String(periodSelect.value || "1")
+          duration_hours: String(periodSelect.value || "1"),
+          notify_user: String(notifySelect.value || "1") === "1"
         };
 
         if (tg) {

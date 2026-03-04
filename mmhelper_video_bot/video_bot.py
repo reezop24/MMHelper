@@ -1246,12 +1246,19 @@ def _normalize_happy_hour_entry(raw: dict) -> dict | None:
     if not videos:
         return None
 
+    notify_raw = raw.get("notify_user", True)
+    if isinstance(notify_raw, bool):
+        notify_user = notify_raw
+    else:
+        notify_user = str(notify_raw).strip().lower() in {"1", "true", "yes", "on"}
+
     return {
         "id": entry_id,
         "start_ts": int(start_at.timestamp()),
         "end_ts": int(end_at.timestamp()),
         "start_at": start_at,
         "end_at": end_at,
+        "notify_user": bool(notify_user),
         "videos": videos,
         "video_keys": video_keys,
     }
@@ -1563,14 +1570,15 @@ async def _send_topic_video(
             delete_at=delete_at,
         )
         _save_happy_hour_runtime(runtime)
-        await context.bot.send_message(
-            chat_id=chat_id,
-            text=(
-                f"{_build_happy_hour_user_message(happy_hour_entry)}\n\n"
-                f"Penggunaan topik ini untuk sesi semasa: {after_count}/{HAPPY_HOUR_FREE_PICK_LIMIT}"
-            ),
-            reply_markup=topic_navigation_keyboard(user_id),
-        )
+        if bool(happy_hour_entry.get("notify_user", True)):
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=(
+                    f"{_build_happy_hour_user_message(happy_hour_entry)}\n\n"
+                    f"Penggunaan topik ini untuk sesi semasa: {after_count}/{HAPPY_HOUR_FREE_PICK_LIMIT}"
+                ),
+                reply_markup=topic_navigation_keyboard(user_id),
+            )
 
     if has_save_later_access(user_id):
         await context.bot.send_message(
