@@ -1470,13 +1470,19 @@ def _build_happy_hour_user_message(entry: dict) -> str:
     start_at = entry.get("start_at")
     end_at = entry.get("end_at")
     if not isinstance(start_at, datetime):
-        start_text = "-"
+        start_date = "-"
+        start_time = "-"
     else:
-        start_text = start_at.astimezone(tz).strftime("%Y-%m-%d %H:%M %Z")
+        local_start = start_at.astimezone(tz)
+        start_date = local_start.strftime("%Y-%m-%d")
+        start_time = local_start.strftime("%H:%M")
     if not isinstance(end_at, datetime):
-        end_text = "-"
+        end_date = "-"
+        end_time = "-"
     else:
-        end_text = end_at.astimezone(tz).strftime("%Y-%m-%d %H:%M %Z")
+        local_end = end_at.astimezone(tz)
+        end_date = local_end.strftime("%Y-%m-%d")
+        end_time = local_end.strftime("%H:%M")
 
     lines = []
     for row in entry.get("videos", []):
@@ -1487,17 +1493,22 @@ def _build_happy_hour_user_message(entry: dict) -> str:
         if level not in LEVEL_TOPICS or topic_no <= 0:
             continue
         title = str(row.get("title") or "").strip() or _topic_title(level, topic_no)
-        lines.append(f"{LEVEL_LABELS.get(level, level.title())}\nTopik {topic_no}\n{title}")
+        lines.append(f"<b>{LEVEL_LABELS.get(level, level.title())}\nTopik {topic_no}\n{title}</b>")
     selected_text = "\n\n".join(lines) if lines else "-"
 
     return (
         "Happy Hour akan diaktifkan pada\n\n"
-        f"{start_text}\n\n"
+        f"Tarikh: {start_date}\n"
+        f"Masa: {start_time}\n"
+        "MYT\n\n"
         "Anda kini boleh menonton video/topik dibawah secara percuma dalam tempoh Happy Hour yang ditetapkan.\n\n"
         f"{selected_text}\n\n"
         "Video akan automatik terpadam dalam tempoh 30 minit selepas anda pilih atau selepas tamat tempoh Happy Hour.\n\n"
         "Setiap video Happy Hour hanya boleh dipilih maksima 2 kali sahaja dalam tempoh Happy Hour berlangsung.\n\n"
-        f"Waktu tamat Happy Hour: {end_text}"
+        "Waktu tamat Happy Hour:\n"
+        f"Tarikh: {end_date}\n"
+        f"Masa: {end_time}\n"
+        "MYT"
     )
 
 
@@ -1690,6 +1701,7 @@ async def _send_topic_video(
                     f"{_build_happy_hour_user_message(happy_hour_entry)}\n\n"
                     f"Penggunaan topik ini untuk sesi semasa: {after_count}/{HAPPY_HOUR_FREE_PICK_LIMIT}"
                 ),
+                parse_mode="HTML",
                 reply_markup=topic_navigation_keyboard(user_id),
             )
 
