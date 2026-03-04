@@ -70,6 +70,7 @@ SIDEBOT_STATE_TABLE = "sidebot_kv_state"
 VIDEO_HAPPY_HOUR_RULES_KEY = "video_happy_hour_rules"
 VIDEO_HAPPY_HOUR_RUNTIME_KEY = "video_happy_hour_runtime"
 VIDEO_HAPPY_HOUR_RESET_REQUEST_KEY = "video_happy_hour_reset_request"
+VIDEO_HAPPY_HOUR_ANNOUNCE_REQUEST_KEY = "video_happy_hour_announce_request"
 SAVE_LATER_MAX = 2
 VIP2_SUBSCRIPTION_DAYS = 45
 HAPPY_HOUR_FREE_PICK_LIMIT = 2
@@ -313,6 +314,23 @@ def _write_sidebot_state_json(key: str, value: object) -> None:
             )
     except sqlite3.Error:
         logger.warning("Sidebot state DB write failed key=%s", key, exc_info=True)
+
+
+def _pop_pending_happy_hour_announce_requests() -> list[dict]:
+    payload = _read_state_json_from_db(VIDEO_HAPPY_HOUR_ANNOUNCE_REQUEST_KEY)
+    if not isinstance(payload, dict):
+        return []
+    pending = payload.get("pending")
+    if not isinstance(pending, list) or not pending:
+        return []
+    cleaned: list[dict] = []
+    for row in pending:
+        if isinstance(row, dict):
+            cleaned.append(row)
+    payload["pending"] = []
+    payload["last_processed_at"] = datetime.now(timezone.utc).isoformat()
+    _write_state_json_to_db(VIDEO_HAPPY_HOUR_ANNOUNCE_REQUEST_KEY, payload)
+    return cleaned
 
 
 def _bootstrap_state_key_from_file(conn: sqlite3.Connection, key: str, path: Path, default: object) -> None:
@@ -1200,8 +1218,40 @@ async def _process_happy_hour_reset_request(context: ContextTypes.DEFAULT_TYPE) 
     return True
 
 
+async def _process_happy_hour_announce_requests(context: ContextTypes.DEFAULT_TYPE) -> bool:
+    requests = _pop_pending_happy_hour_announce_requests()
+    if not requests:
+        return False
+    changed = False
+    now = int(time.time())
+    known_users = _load_int_list(KNOWN_USERS_PATH)
+    for req in requests:
+        if not isinstance(req, dict):
+            continue
+        session_id = str(req.get("session_id") or "").strip()
+        entry = _find_happy_hour_entry_by_id(session_id)
+        if not isinstance(entry, dict):
+            continue
+        end_ts = int(entry.get("end_ts") or 0)
+        if end_ts <= now:
+            continue
+        if not bool(entry.get("notify_user", True)):
+            continue
+        message = _build_happy_hour_user_message(entry)
+        for chat_id in known_users:
+            if has_next_topic_access(chat_id):
+                continue
+            try:
+                await context.bot.send_message(chat_id=int(chat_id), text=message, parse_mode="HTML")
+            except Exception:
+                continue
+        changed = True
+    return changed
+
+
 async def happy_hour_worker(context: ContextTypes.DEFAULT_TYPE) -> None:
     await _process_happy_hour_reset_request(context)
+    await _process_happy_hour_announce_requests(context)
     now = int(time.time())
     entries = _load_happy_hour_entries()
 
@@ -1391,6 +1441,16 @@ def _load_happy_hour_entries() -> list[dict]:
         if entry is not None:
             out.append(entry)
     return out
+
+
+def _find_happy_hour_entry_by_id(session_id: str) -> dict | None:
+    needle = str(session_id or "").strip()
+    if not needle:
+        return None
+    for entry in _load_happy_hour_entries():
+        if str(entry.get("id") or "") == needle:
+            return entry
+    return None
 
 
 def _find_active_happy_hour(level: str, topic_no: int, now_ts: int | None = None) -> dict | None:

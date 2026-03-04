@@ -67,6 +67,7 @@ VIDEO_STATE_TABLE = "video_bot_kv_state"
 VIDEO_HAPPY_HOUR_RULES_KEY = "video_happy_hour_rules"
 VIDEO_HAPPY_HOUR_RUNTIME_KEY = "video_happy_hour_runtime"
 VIDEO_HAPPY_HOUR_RESET_REQUEST_KEY = "video_happy_hour_reset_request"
+VIDEO_HAPPY_HOUR_ANNOUNCE_REQUEST_KEY = "video_happy_hour_announce_request"
 VIP2_SUBSCRIPTION_DAYS = 45
 VIP2_REMINDER_DAYS_BEFORE = 7
 
@@ -840,7 +841,7 @@ def _parse_iso_dt(value: str) -> datetime | None:
 
 
 def _happy_hour_status_payload() -> str:
-    out: dict[str, object] = {"active_sessions": [], "generated_at": _format_dt_display(datetime.now(timezone.utc).isoformat())}
+    out: dict[str, object] = {"sessions": [], "generated_at": _format_dt_display(datetime.now(timezone.utc).isoformat())}
     try:
         with _connect_shared_db() as conn:
             _ensure_state_table(conn)
@@ -866,8 +867,11 @@ def _happy_hour_status_payload() -> str:
             continue
         start_at = _parse_iso_dt(str(row.get("start_at_utc") or ""))
         end_at = _parse_iso_dt(str(row.get("end_at_utc") or ""))
-        if start_at is None or end_at is None or not (start_at <= now < end_at):
+        if start_at is None or end_at is None:
             continue
+        if end_at <= now:
+            continue
+        status = "active" if start_at <= now < end_at else "scheduled"
 
         videos = row.get("videos")
         topics: list[str] = []
@@ -906,15 +910,19 @@ def _happy_hour_status_payload() -> str:
                     if total > 0:
                         used_users += 1
 
-        out["active_sessions"].append(
+        out["sessions"].append(
             {
                 "session_id": session_id,
+                "status": status,
                 "notify_user": bool(row.get("notify_user", True)),
+                "starts_at": _format_dt_display(start_at.isoformat()),
                 "ends_at": _format_dt_display(end_at.isoformat()),
                 "topics": topics,
                 "free_user_used": used_users,
             }
         )
+
+    out["sessions"].sort(key=lambda x: str(x.get("starts_at") or ""))
 
     return json.dumps(out, ensure_ascii=False)
 
@@ -3472,6 +3480,21 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 entries.append(entry)
                 bucket["entries"] = entries[-200:]
                 _write_generic_kv_json(conn, "video_happy_hour_rules", bucket)
+                if notify_user:
+                    announce_bucket = _read_video_kv_json(conn, VIDEO_HAPPY_HOUR_ANNOUNCE_REQUEST_KEY, default={"pending": []})
+                    pending = announce_bucket.get("pending")
+                    if not isinstance(pending, list):
+                        pending = []
+                    pending.append(
+                        {
+                            "request_id": str(uuid4()),
+                            "session_id": str(entry["id"]),
+                            "requested_at": datetime.now(timezone.utc).isoformat(),
+                            "requested_by": int(user.id),
+                        }
+                    )
+                    announce_bucket["pending"] = pending[-200:]
+                    _write_video_kv_json(conn, VIDEO_HAPPY_HOUR_ANNOUNCE_REQUEST_KEY, announce_bucket)
         except sqlite3.Error:
             logger.exception("Failed to save happy hour schedule")
             await message.reply_text("❌ Gagal simpan Happy Hour ke database.")

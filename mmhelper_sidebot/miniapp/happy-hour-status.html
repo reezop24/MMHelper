@@ -109,7 +109,7 @@
     </header>
 
     <section class="card content-card">
-      <p>Paparan sesi Happy Hour aktif dan penggunaan quota free user.</p>
+      <p>Paparan sesi Happy Hour (scheduled + aktif) dan penggunaan quota free user.</p>
       <p id="meta" class="meta">Loading...</p>
       <section id="list" class="status-list"></section>
 
@@ -138,15 +138,15 @@
       function parsePayload() {
         try {
           var raw = new URLSearchParams(window.location.search).get("happy_hour_status_payload");
-          if (!raw) return { active_sessions: [], generated_at: "-" };
+          if (!raw) return { sessions: [], generated_at: "-" };
           var parsed = JSON.parse(raw);
-          if (!parsed || typeof parsed !== "object") return { active_sessions: [], generated_at: "-" };
+          if (!parsed || typeof parsed !== "object") return { sessions: [], generated_at: "-" };
           return {
-            active_sessions: Array.isArray(parsed.active_sessions) ? parsed.active_sessions : [],
+            sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
             generated_at: String(parsed.generated_at || "-")
           };
         } catch (e) {
-          return { active_sessions: [], generated_at: "-" };
+          return { sessions: [], generated_at: "-" };
         }
       }
 
@@ -166,6 +166,8 @@
           '<article class="status-card">' +
             '<p class="status-title">Session ' + (item.session_id || "-") + '</p>' +
             '<p class="line"><span class="label">Masa Tamat:</span>' + (item.ends_at || "-") + '</p>' +
+            '<p class="line"><span class="label">Masa Mula:</span>' + (item.starts_at || "-") + '</p>' +
+            '<p class="line"><span class="label">Status:</span>' + (item.status === "active" ? "Aktif" : "Scheduled") + '</p>' +
             '<p class="line"><span class="label">Notification:</span>' + (item.notify_user ? "ON" : "OFF") + '</p>' +
             '<p class="line"><span class="label">Free User Guna Quota:</span>' + String(item.free_user_used || 0) + '</p>' +
             '<p class="line"><span class="label">Topik:</span></p>' +
@@ -176,13 +178,13 @@
 
       function render(data) {
         metaEl.textContent = "Last update: " + (data.generated_at || "-");
-        if (!data.active_sessions.length) {
-          listEl.innerHTML = '<div class="empty">Tiada sesi Happy Hour aktif sekarang.</div>';
+        if (!data.sessions.length) {
+          listEl.innerHTML = '<div class="empty">Tiada sesi Happy Hour (scheduled/aktif) sekarang.</div>';
           return;
         }
         var html = "";
-        for (var i = 0; i < data.active_sessions.length; i += 1) {
-          html += renderCard(data.active_sessions[i] || {});
+        for (var i = 0; i < data.sessions.length; i += 1) {
+          html += renderCard(data.sessions[i] || {});
         }
         listEl.innerHTML = html;
       }
