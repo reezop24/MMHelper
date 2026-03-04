@@ -1406,7 +1406,13 @@ async def handle_text_actions(update: Update, context: ContextTypes.DEFAULT_TYPE
         await send_screen(
             context,
             message.chat_id,
-            "Tekan butang di bawah untuk buka bot video.",
+            MAIN_MENU_OPENED_TEXT,
+            reply_markup=main_menu_keyboard(user.id),
+            parse_mode="Markdown",
+        )
+        await context.bot.send_message(
+            chat_id=message.chat_id,
+            text="Tekan butang di bawah untuk buka bot video.",
             reply_markup=InlineKeyboardMarkup(
                 [[InlineKeyboardButton(text="Buka NEXT eVideo Bot", url=evideo_url)]]
             ),
