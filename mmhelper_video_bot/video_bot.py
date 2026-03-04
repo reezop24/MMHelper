@@ -1096,34 +1096,6 @@ async def happy_hour_worker(context: ContextTypes.DEFAULT_TYPE) -> None:
     sessions = runtime.setdefault("sessions", {})
     changed = False
 
-    # Send one start notice per session to free users only.
-    known_users = _load_int_list(KNOWN_USERS_PATH)
-    for entry in entries:
-        start_ts = int(entry.get("start_ts") or 0)
-        end_ts = int(entry.get("end_ts") or 0)
-        if not (start_ts <= now < end_ts):
-            continue
-        session_id = str(entry.get("id") or "")
-        if not session_id:
-            continue
-        session = sessions.setdefault(session_id, {})
-        if bool(session.get("start_notice_sent")):
-            continue
-        notice = _build_happy_hour_user_message(entry)
-        sent_count = 0
-        for chat_id in known_users:
-            if has_next_topic_access(chat_id):
-                continue
-            try:
-                await context.bot.send_message(chat_id=int(chat_id), text=notice)
-                sent_count += 1
-            except Exception:
-                continue
-        session["start_notice_sent"] = 1
-        session["start_notice_sent_at"] = now
-        session["start_notice_sent_count"] = sent_count
-        changed = True
-
     # Delete any Happy Hour video past delete deadline.
     for session in sessions.values():
         if not isinstance(session, dict):
