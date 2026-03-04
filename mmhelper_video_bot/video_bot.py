@@ -66,8 +66,13 @@ VIDEO_KNOWN_USERS_KEY = "video_known_users"
 VIDEO_SCHEDULED_KEY = "video_scheduled_notifications"
 VIDEO_AUTO_DELETE_KEY = "video_auto_delete_notices"
 VIDEO_SAVED_VIDEOS_KEY = "video_saved_videos"
+SIDEBOT_STATE_TABLE = "sidebot_kv_state"
+VIDEO_HAPPY_HOUR_RULES_KEY = "video_happy_hour_rules"
+VIDEO_HAPPY_HOUR_RUNTIME_KEY = "video_happy_hour_runtime"
 SAVE_LATER_MAX = 2
 VIP2_SUBSCRIPTION_DAYS = 45
+HAPPY_HOUR_FREE_PICK_LIMIT = 2
+HAPPY_HOUR_DELETE_AFTER_SECONDS = 30 * 60
 
 
 def load_local_env() -> None:
@@ -259,6 +264,26 @@ def _write_state_json_to_db(key: str, value: object) -> None:
         logger.warning("Video state DB write failed key=%s", key, exc_info=True)
 
 
+def _read_sidebot_state_json(key: str) -> object | None:
+    try:
+        with _connect_shared_db() as con:
+            row = con.execute(
+                f"SELECT value_json FROM {SIDEBOT_STATE_TABLE} WHERE key = ?",
+                (key,),
+            ).fetchone()
+            if row is None:
+                return None
+            raw = str(row["value_json"] or "").strip()
+            if not raw:
+                return None
+            try:
+                return json.loads(raw)
+            except json.JSONDecodeError:
+                return None
+    except sqlite3.Error:
+        return None
+
+
 def _bootstrap_state_key_from_file(conn: sqlite3.Connection, key: str, path: Path, default: object) -> None:
     existing = conn.execute(
         f"SELECT 1 FROM {VIDEO_STATE_TABLE} WHERE key = ? LIMIT 1",
@@ -290,6 +315,12 @@ def init_video_storage() -> None:
         _bootstrap_state_key_from_file(con, VIDEO_KNOWN_USERS_KEY, KNOWN_USERS_PATH, [])
         _bootstrap_state_key_from_file(con, VIDEO_SCHEDULED_KEY, SCHEDULED_NOTIFICATIONS_PATH, [])
         _bootstrap_state_key_from_file(con, VIDEO_AUTO_DELETE_KEY, AUTO_DELETE_NOTICES_PATH, {})
+        _bootstrap_state_key_from_file(
+            con,
+            VIDEO_HAPPY_HOUR_RUNTIME_KEY,
+            Path("__video_happy_hour_runtime_bootstrap__.json"),
+            {"sessions": {}},
+        )
 
 
 def _parse_iso_datetime(value: str) -> datetime | None:
@@ -1055,6 +1086,84 @@ async def scheduled_notification_worker(context: ContextTypes.DEFAULT_TYPE) -> N
         _save_scheduled_notifications(rows)
 
 
+async def happy_hour_worker(context: ContextTypes.DEFAULT_TYPE) -> None:
+    now = int(time.time())
+    entries = _load_happy_hour_entries()
+    if not entries:
+        return
+
+    runtime = _load_happy_hour_runtime()
+    sessions = runtime.setdefault("sessions", {})
+    changed = False
+
+    # Send one start notice per session to free users only.
+    known_users = _load_int_list(KNOWN_USERS_PATH)
+    for entry in entries:
+        start_ts = int(entry.get("start_ts") or 0)
+        end_ts = int(entry.get("end_ts") or 0)
+        if not (start_ts <= now < end_ts):
+            continue
+        session_id = str(entry.get("id") or "")
+        if not session_id:
+            continue
+        session = sessions.setdefault(session_id, {})
+        if bool(session.get("start_notice_sent")):
+            continue
+        notice = _build_happy_hour_user_message(entry)
+        sent_count = 0
+        for chat_id in known_users:
+            if has_next_topic_access(chat_id):
+                continue
+            try:
+                await context.bot.send_message(chat_id=int(chat_id), text=notice)
+                sent_count += 1
+            except Exception:
+                continue
+        session["start_notice_sent"] = 1
+        session["start_notice_sent_at"] = now
+        session["start_notice_sent_count"] = sent_count
+        changed = True
+
+    # Delete any Happy Hour video past delete deadline.
+    for session in sessions.values():
+        if not isinstance(session, dict):
+            continue
+        users = session.get("users")
+        if not isinstance(users, dict):
+            continue
+        for user_row in users.values():
+            if not isinstance(user_row, dict):
+                continue
+            deliveries = user_row.get("deliveries")
+            if not isinstance(deliveries, list):
+                continue
+            for item in deliveries:
+                if not isinstance(item, dict):
+                    continue
+                if int(item.get("deleted") or 0) == 1:
+                    continue
+                delete_at = int(item.get("delete_at") or 0)
+                if delete_at <= 0 or delete_at > now:
+                    continue
+                chat_id = int(item.get("chat_id") or 0)
+                message_id = int(item.get("message_id") or 0)
+                if chat_id == 0 or message_id <= 0:
+                    item["deleted"] = 1
+                    changed = True
+                    continue
+                try:
+                    await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
+                except Exception:
+                    pass
+                _remove_sent_video_log_entry(chat_id, message_id)
+                item["deleted"] = 1
+                item["deleted_at"] = now
+                changed = True
+
+    if changed:
+        _save_happy_hour_runtime(runtime)
+
+
 def build_level_text(level_key: str, group_id: int | None) -> str:
     label = LEVEL_LABELS.get(level_key, level_key.title())
     level_topics = LEVEL_TOPICS.get(level_key, [])
@@ -1094,6 +1203,210 @@ def _find_level_topic(level: str, topic_no: int) -> dict | None:
         if int(row.get("topic_no") or 0) == int(topic_no):
             return row
     return None
+
+
+def _is_free_user(user_id: int | None) -> bool:
+    if not isinstance(user_id, int):
+        return False
+    return not has_next_topic_access(user_id)
+
+
+def _topic_key(level: str, topic_no: int) -> str:
+    return f"{str(level).strip().lower()}:{int(topic_no)}"
+
+
+def _topic_title(level: str, topic_no: int) -> str:
+    row = _find_level_topic(level, topic_no)
+    if isinstance(row, dict):
+        title = str(row.get("topic_title") or "").strip()
+        if title:
+            return title
+    return f"Topik {int(topic_no)}"
+
+
+def _load_happy_hour_runtime() -> dict:
+    raw = _read_state_json_from_db(VIDEO_HAPPY_HOUR_RUNTIME_KEY)
+    if not isinstance(raw, dict):
+        return {"sessions": {}}
+    sessions = raw.get("sessions")
+    if not isinstance(sessions, dict):
+        return {"sessions": {}}
+    return {"sessions": sessions}
+
+
+def _save_happy_hour_runtime(data: dict) -> None:
+    sessions = data.get("sessions")
+    normalized = {"sessions": sessions if isinstance(sessions, dict) else {}}
+    _write_state_json_to_db(VIDEO_HAPPY_HOUR_RUNTIME_KEY, normalized)
+
+
+def _normalize_happy_hour_entry(raw: dict) -> dict | None:
+    if not isinstance(raw, dict):
+        return None
+    entry_id = str(raw.get("id") or "").strip()
+    if not entry_id:
+        return None
+    start_at = _parse_iso_datetime(str(raw.get("start_at_utc") or ""))
+    end_at = _parse_iso_datetime(str(raw.get("end_at_utc") or ""))
+    if start_at is None or end_at is None or end_at <= start_at:
+        return None
+    videos_raw = raw.get("videos")
+    if not isinstance(videos_raw, list):
+        return None
+
+    videos: list[dict[str, object]] = []
+    video_keys: set[str] = set()
+    for row in videos_raw:
+        if not isinstance(row, dict):
+            continue
+        level = str(row.get("level") or "").strip().lower()
+        if level not in LEVEL_TOPICS:
+            continue
+        try:
+            topic_no = int(row.get("topic_no") or 0)
+        except (TypeError, ValueError):
+            continue
+        if topic_no < 1 or topic_no > len(LEVEL_TOPICS.get(level, [])):
+            continue
+        title = str(row.get("title") or "").strip() or _topic_title(level, topic_no)
+        videos.append({"level": level, "topic_no": topic_no, "title": title})
+        video_keys.add(_topic_key(level, topic_no))
+    if not videos:
+        return None
+
+    return {
+        "id": entry_id,
+        "start_ts": int(start_at.timestamp()),
+        "end_ts": int(end_at.timestamp()),
+        "start_at": start_at,
+        "end_at": end_at,
+        "videos": videos,
+        "video_keys": video_keys,
+    }
+
+
+def _load_happy_hour_entries() -> list[dict]:
+    # Source of truth is sidebot saved schedules.
+    data = _read_sidebot_state_json(VIDEO_HAPPY_HOUR_RULES_KEY)
+    if not isinstance(data, dict):
+        return []
+    rows = data.get("entries")
+    if not isinstance(rows, list):
+        return []
+    out: list[dict] = []
+    for row in rows:
+        entry = _normalize_happy_hour_entry(row)
+        if entry is not None:
+            out.append(entry)
+    return out
+
+
+def _find_active_happy_hour(level: str, topic_no: int, now_ts: int | None = None) -> dict | None:
+    now = int(time.time()) if now_ts is None else int(now_ts)
+    needle = _topic_key(level, topic_no)
+    active: list[dict] = []
+    for entry in _load_happy_hour_entries():
+        if needle not in entry.get("video_keys", set()):
+            continue
+        start_ts = int(entry.get("start_ts") or 0)
+        end_ts = int(entry.get("end_ts") or 0)
+        if start_ts <= now < end_ts:
+            active.append(entry)
+    if not active:
+        return None
+    active.sort(key=lambda x: int(x.get("start_ts") or 0), reverse=True)
+    return active[0]
+
+
+def _get_happy_hour_pick_count(runtime: dict, session_id: str, user_id: int, level: str, topic_no: int) -> int:
+    sessions = runtime.get("sessions")
+    if not isinstance(sessions, dict):
+        return 0
+    session = sessions.get(str(session_id))
+    if not isinstance(session, dict):
+        return 0
+    users = session.get("users")
+    if not isinstance(users, dict):
+        return 0
+    user_row = users.get(str(int(user_id)))
+    if not isinstance(user_row, dict):
+        return 0
+    counts = user_row.get("topic_counts")
+    if not isinstance(counts, dict):
+        return 0
+    try:
+        return int(counts.get(_topic_key(level, topic_no)) or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _record_happy_hour_delivery(
+    runtime: dict,
+    session_id: str,
+    user_id: int,
+    level: str,
+    topic_no: int,
+    chat_id: int,
+    message_id: int,
+    delete_at: int,
+) -> int:
+    sessions = runtime.setdefault("sessions", {})
+    session = sessions.setdefault(str(session_id), {})
+    users = session.setdefault("users", {})
+    user_row = users.setdefault(str(int(user_id)), {})
+    counts = user_row.setdefault("topic_counts", {})
+    topic_key = _topic_key(level, topic_no)
+    try:
+        next_count = int(counts.get(topic_key) or 0) + 1
+    except (TypeError, ValueError):
+        next_count = 1
+    counts[topic_key] = int(next_count)
+    deliveries = user_row.setdefault("deliveries", [])
+    deliveries.append(
+        {
+            "chat_id": int(chat_id),
+            "message_id": int(message_id),
+            "delete_at": int(delete_at),
+            "deleted": 0,
+        }
+    )
+    return int(next_count)
+
+
+def _build_happy_hour_user_message(entry: dict) -> str:
+    tz = get_bot_timezone()
+    start_at = entry.get("start_at")
+    end_at = entry.get("end_at")
+    if not isinstance(start_at, datetime):
+        start_text = "-"
+    else:
+        start_text = start_at.astimezone(tz).strftime("%Y-%m-%d %H:%M %Z")
+    if not isinstance(end_at, datetime):
+        end_text = "-"
+    else:
+        end_text = end_at.astimezone(tz).strftime("%Y-%m-%d %H:%M %Z")
+
+    lines = []
+    for row in entry.get("videos", []):
+        if not isinstance(row, dict):
+            continue
+        level = str(row.get("level") or "").strip().lower()
+        topic_no = int(row.get("topic_no") or 0)
+        if level not in LEVEL_TOPICS or topic_no <= 0:
+            continue
+        title = str(row.get("title") or "").strip() or _topic_title(level, topic_no)
+        lines.append(f"{LEVEL_LABELS.get(level, level.title())}\nTopik {topic_no}\n{title}")
+    selected_text = "\n\n".join(lines) if lines else "-"
+
+    return (
+        "Happy Hour akan diaktifkan pada\n\n"
+        f"{start_text}\n\n"
+        "Anda kini boleh menonton video/topik dibawah secara percuma dalam tempoh Happy Hour yang ditetapkan.\n\n"
+        f"{selected_text}\n\n"
+        "Video akan automatik terpadam dalam tempoh 30 minit selepas anda pilih atau selepas tamat tempoh Happy Hour.\n\n"
+        "Setiap video Happy Hour hanya boleh dipilih maksima 2 kali sahaja dalam tempoh Happy Hour berlangsung.\n\n"
+        f"Waktu tamat Happy Hour: {end_text}"
+    )
 
 
 def save_later_keyboard(message_id: int) -> InlineKeyboardMarkup:
@@ -1164,7 +1477,13 @@ async def _send_topic_video(
         )
         return
 
-    if bool(topic.get("next_only")) and not has_next_topic_access(user_id):
+    topic_is_next_only = bool(topic.get("next_only"))
+    has_next_access = has_next_topic_access(user_id)
+    happy_hour_entry: dict | None = None
+    if topic_is_next_only and not has_next_access and _is_free_user(user_id):
+        happy_hour_entry = _find_active_happy_hour(level, topic_no)
+
+    if topic_is_next_only and not has_next_access and happy_hour_entry is None:
         context.user_data["last_topic_level"] = level
         context.user_data["last_topic_no"] = topic_no
         await context.bot.send_message(
@@ -1176,6 +1495,20 @@ async def _send_topic_video(
             reply_markup=vip_locked_keyboard(),
         )
         return
+
+    if happy_hour_entry is not None and isinstance(user_id, int):
+        runtime = _load_happy_hour_runtime()
+        current_count = _get_happy_hour_pick_count(runtime, str(happy_hour_entry.get("id") or ""), user_id, level, topic_no)
+        if current_count >= HAPPY_HOUR_FREE_PICK_LIMIT:
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=(
+                    "⚠️ Kuota Happy Hour untuk topik ini telah habis.\n"
+                    f"Maksimum pilihan: {HAPPY_HOUR_FREE_PICK_LIMIT} kali bagi setiap topik dalam sesi ini."
+                ),
+                reply_markup=topic_navigation_keyboard(user_id),
+            )
+            return
 
     group_id = get_video_db_group_id()
     if group_id is None:
@@ -1241,6 +1574,32 @@ async def _send_topic_video(
         text=f"✅ Topik {topic_no}: {topic_title}",
         reply_markup=topic_navigation_keyboard(user_id),
     )
+
+    if happy_hour_entry is not None and isinstance(user_id, int):
+        now_ts = int(time.time())
+        end_ts = int(happy_hour_entry.get("end_ts") or now_ts)
+        delete_at = min(now_ts + HAPPY_HOUR_DELETE_AFTER_SECONDS, end_ts)
+        runtime = _load_happy_hour_runtime()
+        after_count = _record_happy_hour_delivery(
+            runtime=runtime,
+            session_id=str(happy_hour_entry.get("id") or ""),
+            user_id=user_id,
+            level=level,
+            topic_no=topic_no,
+            chat_id=chat_id,
+            message_id=int(sent_video.message_id),
+            delete_at=delete_at,
+        )
+        _save_happy_hour_runtime(runtime)
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=(
+                f"{_build_happy_hour_user_message(happy_hour_entry)}\n\n"
+                f"Penggunaan topik ini untuk sesi semasa: {after_count}/{HAPPY_HOUR_FREE_PICK_LIMIT}"
+            ),
+            reply_markup=topic_navigation_keyboard(user_id),
+        )
+
     if has_save_later_access(user_id):
         await context.bot.send_message(
             chat_id=chat_id,
@@ -1771,8 +2130,9 @@ def main() -> None:
     app = ApplicationBuilder().token(token).build()
     if app.job_queue is not None:
         app.job_queue.run_repeating(scheduled_notification_worker, interval=10, first=5)
+        app.job_queue.run_repeating(happy_hour_worker, interval=15, first=8)
     else:
-        logger.warning("Job queue unavailable; scheduled notifications disabled.")
+        logger.warning("Job queue unavailable; scheduled workers disabled.")
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("groupid", groupid))
     app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp_data))
