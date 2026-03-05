@@ -306,7 +306,7 @@
     },
     {
       topic: 21,
-      title: "Psychology (Level 2)",
+      title: "Psychology (Level 3)",
       subtopics: ["Menguruskan winning streak", "Menguruskan losing streak", "Mengenalpasti emotional trading pattern", "Kaedah membina disiplin"]
     }
   ];
@@ -379,7 +379,7 @@
     },
     {
       topic: 14,
-      title: "Psychology (Level 3)",
+      title: "Psychology (Level 4)",
       subtopics: ["Ego spike selepas win besar", "Trauma selepas loss streak", "Detachment from result", "Trading as execution, bukan emosi"]
     },
     {
