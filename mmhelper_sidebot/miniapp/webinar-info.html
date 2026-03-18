@@ -768,6 +768,14 @@
         }
       }
 
+      function getWebinarRegisterUrl() {
+        try {
+          return String(new URLSearchParams(window.location.search).get("webinar_register_url") || "").trim();
+        } catch (err) {
+          return "";
+        }
+      }
+
       function activate(index) {
         tabs.forEach(function (item, idx) {
           var active = idx === index;
@@ -787,28 +795,25 @@
       }
 
       function openSeries1Register() {
-        var payload = { type: "sidebot_webinar_register_open", series: "1" };
-        if (tg) {
-          tg.sendData(JSON.stringify(payload));
-          tg.close();
+        var registerUrl = getWebinarRegisterUrl();
+        if (registerUrl) {
+          window.location.href = registerUrl + (registerUrl.indexOf("?") >= 0 ? "&" : "?") + "series=1";
           return;
         }
       }
 
       function openSeries2Register() {
-        var payload = { type: "sidebot_webinar_register_open", series: "2" };
-        if (tg) {
-          tg.sendData(JSON.stringify(payload));
-          tg.close();
+        var registerUrl = getWebinarRegisterUrl();
+        if (registerUrl) {
+          window.location.href = registerUrl + (registerUrl.indexOf("?") >= 0 ? "&" : "?") + "series=2";
           return;
         }
       }
 
       function openSeries3Register() {
-        var payload = { type: "sidebot_webinar_register_open", series: "3" };
-        if (tg) {
-          tg.sendData(JSON.stringify(payload));
-          tg.close();
+        var registerUrl = getWebinarRegisterUrl();
+        if (registerUrl) {
+          window.location.href = registerUrl + (registerUrl.indexOf("?") >= 0 ? "&" : "?") + "series=3";
           return;
         }
       }

@@ -110,6 +110,17 @@
 
   var webinarStatusPayload = parseWebinarStatusPayload();
 
+  function getSeriesParam() {
+    try {
+      var raw = new URLSearchParams(window.location.search || "").get("series");
+      raw = String(raw || "").trim();
+      if (raw === "1" || raw === "2" || raw === "3") {
+        return raw;
+      }
+    } catch (err) {}
+    return "1";
+  }
+
   function getSeriesStatus(seriesId) {
     var series = webinarStatusPayload && webinarStatusPayload.series;
     var row = series && typeof series === "object" ? series[String(seriesId)] : null;
@@ -438,6 +449,10 @@
   bottomPrevBtn.addEventListener("click", backToPreviousMenu);
   bottomBackBtn.addEventListener("click", sendToMainMenu);
 
+  if (seriesSelect) {
+    seriesSelect.value = getSeriesParam();
+    selectedSeries = String(seriesSelect.value || "1");
+  }
   refreshSeriesTexts();
   resetSeriesSelectionView();
   updateBottomPrevState();

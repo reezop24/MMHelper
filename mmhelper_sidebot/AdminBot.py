@@ -809,11 +809,14 @@ def get_happy_hour_webapp_url() -> str:
 def get_webinar_info_webapp_url() -> str:
     explicit = (os.getenv("SIDEBOT_WEBINAR_INFO_WEBAPP_URL") or "").strip()
     register_url = get_register_next_webapp_url()
+    webinar_register_url = get_webinar_register_webapp_url()
     webinar_status_payload = _webinar_status_payload()
     if explicit.lower().startswith("https://"):
         params: dict[str, str] = {"webinar_status_payload": webinar_status_payload}
         if register_url:
             params["next_register_url"] = register_url
+        if webinar_register_url:
+            params["webinar_register_url"] = webinar_register_url
         sep = "&" if "?" in explicit else "?"
         return f"{explicit}{sep}{urlencode(params)}"
 
@@ -834,6 +837,8 @@ def get_webinar_info_webapp_url() -> str:
         params = {"webinar_status_payload": webinar_status_payload}
         if register_url:
             params["next_register_url"] = register_url
+        if webinar_register_url:
+            params["webinar_register_url"] = webinar_register_url
         sep = "&" if "?" in built else "?"
         return f"{built}{sep}{urlencode(params)}"
     except Exception:
@@ -846,6 +851,8 @@ def get_webinar_info_webapp_url() -> str:
         params = {"webinar_status_payload": webinar_status_payload}
         if register_url:
             params["next_register_url"] = register_url
+        if webinar_register_url:
+            params["webinar_register_url"] = webinar_register_url
         sep = "&" if "?" in built else "?"
         return f"{built}{sep}{urlencode(params)}"
 
