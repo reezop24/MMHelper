@@ -808,7 +808,7 @@ def get_happy_hour_webapp_url() -> str:
 def get_webinar_info_webapp_url() -> str:
     explicit = (os.getenv("SIDEBOT_WEBINAR_INFO_WEBAPP_URL") or "").strip()
     register_url = get_register_next_webapp_url()
-    webinar_status_payload = quote(_webinar_status_payload(), safe="")
+    webinar_status_payload = _webinar_status_payload()
     if explicit.lower().startswith("https://"):
         params: dict[str, str] = {"webinar_status_payload": webinar_status_payload}
         if register_url:
@@ -905,9 +905,9 @@ def get_webinar_status_webapp_url() -> str:
             else:
                 built = f"{base}/webinar-status.html"
 
-    payload = quote(_webinar_status_payload(), safe="")
+    payload = _webinar_status_payload()
     sep = "&" if "?" in built else "?"
-    return f"{built}{sep}webinar_status_payload={payload}"
+    return f"{built}{sep}{urlencode({'webinar_status_payload': payload})}"
 
 
 def _parse_iso_dt(value: str) -> datetime | None:
@@ -1014,9 +1014,9 @@ def get_happy_hour_status_webapp_url() -> str:
     base = get_happy_hour_status_webapp_base_url()
     if not base:
         return ""
-    payload = quote(_happy_hour_status_payload(), safe="")
+    payload = _happy_hour_status_payload()
     sep = "&" if "?" in base else "?"
-    return f"{base}{sep}happy_hour_status_payload={payload}"
+    return f"{base}{sep}{urlencode({'happy_hour_status_payload': payload})}"
 
 
 def _default_webinar_status_state() -> dict[str, object]:
