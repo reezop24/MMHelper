@@ -127,7 +127,14 @@
 
     @media (max-width: 640px) {
       .tabs {
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+      }
+
+      .tab-btn {
+        padding: 9px 6px;
+        font-size: 11px;
+        letter-spacing: 0.02em;
       }
     }
   </style>
