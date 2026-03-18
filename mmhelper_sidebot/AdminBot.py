@@ -1236,6 +1236,8 @@ def grant_webinar_series_access(
     invite_code: str = "",
     telegram_username: str = "",
     full_name: str = "",
+    phone_number: str = "",
+    wallet_id: str = "",
 ) -> None:
     if str(series) not in {"1", "2", "3"}:
         return
@@ -1269,6 +1271,8 @@ def grant_webinar_series_access(
         "invite_code": str(invite_code or ""),
         "telegram_username": str(telegram_username or ""),
         "full_name": str(full_name or ""),
+        "phone_number": str(phone_number or ""),
+        "wallet_id": str(wallet_id or ""),
     }
     _write_webinar_access_state(data)
 
@@ -4310,8 +4314,17 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if payload_type == "sidebot_webinar_special_invite_redeem":
         series = str(payload.get("series") or "").strip()
         invite_code = re.sub(r"\\D", "", str(payload.get("invite_code") or ""))
+        wallet_id = re.sub(r"\D", "", str(payload.get("wallet_id") or ""))
+        full_name = str(payload.get("full_name") or "").strip()
+        phone_number = str(payload.get("phone_number") or "").strip()
         if series not in {"1", "2", "3"}:
             await message.reply_text("❌ Siri webinar tak sah.")
+            return
+        if not re.fullmatch(r"\d{7}", wallet_id):
+            await message.reply_text("❌ AMarkets Wallet ID mesti tepat 7 angka.")
+            return
+        if not full_name or not phone_number:
+            await message.reply_text("❌ Sila lengkapkan nama dan nombor telefon.")
             return
         if len(invite_code) < 8 or len(invite_code) > 10:
             await message.reply_text("❌ Invite code mesti 8 hingga 10 angka.")
@@ -4342,13 +4355,25 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
         data["codes"] = codes
         try:
             _write_invite_codes_state(data)
+            with _connect_shared_db() as conn:
+                _ensure_users_table(conn)
+                _upsert_user_row(
+                    conn,
+                    user.id,
+                    telegram_username=str(user.username or ""),
+                    full_name=full_name,
+                    phone_number=phone_number,
+                    wallet_id=wallet_id,
+                )
             grant_webinar_series_access(
                 user_id=user.id,
                 series=series,
                 source="special_invitation",
                 invite_code=invite_code,
                 telegram_username=str(user.username or ""),
-                full_name=str(user.full_name or ""),
+                full_name=full_name,
+                phone_number=phone_number,
+                wallet_id=wallet_id,
             )
         except sqlite3.Error:
             logger.exception("Failed redeeming webinar invite code")

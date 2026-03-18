@@ -287,19 +287,34 @@
     <section id="specialInvitationView" class="card content-card hidden">
       <img class="screen-logo" src="logo.png" alt="Webinar Logo" />
       <h2 class="section-title">Special Invitation</h2>
-      <p>Masukkan invite code untuk aktifkan akses webinar bagi siri yang dipilih.</p>
+      <p>Untuk special invitation, sila daftar akaun melalui link AMarkets yang sama, kemudian verify akaun anda. Deposit tidak diperlukan untuk flow ini.</p>
       <div class="series-highlight">
         <strong id="specialSeriesLabel">SIRI 1</strong>
         <p id="specialSeriesDate"></p>
       </div>
+      <div class="action-list">
+        <button id="btnSpecialInvitationAmarkets" type="button" class="action-btn">Daftar AMarkets</button>
+      </div>
       <div class="form-grid">
+        <div>
+          <label for="specialWalletIdInput" class="field-label">AMarkets Wallet ID</label>
+          <input id="specialWalletIdInput" class="field-input" type="text" inputmode="numeric" placeholder="Contoh: 2248557" />
+        </div>
+        <div>
+          <label for="specialFullNameInput" class="field-label">Nama penuh</label>
+          <input id="specialFullNameInput" class="field-input" type="text" autocomplete="name" placeholder="Nama penuh seperti dalam akaun AMarkets" />
+        </div>
+        <div>
+          <label for="specialPhoneInput" class="field-label">No telefon</label>
+          <input id="specialPhoneInput" class="field-input" type="tel" inputmode="tel" autocomplete="tel" placeholder="Contoh: +60123456789" />
+        </div>
         <div>
           <label for="inviteCodeInput" class="field-label">Invite Code</label>
           <input id="inviteCodeInput" class="field-input" type="text" inputmode="numeric" placeholder="Masukkan 8-10 angka code" />
         </div>
       </div>
       <p id="specialInviteStatus" class="status-note" aria-live="polite"></p>
-      <button id="submitInviteCodeBtn" type="button" class="submit-btn">Sahkan Invite Code</button>
+      <button id="submitInviteCodeBtn" type="button" class="submit-btn">Daftar Special Invitation</button>
       <div class="inline-actions">
         <button id="btnBackFromSpecialInvitation" type="button" class="back-btn">⬅️ Back to Pilihan Siri</button>
       </div>

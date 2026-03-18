@@ -32,6 +32,10 @@
   var btnHomeSpecialInvitation = document.getElementById("btnHomeSpecialInvitation");
   var specialSeriesLabel = document.getElementById("specialSeriesLabel");
   var specialSeriesDate = document.getElementById("specialSeriesDate");
+  var btnSpecialInvitationAmarkets = document.getElementById("btnSpecialInvitationAmarkets");
+  var specialWalletIdInput = document.getElementById("specialWalletIdInput");
+  var specialFullNameInput = document.getElementById("specialFullNameInput");
+  var specialPhoneInput = document.getElementById("specialPhoneInput");
   var inviteCodeInput = document.getElementById("inviteCodeInput");
   var specialInviteStatus = document.getElementById("specialInviteStatus");
   var submitInviteCodeBtn = document.getElementById("submitInviteCodeBtn");
@@ -304,11 +308,25 @@
     seriesActionList.classList.add("hidden");
     statusEl.textContent = "";
     specialInviteStatus.textContent = "";
+    specialWalletIdInput.value = "";
+    specialFullNameInput.value = "";
+    specialPhoneInput.value = "";
     inviteCodeInput.value = "";
   }
 
   function submitSpecialInvitation() {
+    var walletId = readText(specialWalletIdInput);
+    var fullName = readText(specialFullNameInput);
+    var phoneNumber = readText(specialPhoneInput);
     var inviteCode = String(readText(inviteCodeInput) || "").replace(/\D/g, "");
+    if (!walletId || !fullName || !phoneNumber) {
+      specialInviteStatus.textContent = "Sila lengkapkan Wallet ID, Nama dan No telefon.";
+      return;
+    }
+    if (!isValidWalletId(walletId)) {
+      specialInviteStatus.textContent = "AMarkets Wallet ID mesti tepat 7 angka.";
+      return;
+    }
     if (inviteCode.length < 8 || inviteCode.length > 10) {
       specialInviteStatus.textContent = "Invite code mesti 8 hingga 10 angka.";
       return;
@@ -316,7 +334,10 @@
     var payload = {
       type: "sidebot_webinar_special_invite_redeem",
       series: selectedSeries,
-      invite_code: inviteCode
+      invite_code: inviteCode,
+      wallet_id: walletId,
+      full_name: fullName,
+      phone_number: phoneNumber
     };
     if (tg) {
       try { tg.sendData(JSON.stringify(payload)); } catch (err) {}
@@ -454,6 +475,15 @@
   });
   if (btnDaftarAmarkets) {
     btnDaftarAmarkets.addEventListener("click", function () {
+      if (tg && typeof tg.openLink === "function") {
+        tg.openLink(AMARKETS_SIGNUP_URL);
+        return;
+      }
+      window.open(AMARKETS_SIGNUP_URL, "_blank");
+    });
+  }
+  if (btnSpecialInvitationAmarkets) {
+    btnSpecialInvitationAmarkets.addEventListener("click", function () {
       if (tg && typeof tg.openLink === "function") {
         tg.openLink(AMARKETS_SIGNUP_URL);
         return;
