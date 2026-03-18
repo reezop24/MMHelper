@@ -76,6 +76,94 @@
       display: block;
     }
 
+    .stack-sections {
+      margin-top: 12px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .info-card {
+      border: 1px solid #5a3035;
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(20, 14, 16, 0.92);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    }
+
+    .info-card p {
+      margin: 0;
+    }
+
+    .info-card p + p {
+      margin-top: 10px;
+    }
+
+    .card-heading {
+      margin: 0 0 8px;
+      color: #ffeef1;
+      font-size: 15px;
+      font-weight: 800;
+    }
+
+    .section-label {
+      display: inline-flex;
+      align-items: center;
+      margin-bottom: 8px;
+      border: 1px solid #744147;
+      border-radius: 999px;
+      padding: 4px 10px;
+      background: rgba(56, 24, 29, 0.82);
+      color: #f7d7dc;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .hero-card {
+      border: 1px solid #744147;
+      border-radius: 14px;
+      padding: 14px;
+      background:
+        linear-gradient(180deg, rgba(78, 34, 40, 0.32) 0%, rgba(20, 14, 16, 0.95) 100%);
+    }
+
+    .hero-card .panel-title {
+      margin-bottom: 6px;
+    }
+
+    .hero-copy {
+      margin: 10px 0 0;
+      color: #f0dde1;
+      line-height: 1.55;
+      font-size: 14px;
+    }
+
+    .info-grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .key-points {
+      display: grid;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .key-point {
+      border: 1px solid #5a3035;
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: rgba(31, 20, 23, 0.95);
+      color: #f0dde1;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .key-point strong {
+      color: #ffeef1;
+    }
+
     .panel-title {
       margin: 0 0 8px;
       color: #ffeef1;
@@ -105,6 +193,10 @@
       margin-top: 6px;
     }
 
+    .feature-list.tight li + li {
+      margin-top: 4px;
+    }
+
     .inline-actions {
       margin-top: 12px;
       display: flex;
@@ -125,6 +217,78 @@
       font-weight: 700;
     }
 
+    .action-row {
+      margin-top: 14px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .action-btn {
+      margin: 0;
+      border: 1px solid #f59e0b;
+      border-radius: 12px;
+      padding: 11px 10px;
+      background: linear-gradient(90deg, #f59e0b 0%, #f97316 100%);
+      color: #2e1400;
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1.25;
+      text-align: center;
+    }
+
+    .action-btn.secondary {
+      border-color: #8d4d54;
+      background: rgba(56, 24, 29, 0.86);
+      color: #f4e2e6;
+    }
+
+    .requirement-brand {
+      display: inline-flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      vertical-align: middle;
+      line-height: 1.4;
+    }
+
+    .requirement-brand img {
+      width: 92px;
+      max-width: 100%;
+      display: inline-block;
+      vertical-align: middle;
+      background: transparent;
+      padding: 0;
+    }
+
+    .inline-brand {
+      display: inline-flex;
+      align-items: center;
+      vertical-align: middle;
+    }
+
+    .inline-brand img {
+      width: 96px;
+      max-width: 100%;
+      display: inline-block;
+      vertical-align: middle;
+    }
+
+    .auto-note {
+      border: 1px solid #6b4421;
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(53, 31, 10, 0.28);
+    }
+
+    .auto-note p {
+      margin: 0;
+    }
+
+    .auto-note p + p {
+      margin-top: 8px;
+    }
+
     @media (max-width: 640px) {
       .tabs {
         grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -135,6 +299,10 @@
         padding: 9px 6px;
         font-size: 11px;
         letter-spacing: 0.02em;
+      }
+
+      .action-row {
+        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -161,7 +329,7 @@
       </div>
 
       <p>Anda perlu mendaftar untuk setiap siri yang diadakan.</p>
-      <p><strong>NEXTexclusive member</strong> yang masih aktif, layak secara automatik untuk semua SIRI.</p>
+      <p><strong><span class="inline-brand"><img src="nextexc.png" alt="NEXTexclusive" /></span> member</strong> yang masih aktif, layak secara automatik untuk semua SIRI.</p>
       <p><strong>NEXTeVideo26 subscriber</strong> layak secara automatik untuk SIRI 1, serta akses untuk semua rakaman bagi semua SIRI.</p>
       <p>Butiran topik dan cara pendaftaran boleh semak pada tab di bawah.</p>
 
@@ -173,14 +341,88 @@
 
       <div class="tab-panels">
         <section id="panelS1" class="tab-panel active">
-          <h2 class="panel-title">SIRI 1</h2>
-          <span class="date-pill">7 &amp; 8 April 2026</span>
-          <ul class="feature-list">
-            <li>Fokus kepada flow pergerakan harga secara menyeluruh.</li>
-            <li>Sesuai sebagai siri permulaan untuk memahami fasa market yang sedang berlaku.</li>
-            <li>NEXTeVideo26 subscriber layak automatik untuk siri ini.</li>
-            <li>Cara daftar: buka menu <code>Daftar webinar</code> dan lengkapkan pendaftaran untuk SIRI 1.</li>
-          </ul>
+          <div class="hero-card">
+            <span class="section-label">Siri Webinar</span>
+            <h2 class="panel-title">SIRI 1</h2>
+            <span class="date-pill">7 &amp; 8 April 2026</span>
+            <p class="hero-copy">Fokus siri ini adalah pada flow asas pergerakan harga secara menyeluruh supaya anda boleh nampak fasa market dengan lebih jelas dan tersusun.</p>
+          </div>
+
+          <div class="stack-sections">
+            <div class="info-card">
+              <p class="card-heading">📌 Topik</p>
+              <ul class="feature-list tight">
+                <li>Structure penuh: Range -> Breakout -> Retracement</li>
+              </ul>
+            </div>
+
+            <div class="info-grid">
+              <div class="info-card">
+                <p class="card-heading">Cara</p>
+                <ul class="feature-list tight">
+                  <li>Cari Range</li>
+                  <li>Kenal pasti Active Leg</li>
+                  <li>Cari POI</li>
+                </ul>
+              </div>
+
+              <div class="info-card">
+                <p class="card-heading">Introduction (versi padat)</p>
+                <ul class="feature-list tight">
+                  <li>Liquidity</li>
+                  <li>Impulse</li>
+                  <li>Orderblock</li>
+                  <li>Imbalance</li>
+                  <li>Behaviour market dalam setiap fasa</li>
+                  <li>Flow asas untuk entry (tanpa detail mendalam)</li>
+                </ul>
+              </div>
+
+              <div class="info-card">
+                <p class="card-heading">🎯 Outcome</p>
+                <div class="key-points">
+                  <div class="key-point"><strong>Big picture market</strong><br />Nampak keseluruhan struktur dan arah pergerakan price.</div>
+                  <div class="key-point"><strong>Sebab market bergerak</strong><br />Faham kenapa pergerakan itu berlaku pada fasa tertentu.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="info-card">
+              <p class="card-heading">MAKLUMAT TAMBAHAN</p>
+              <ul class="feature-list tight">
+                <li>7 &amp; 8 April 2026</li>
+                <li>9pm-12pm</li>
+                <li>Zoom</li>
+                <li>Rakaman disediakan</li>
+                <li>eBook disediakan (sebelum webinar)</li>
+                <li>eVideo berkala untuk topik berkaitan (selepas webinar)</li>
+              </ul>
+            </div>
+
+            <div class="info-card">
+              <p class="card-heading">Syarat pendaftaran</p>
+              <ul class="feature-list tight">
+                <li>
+                  <span class="requirement-brand">
+                    <span>Daftar</span>
+                    <img src="amarketslogo.png" alt="AMarkets" />
+                    <span>dan deposit 50USD</span>
+                  </span>
+                </li>
+                <li>Anda juga boleh mendaftar sebagai <span class="inline-brand"><img src="nextexc.png" alt="NEXTexclusive" /></span> member untuk dapatkan akses yang lebih luas</li>
+              </ul>
+            </div>
+
+            <div class="auto-note">
+              <p><strong><span class="inline-brand"><img src="nextexc.png" alt="NEXTexclusive" /></span> member dan pelanggan NEXTeVideo26 didaftarkan secara automatik</strong></p>
+              <p>Untuk mendaftar sila tekan butang pendaftaran di bawah.</p>
+            </div>
+          </div>
+
+          <div class="action-row">
+            <button id="registerSeries1Btn" type="button" class="action-btn">DAFTAR WEBINAR SIRI 1</button>
+            <button id="registerNextBtn" type="button" class="action-btn secondary">DAFTAR NEXTexclusive</button>
+          </div>
         </section>
 
         <section id="panelS2" class="tab-panel">
@@ -189,7 +431,7 @@
           <ul class="feature-list">
             <li>Sambungan kepada flow price action dan kesinambungan fasa pergerakan harga.</li>
             <li>Penekanan lebih mendalam pada bacaan struktur dan kesinambungan market behavior.</li>
-            <li>NEXTexclusive member aktif layak automatik.</li>
+            <li><span class="inline-brand"><img src="nextexc.png" alt="NEXTexclusive" /></span> member aktif layak automatik.</li>
             <li>Cara daftar: buka menu <code>Daftar webinar</code> dan lengkapkan pendaftaran untuk SIRI 2.</li>
           </ul>
         </section>
@@ -200,7 +442,7 @@
           <ul class="feature-list">
             <li>Penutup keseluruhan siri webinar dengan fokus pada pemahaman flow harga dari awal hingga lanjutan.</li>
             <li>Membantu anda membezakan kedudukan price dalam fasa semasa dengan lebih jelas.</li>
-            <li>NEXTexclusive member aktif layak automatik.</li>
+            <li><span class="inline-brand"><img src="nextexc.png" alt="NEXTexclusive" /></span> member aktif layak automatik.</li>
             <li>Cara daftar: buka menu <code>Daftar webinar</code> dan lengkapkan pendaftaran untuk SIRI 3.</li>
           </ul>
         </section>
@@ -228,6 +470,16 @@
       ];
       var topBackBtn = document.getElementById("topBackBtn");
       var bottomBackBtn = document.getElementById("bottomBackBtn");
+      var registerSeries1Btn = document.getElementById("registerSeries1Btn");
+      var registerNextBtn = document.getElementById("registerNextBtn");
+
+      function getNextRegisterUrl() {
+        try {
+          return String(new URLSearchParams(window.location.search).get("next_register_url") || "").trim();
+        } catch (err) {
+          return "";
+        }
+      }
 
       function activate(index) {
         tabs.forEach(function (item, idx) {
@@ -247,6 +499,23 @@
         window.history.back();
       }
 
+      function openSeries1Register() {
+        var payload = { type: "sidebot_webinar_register_open", series: "1" };
+        if (tg) {
+          tg.sendData(JSON.stringify(payload));
+          tg.close();
+          return;
+        }
+      }
+
+      function openNextRegister() {
+        var nextRegisterUrl = getNextRegisterUrl();
+        if (!nextRegisterUrl) {
+          return;
+        }
+        window.location.href = nextRegisterUrl;
+      }
+
       tabs.forEach(function (item, index) {
         item.btn.addEventListener("click", function () {
           activate(index);
@@ -258,6 +527,12 @@
       }
       if (bottomBackBtn) {
         bottomBackBtn.addEventListener("click", backToMainMenu);
+      }
+      if (registerSeries1Btn) {
+        registerSeries1Btn.addEventListener("click", openSeries1Register);
+      }
+      if (registerNextBtn) {
+        registerNextBtn.addEventListener("click", openNextRegister);
       }
 
       activate(0);

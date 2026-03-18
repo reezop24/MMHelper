@@ -805,8 +805,12 @@ def get_happy_hour_webapp_url() -> str:
 
 def get_webinar_info_webapp_url() -> str:
     explicit = (os.getenv("SIDEBOT_WEBINAR_INFO_WEBAPP_URL") or "").strip()
+    register_url = get_register_next_webapp_url()
     if explicit.lower().startswith("https://"):
-        return explicit
+        if not register_url:
+            return explicit
+        sep = "&" if "?" in explicit else "?"
+        return f"{explicit}{sep}{urlencode({'next_register_url': register_url})}"
 
     base = get_register_next_webapp_url()
     if not base:
@@ -821,13 +825,22 @@ def get_webinar_info_webapp_url() -> str:
             new_path = f"{parent}/webinar-info.html" if parent else "/webinar-info.html"
         else:
             new_path = f"{path}/webinar-info.html"
-        return urlunsplit((parts.scheme, parts.netloc, new_path, parts.query, parts.fragment))
+        built = urlunsplit((parts.scheme, parts.netloc, new_path, parts.query, parts.fragment))
+        if not register_url:
+            return built
+        sep = "&" if "?" in built else "?"
+        return f"{built}{sep}{urlencode({'next_register_url': register_url})}"
     except Exception:
         if base.endswith("/"):
-            return f"{base}webinar-info.html"
-        if base.endswith(".html"):
-            return f"{base.rsplit('/', 1)[0]}/webinar-info.html"
-        return f"{base}/webinar-info.html"
+            built = f"{base}webinar-info.html"
+        elif base.endswith(".html"):
+            built = f"{base.rsplit('/', 1)[0]}/webinar-info.html"
+        else:
+            built = f"{base}/webinar-info.html"
+        if not register_url:
+            return built
+        sep = "&" if "?" in built else "?"
+        return f"{built}{sep}{urlencode({'next_register_url': register_url})}"
 
 
 def get_happy_hour_status_webapp_base_url() -> str:
@@ -3630,6 +3643,15 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await message.reply_text(
             "✅ Reset Happy Hour diterima.\nSistem sedang reset semua sesi & setting.",
             reply_markup=admin_panel_keyboard(),
+        )
+        return
+
+    if payload_type == "sidebot_webinar_register_open":
+        series = str(payload.get("series") or "").strip()
+        label = f"SIRI {series}" if series else "siri pilihan"
+        await message.reply_text(
+            f"Flow daftar webinar untuk {label} belum dibuka lagi. Next boleh sambung borang atau miniapp pendaftaran khusus.",
+            reply_markup=webinar_menu_keyboard(),
         )
         return
 
