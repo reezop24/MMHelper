@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import sqlite3
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
@@ -910,6 +911,40 @@ def get_webinar_status_webapp_url() -> str:
     return f"{built}{sep}{urlencode({'webinar_status_payload': payload})}"
 
 
+def get_webinar_register_webapp_url() -> str:
+    explicit = (os.getenv("SIDEBOT_WEBINAR_REGISTER_WEBAPP_URL") or "").strip()
+    built = ""
+    if explicit.lower().startswith("https://"):
+        built = explicit
+
+    if not built:
+        base = get_register_next_webapp_url()
+        if not base:
+            return ""
+        try:
+            parts = urlsplit(base)
+            path = parts.path or "/"
+            if path.endswith("/"):
+                new_path = f"{path}webinar-register.html"
+            elif path.endswith(".html"):
+                parent = path.rsplit("/", 1)[0] if "/" in path else ""
+                new_path = f"{parent}/webinar-register.html" if parent else "/webinar-register.html"
+            else:
+                new_path = f"{path}/webinar-register.html"
+            built = urlunsplit((parts.scheme, parts.netloc, new_path, parts.query, parts.fragment))
+        except Exception:
+            if base.endswith("/"):
+                built = f"{base}webinar-register.html"
+            elif base.endswith(".html"):
+                built = f"{base.rsplit('/', 1)[0]}/webinar-register.html"
+            else:
+                built = f"{base}/webinar-register.html"
+
+    payload = _webinar_status_payload()
+    sep = "&" if "?" in built else "?"
+    return f"{built}{sep}{urlencode({'webinar_status_payload': payload})}"
+
+
 def _parse_iso_dt(value: str) -> datetime | None:
     raw = str(value or "").strip()
     if not raw:
@@ -1119,6 +1154,8 @@ def _admin_users_payload() -> str:
         if not user_id:
             continue
         flow = str(row["registration_flow"] or "").strip().lower()
+        if _is_webinar_registration_flow(flow):
+            continue
         user_item = {
             "name": str(row["full_name"] or "-"),
             "telegram_username": str(row["telegram_username"] or ""),
@@ -1521,7 +1558,35 @@ def remove_user_from_vip_tier(user_id: int, tier: str) -> bool:
 
 
 def _tier_for_registration_flow(registration_flow: str) -> str:
-    return "vip3" if str(registration_flow or "").strip().lower() == "one_time_purchase" else "vip2"
+    base_flow = _base_registration_flow(registration_flow)
+    if base_flow == "one_time_purchase":
+        return "vip3"
+    if _is_webinar_registration_flow(registration_flow):
+        return ""
+    return "vip2"
+
+
+def _is_webinar_registration_flow(registration_flow: str) -> bool:
+    return str(registration_flow or "").strip().lower().startswith("webinar_s")
+
+
+def _webinar_series_number_from_flow(registration_flow: str) -> str:
+    raw = str(registration_flow or "").strip().lower()
+    match = re.match(r"^webinar_s([123])_", raw)
+    return str(match.group(1)) if match else ""
+
+
+def _base_registration_flow(registration_flow: str) -> str:
+    raw = str(registration_flow or "").strip().lower()
+    match = re.match(r"^webinar_s[123]_(.+)$", raw)
+    if match:
+        return str(match.group(1))
+    return raw
+
+
+def _webinar_series_label_from_flow(registration_flow: str) -> str:
+    number = _webinar_series_number_from_flow(registration_flow)
+    return f"SIRI {number}" if number else "siri webinar"
 
 
 def _parse_iso_datetime(value: str) -> datetime | None:
@@ -1605,7 +1670,10 @@ def _admin_renew_action_keyboard(user_id: int) -> InlineKeyboardMarkup:
 
 
 def get_required_deposit_amount(registration_flow: str) -> int:
-    if registration_flow == "under_ib_reezo":
+    base_flow = _base_registration_flow(registration_flow)
+    if base_flow == "under_ib_reezo":
+        return 50
+    if _is_webinar_registration_flow(registration_flow):
         return 50
     return 100
 
@@ -1829,11 +1897,12 @@ def store_onetime_payment_submission(
 
 
 def verification_action_keyboard(submission_id: str, registration_flow: str) -> InlineKeyboardMarkup:
-    request_label = "💸 Request Payment" if registration_flow == "one_time_purchase" else "💸 Request Deposit"
+    base_flow = _base_registration_flow(registration_flow)
+    request_label = "💸 Request Payment" if base_flow == "one_time_purchase" else "💸 Request Deposit"
     second_row = [InlineKeyboardButton(request_label, callback_data=f"{CB_VERIF_REQUEST_DEPOSIT}:{submission_id}")]
-    if registration_flow == "one_time_purchase":
+    if base_flow == "one_time_purchase":
         second_row.append(InlineKeyboardButton("✍️ Request Payment (Custom)", callback_data=f"{CB_VERIF_REQUEST_PAYMENT_CUSTOM}:{submission_id}"))
-    if registration_flow == "ib_transfer":
+    if base_flow == "ib_transfer":
         second_row.append(InlineKeyboardButton("🔁 Request Change IB", callback_data=f"{CB_VERIF_REQUEST_CHANGE_IB}:{submission_id}"))
     return InlineKeyboardMarkup(
         [
@@ -1856,7 +1925,7 @@ def approved_admin_keyboard(submission_id: str) -> InlineKeyboardMarkup:
 
 
 def user_deposit_keyboard(submission_id: str, registration_flow: str = "") -> InlineKeyboardMarkup:
-    done_label = "✅ Payment Selesai" if registration_flow == "one_time_purchase" else "✅ Deposit Selesai"
+    done_label = "✅ Payment Selesai" if _base_registration_flow(registration_flow) == "one_time_purchase" else "✅ Deposit Selesai"
     return InlineKeyboardMarkup(
         [
             [
@@ -2082,14 +2151,28 @@ def render_admin_submission_text(item: dict) -> str:
     username_text = f"@{username}" if username != "-" else "-"
     deposit_text = "Ya" if bool(item.get("has_deposit_100")) else "Belum"
     flow = str(item.get("registration_flow") or "new_registration")
+    base_flow = _base_registration_flow(flow)
     deposit_required_usd = int(item.get("deposit_required_usd") or get_required_deposit_amount(flow))
     flow_text_map = {
         "new_registration": "Pelanggan Baru",
         "ib_transfer": "Penukaran IB",
         "under_ib_reezo": "Client Under IB Reezo",
     }
-    flow_text = flow_text_map.get(flow, flow)
-    if flow == "one_time_purchase":
+    flow_text = flow_text_map.get(base_flow, base_flow)
+    if _is_webinar_registration_flow(flow):
+        return (
+            "📚 Webinar Registration Submit\n\n"
+            f"Flow: {_webinar_series_label_from_flow(flow)} - {flow_text}\n"
+            f"Submission ID: {item.get('submission_id')}\n"
+            f"User ID: {user_id}\n"
+            f"Username: {username_text}\n"
+            f"Nama: {item.get('full_name')}\n"
+            f"Wallet ID: {item.get('wallet_id')}\n"
+            f"Deposit Minimum USD{deposit_required_usd}: {deposit_text}\n"
+            f"No Telefon: {item.get('phone_number')}\n"
+            f"Status: {status_text}"
+        )
+    if base_flow == "one_time_purchase":
         channel = str(item.get("transfer_to") or "").strip().lower()
         channel_text = {"maybank": "Maybank", "tng": "TNG"}.get(channel, channel or "-")
         amount_paid = int(item.get("amount_paid") or 0)
@@ -2110,7 +2193,7 @@ def render_admin_submission_text(item: dict) -> str:
         )
     ib_req = item.get("ib_request_submitted")
     ib_req_text = ""
-    if flow == "ib_transfer":
+    if base_flow == "ib_transfer":
         ib_req_text = f"Submit Request IB: {'Ya' if ib_req else 'Belum'}\n"
     api_check_text = ""
     api_ib_status = item.get("api_is_client_under_ib")
@@ -2319,14 +2402,21 @@ async def send_user_deposit_request_message(
     if not isinstance(user_id, int):
         return
     registration_flow = str(item.get("registration_flow") or "")
+    base_flow = _base_registration_flow(registration_flow)
     deposit_required_usd = int(item.get("deposit_required_usd") or get_required_deposit_amount(registration_flow))
     await clear_user_deposit_prompt(context, item)
     await clear_user_ib_prompt(context, item)
-    if registration_flow == "one_time_purchase":
+    if base_flow == "one_time_purchase":
         requested_amount_rm = int(item.get("payment_request_amount_rm") or 350)
         request_text = (
             f"Sila buat pembayaran RM{requested_amount_rm} untuk melengkapkan proses one-time purchase.\n\n"
             "Tekan butang PAYMENT SELESAI untuk pengesahan semula."
+        )
+    elif _is_webinar_registration_flow(registration_flow):
+        request_text = (
+            f"Sila buat deposit USD{deposit_required_usd} ke akaun Amarkets ({item.get('wallet_id')}) "
+            f"untuk melengkapkan proses pendaftaran webinar {_webinar_series_label_from_flow(registration_flow)}.\n\n"
+            "Tekan butang DEPOSIT SELESAI untuk pengesahan semula."
         )
     else:
         request_text = (
@@ -2423,10 +2513,15 @@ def webinar_menu_keyboard() -> ReplyKeyboardMarkup:
         webinar_info_button = KeyboardButton(MENU_WEBINAR_INFO, web_app=WebAppInfo(url=webinar_info_url))
     else:
         webinar_info_button = KeyboardButton(MENU_WEBINAR_INFO)
+    webinar_register_url = get_webinar_register_webapp_url()
+    if webinar_register_url:
+        webinar_register_button = KeyboardButton(MENU_WEBINAR_REGISTER, web_app=WebAppInfo(url=webinar_register_url))
+    else:
+        webinar_register_button = KeyboardButton(MENU_WEBINAR_REGISTER)
     return ReplyKeyboardMarkup(
         [
             [webinar_info_button],
-            [KeyboardButton(MENU_WEBINAR_REGISTER)],
+            [webinar_register_button],
             [KeyboardButton(MENU_BACK_MAIN)],
         ],
         resize_keyboard=True,
@@ -2666,8 +2761,9 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
         if action == CB_VERIF_REQUEST_DEPOSIT:
             current = get_submission(submission_id)
             registration_flow = str(current.get("registration_flow") or "") if isinstance(current, dict) else ""
-            next_status = "request_payment" if registration_flow == "one_time_purchase" else "request_deposit"
-            request_amount = 350 if registration_flow == "one_time_purchase" else None
+            base_flow = _base_registration_flow(registration_flow)
+            next_status = "request_payment" if base_flow == "one_time_purchase" else "request_deposit"
+            request_amount = 350 if base_flow == "one_time_purchase" else None
             item = update_submission_fields(
                 submission_id=submission_id,
                 fields={
@@ -2688,7 +2784,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 except Exception:
                     logger.exception("Failed to notify user for deposit request")
             await refresh_admin_submission_message(context, submission_id)
-            if registration_flow == "one_time_purchase":
+            if base_flow == "one_time_purchase":
                 await _reply_to_query_message(query, f"✅ Request payment RM350 dihantar kepada user untuk submission {submission_id}.")
             else:
                 await _reply_to_query_message(query, f"✅ Request deposit dihantar kepada user untuk submission {submission_id}.")
@@ -2700,7 +2796,7 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 await _reply_to_query_message(query, "❌ Rekod submission tak jumpa atau dah dipadam.")
                 return
             registration_flow = str(current.get("registration_flow") or "")
-            if registration_flow != "one_time_purchase":
+            if _base_registration_flow(registration_flow) != "one_time_purchase":
                 await _reply_to_query_message(query, "⚠️ Mode ini hanya untuk one-time purchase.")
                 return
             context.user_data["awaiting_custom_payment_submission_id"] = submission_id
@@ -2741,10 +2837,13 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 return
             user_id = item.get("user_id")
             registration_flow = str(item.get("registration_flow") or "")
+            base_flow = _base_registration_flow(registration_flow)
             if not isinstance(user_id, int):
                 await _reply_to_query_message(query, "❌ User ID tak sah.")
                 return
-            remove_user_from_vip_tier(user_id, _tier_for_registration_flow(registration_flow))
+            tier = _tier_for_registration_flow(registration_flow)
+            if tier:
+                remove_user_from_vip_tier(user_id, tier)
             update_submission_fields(
                 submission_id=submission_id,
                 fields={
@@ -2759,7 +2858,12 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                 revoked_text = (
                     "Akses one-time purchase NEXT eVideo26 anda telah ditarik semula oleh admin.\n"
                     "Sila hubungi admin untuk maklumat lanjut."
-                    if registration_flow == "one_time_purchase"
+                    if base_flow == "one_time_purchase"
+                    else (
+                        f"Pendaftaran webinar {_webinar_series_label_from_flow(registration_flow)} anda telah ditarik semula oleh admin.\n"
+                        "Sila hubungi admin untuk maklumat lanjut."
+                    )
+                    if _is_webinar_registration_flow(registration_flow)
                     else "Akses NEXTexclusive anda telah ditarik semula oleh admin.\n"
                     "Sila hubungi admin untuk maklumat lanjut."
                 )
@@ -2789,11 +2893,17 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
             await clear_user_deposit_prompt_by_submission(context, submission_id)
             await clear_user_ib_prompt_by_submission(context, submission_id)
             try:
+                base_flow = _base_registration_flow(registration_flow)
                 if status == "rejected":
                     rejected_text = (
                         "Permohonan NEXT eVideo26 one-time purchase anda tidak diluluskan.\n"
                         "Sila hubungi admin untuk maklumat lanjut."
-                        if registration_flow == "one_time_purchase"
+                        if base_flow == "one_time_purchase"
+                        else (
+                            f"Permohonan pendaftaran webinar {_webinar_series_label_from_flow(registration_flow)} anda tidak diluluskan.\n"
+                            "Sila semak semula syarat pendaftaran atau hubungi admin."
+                        )
+                        if _is_webinar_registration_flow(registration_flow)
                         else "Permohonan akses NEXTexclusive anda tidak diluluskan.\n"
                         "Sila buat pendaftaran baru."
                     )
@@ -2810,11 +2920,18 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                         ),
                     )
                 elif status == "approved":
-                    add_user_to_vip_tier(updated, _tier_for_registration_flow(registration_flow))
+                    tier = _tier_for_registration_flow(registration_flow)
+                    if tier:
+                        add_user_to_vip_tier(updated, tier)
                     approved_text = (
                         "Tahniah! Pembayaran one-time purchase NEXT eVideo26 anda telah diluluskan.\n"
                         "Sila tunggu arahan akses seterusnya daripada admin."
-                        if registration_flow == "one_time_purchase"
+                        if base_flow == "one_time_purchase"
+                        else (
+                            f"Tahniah! Pendaftaran webinar {_webinar_series_label_from_flow(registration_flow)} anda telah diluluskan.\n"
+                            "Sila tunggu maklumat akses atau arahan seterusnya daripada admin."
+                        )
+                        if _is_webinar_registration_flow(registration_flow)
                         else (
                             "Tahniah! Anda kini boleh menikmati semua keistimewaan/privilege NEXTexclusive.\n"
                             f"Baki subscription anda: {VIP2_SUBSCRIPTION_DAYS} hari.\n"
@@ -3295,6 +3412,9 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
 
     if text == MENU_WEBINAR_REGISTER:
+        if get_webinar_register_webapp_url():
+            await message.reply_text("Buka miniapp Daftar Webinar melalui butang web app pada menu.")
+            return
         await message.reply_text(
             "Flow daftar webinar belum dibuka lagi. Saya dah sediakan submenu, next boleh sambung borang atau miniapp pendaftaran.",
             reply_markup=webinar_menu_keyboard(),
@@ -3405,9 +3525,10 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     if payload_type == "sidebot_verification_submit":
         registration_flow = str(payload.get("registration_flow") or "new_registration").strip() or "new_registration"
+        base_flow = _base_registration_flow(registration_flow)
         ib_request_raw = payload.get("ib_request_submitted", None)
         ib_request_submitted = None
-        if registration_flow == "ib_transfer":
+        if base_flow == "ib_transfer":
             if isinstance(ib_request_raw, bool):
                 ib_request_submitted = ib_request_raw
 
@@ -3422,7 +3543,7 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
         if not is_valid_wallet_id(wallet_id):
             await message.reply_text("❌ AMarkets Wallet ID mesti tepat 7 angka.")
             return
-        if registration_flow == "ib_transfer" and ib_request_submitted is None:
+        if base_flow == "ib_transfer" and ib_request_submitted is None:
             await message.reply_text("❌ Status submit request penukaran IB belum dipilih. Sila isi semula.")
             return
 
@@ -3438,7 +3559,7 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         api_is_client_under_ib = None
         api_check_message = ""
-        if registration_flow in {"ib_transfer", "under_ib_reezo"}:
+        if base_flow in {"ib_transfer", "under_ib_reezo"}:
             api_is_client_under_ib, api_check_message = amarkets_check_is_client(wallet_id)
             update_submission_fields(
                 submission_id=str(saved.get("submission_id")),
@@ -3465,18 +3586,31 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
             if admin_notified
             else "Permohonan anda telah direkod. Notifikasi admin belum berjaya dihantar.\n"
         )
-        await message.reply_text(
-            "✅ Pengesahan diterima.\n"
-            f"{notify_text}"
-            "Sila tunggu approval.\n\n"
-            f"Submission ID: {submission_id}\n"
-            f"Wallet ID: {wallet_id}\n"
-            f"Deposit Minimum USD{deposit_required_usd}: {deposit_text}\n"
-            f"Nama: {full_name}\n"
-            f"Telefon: {phone_number}",
-            reply_markup=main_menu_keyboard(user.id),
-        )
-        if registration_flow == "ib_transfer":
+        if _is_webinar_registration_flow(registration_flow):
+            await message.reply_text(
+                f"✅ Pengesahan webinar {_webinar_series_label_from_flow(registration_flow)} diterima.\n"
+                f"{notify_text}"
+                "Sila tunggu approval.\n\n"
+                f"Submission ID: {submission_id}\n"
+                f"Wallet ID: {wallet_id}\n"
+                f"Deposit Minimum USD{deposit_required_usd}: {deposit_text}\n"
+                f"Nama: {full_name}\n"
+                f"Telefon: {phone_number}",
+                reply_markup=main_menu_keyboard(user.id),
+            )
+        else:
+            await message.reply_text(
+                "✅ Pengesahan diterima.\n"
+                f"{notify_text}"
+                "Sila tunggu approval.\n\n"
+                f"Submission ID: {submission_id}\n"
+                f"Wallet ID: {wallet_id}\n"
+                f"Deposit Minimum USD{deposit_required_usd}: {deposit_text}\n"
+                f"Nama: {full_name}\n"
+                f"Telefon: {phone_number}",
+                reply_markup=main_menu_keyboard(user.id),
+            )
+        if base_flow == "ib_transfer":
             if not ib_request_submitted:
                 try:
                     latest = get_submission(submission_id)
