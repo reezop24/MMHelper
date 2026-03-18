@@ -23,14 +23,19 @@
 
     .note-box {
       margin-top: 12px;
-      border: 1px solid #5a3035;
+      border: 1px solid #9d2d3a;
       border-radius: 12px;
       padding: 12px;
-      background: rgba(27, 18, 20, 0.92);
+      background: linear-gradient(135deg, rgba(118, 18, 34, 0.94) 0%, rgba(42, 12, 19, 0.96) 100%);
+      box-shadow: 0 10px 24px rgba(112, 16, 34, 0.22);
     }
 
     .note-box strong {
-      color: #ffeef1;
+      color: #fff4f6;
+    }
+
+    .note-box p {
+      color: #ffe4e8;
     }
 
     .tabs {
@@ -541,20 +546,98 @@
           </div>
 
           <div class="action-row">
-            <button type="button" class="action-btn">DAFTAR WEBINAR SIRI 2</button>
-            <button type="button" class="action-btn secondary">DAFTAR NEXTexclusive</button>
+            <button id="registerSeries2Btn" type="button" class="action-btn">DAFTAR WEBINAR SIRI 2</button>
+            <button id="registerNextBtnS2" type="button" class="action-btn secondary">DAFTAR NEXTexclusive</button>
           </div>
         </section>
 
         <section id="panelS3" class="tab-panel">
-          <h2 class="panel-title">SIRI 3</h2>
-          <span class="date-pill">14 &amp; 15 May 2026</span>
-          <ul class="feature-list">
-            <li>Penutup keseluruhan siri webinar dengan fokus pada pemahaman flow harga dari awal hingga lanjutan.</li>
-            <li>Membantu anda membezakan kedudukan price dalam fasa semasa dengan lebih jelas.</li>
-            <li><span class="inline-brand"><img src="nextexc.png" alt="NEXTexclusive" /></span> member aktif layak automatik.</li>
-            <li>Cara daftar: buka menu <code>Daftar webinar</code> dan lengkapkan pendaftaran untuk SIRI 3.</li>
-          </ul>
+          <div class="hero-card">
+            <span class="section-label">Siri Webinar</span>
+            <h2 class="panel-title">SIRI 3</h2>
+            <span class="date-pill">14 &amp; 15 May 2026</span>
+            <p class="hero-copy">Siri ini fokus pada behaviour selepas breakout dan cara membina flow entry yang lebih kemas, tepat, dan berstruktur sehingga ke bahagian management.</p>
+          </div>
+
+          <div class="stack-sections">
+            <div class="info-card">
+              <p class="card-heading">📌 Topik</p>
+              <ul class="feature-list tight">
+                <li>Behaviour selepas breakout</li>
+              </ul>
+            </div>
+
+            <div class="info-grid">
+              <div class="info-card">
+                <p class="card-heading">Cara kenal</p>
+                <ul class="feature-list tight">
+                  <li>Retracement sihat vs reversal</li>
+                </ul>
+              </div>
+
+              <div class="info-card">
+                <p class="card-heading">Cara cari POI</p>
+                <ul class="feature-list tight">
+                  <li>Orderblock</li>
+                  <li>Imbalance</li>
+                  <li>Zone yang dah diambil</li>
+                </ul>
+              </div>
+
+              <div class="info-card">
+                <p class="card-heading">Entry timing</p>
+                <ul class="feature-list tight">
+                  <li>Confirmation vs aggressive entry</li>
+                  <li>Flow lengkap entry -> management</li>
+                </ul>
+              </div>
+
+              <div class="info-card">
+                <p class="card-heading">🎯 Outcome</p>
+                <div class="key-points">
+                  <div class="key-point"><strong>Entry lebih tepat</strong><br />Entry jadi lebih tepat dan berstruktur selepas breakout berlaku.</div>
+                  <div class="key-point"><strong>Kurang FOMO</strong><br />Kurangkan FOMO dan entry lewat pada pergerakan yang sudah jauh.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="info-card">
+              <p class="card-heading">MAKLUMAT TAMBAHAN</p>
+              <ul class="feature-list tight">
+                <li>14 &amp; 15 May 2026</li>
+                <li>9pm-12pm</li>
+                <li>Zoom</li>
+                <li>Rakaman disediakan</li>
+                <li>eBook disediakan (sebelum webinar)</li>
+                <li>eVideo berkala untuk topik berkaitan (selepas webinar)</li>
+              </ul>
+            </div>
+
+            <div class="info-card">
+              <p class="card-heading">Syarat pendaftaran</p>
+              <ul class="feature-list tight">
+                <li>
+                  <span class="requirement-brand">
+                    <span>Daftar</span>
+                    <img src="amarketslogo.png" alt="AMarkets" />
+                    <span>dan deposit 50USD</span>
+                  </span>
+                </li>
+                <li>Anda juga boleh mendaftar sebagai <span class="inline-brand"><img src="nextexc.png" alt="NEXTexclusive" /></span> member untuk dapatkan akses yang lebih luas</li>
+              </ul>
+            </div>
+
+            <div class="access-note">
+              <p><strong>Maklumat Akses</strong></p>
+              <p><strong><span class="inline-brand"><img src="nextexc.png" alt="NEXTexclusive" /></span> member didaftarkan secara automatik untuk akses live.</strong></p>
+              <p>Pelanggan NEXTeVideo26 masih boleh menonton rakaman untuk SIRI 3.</p>
+            </div>
+          </div>
+
+          <div class="action-row">
+            <button id="registerSeries3Btn" type="button" class="action-btn">DAFTAR WEBINAR SIRI 3</button>
+            <button id="registerNextBtnS3" type="button" class="action-btn secondary">DAFTAR NEXTexclusive</button>
+          </div>
         </section>
       </div>
 
@@ -582,6 +665,10 @@
       var bottomBackBtn = document.getElementById("bottomBackBtn");
       var registerSeries1Btn = document.getElementById("registerSeries1Btn");
       var registerNextBtn = document.getElementById("registerNextBtn");
+      var registerSeries2Btn = document.getElementById("registerSeries2Btn");
+      var registerNextBtnS2 = document.getElementById("registerNextBtnS2");
+      var registerSeries3Btn = document.getElementById("registerSeries3Btn");
+      var registerNextBtnS3 = document.getElementById("registerNextBtnS3");
 
       function getNextRegisterUrl() {
         try {
@@ -618,6 +705,24 @@
         }
       }
 
+      function openSeries2Register() {
+        var payload = { type: "sidebot_webinar_register_open", series: "2" };
+        if (tg) {
+          tg.sendData(JSON.stringify(payload));
+          tg.close();
+          return;
+        }
+      }
+
+      function openSeries3Register() {
+        var payload = { type: "sidebot_webinar_register_open", series: "3" };
+        if (tg) {
+          tg.sendData(JSON.stringify(payload));
+          tg.close();
+          return;
+        }
+      }
+
       function openNextRegister() {
         var nextRegisterUrl = getNextRegisterUrl();
         if (!nextRegisterUrl) {
@@ -643,6 +748,18 @@
       }
       if (registerNextBtn) {
         registerNextBtn.addEventListener("click", openNextRegister);
+      }
+      if (registerSeries2Btn) {
+        registerSeries2Btn.addEventListener("click", openSeries2Register);
+      }
+      if (registerNextBtnS2) {
+        registerNextBtnS2.addEventListener("click", openNextRegister);
+      }
+      if (registerSeries3Btn) {
+        registerSeries3Btn.addEventListener("click", openSeries3Register);
+      }
+      if (registerNextBtnS3) {
+        registerNextBtnS3.addEventListener("click", openNextRegister);
       }
 
       activate(0);
