@@ -73,6 +73,9 @@ VIP2_REMINDER_DAYS_BEFORE = 7
 
 MENU_DAFTAR_NEXT_MEMBER = "🚀 Daftar NEXTexclusive"
 MENU_BELI_EVIDEO26 = "🎬 One Time Purchase NEXT eVideo26"
+MENU_PENDAFTARAN_WEBINAR = "📚 Pendaftaran Webinar"
+MENU_WEBINAR_INFO = "ℹ️ Maklumat webinar"
+MENU_WEBINAR_REGISTER = "📝 Daftar webinar"
 MENU_OPEN_MMHELPER_BOT = "🤖 Buka MM Helper Bot"
 MENU_OPEN_EVIDEO_BOT = "🎥 Buka NEXT eVideo Bot"
 MENU_ALL_PRODUCT_PREVIEW = "🛍️ All Product Preview (coming soon)"
@@ -2270,12 +2273,24 @@ def main_menu_keyboard(user_id: int | None) -> ReplyKeyboardMarkup:
     rows = [
         [register_button],
         [onetime_button],
+        [KeyboardButton(MENU_PENDAFTARAN_WEBINAR)],
         [KeyboardButton(MENU_OPEN_MMHELPER_BOT), KeyboardButton(MENU_OPEN_EVIDEO_BOT)],
         [KeyboardButton(MENU_ALL_PRODUCT_PREVIEW)],
     ]
     if is_admin_user(user_id):
         rows.append([KeyboardButton(MENU_ADMIN_PANEL)])
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
+
+
+def webinar_menu_keyboard() -> ReplyKeyboardMarkup:
+    return ReplyKeyboardMarkup(
+        [
+            [KeyboardButton(MENU_WEBINAR_INFO)],
+            [KeyboardButton(MENU_WEBINAR_REGISTER)],
+            [KeyboardButton(MENU_BACK_MAIN)],
+        ],
+        resize_keyboard=True,
+    )
 
 
 def admin_panel_keyboard() -> ReplyKeyboardMarkup:
@@ -3108,6 +3123,27 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             await message.reply_text("Buka miniapp One Time Purchase melalui butang web app pada menu.")
             return
         await message.reply_text("Miniapp URL belum diset. Isi SIDEBOT_ONETIME_EVIDEO_WEBAPP_URL dalam .env dulu.")
+        return
+
+    if text == MENU_PENDAFTARAN_WEBINAR:
+        await message.reply_text(
+            "Pilih tindakan untuk webinar.",
+            reply_markup=webinar_menu_keyboard(),
+        )
+        return
+
+    if text == MENU_WEBINAR_INFO:
+        await message.reply_text(
+            "Maklumat webinar akan dipaparkan di sini. Flow pendaftaran boleh disambung dalam langkah seterusnya.",
+            reply_markup=webinar_menu_keyboard(),
+        )
+        return
+
+    if text == MENU_WEBINAR_REGISTER:
+        await message.reply_text(
+            "Flow daftar webinar belum dibuka lagi. Saya dah sediakan submenu, next boleh sambung borang atau miniapp pendaftaran.",
+            reply_markup=webinar_menu_keyboard(),
+        )
         return
 
     if text == MENU_OPEN_MMHELPER_BOT:
