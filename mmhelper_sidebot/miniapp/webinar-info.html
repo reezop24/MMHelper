@@ -229,6 +229,45 @@
       gap: 8px;
     }
 
+    .status-overlay {
+      display: none;
+      margin-top: 14px;
+      border-radius: 16px;
+      padding: 16px 14px;
+      border: 1px solid #8d4d54;
+      background: linear-gradient(180deg, rgba(74, 27, 34, 0.95) 0%, rgba(49, 20, 24, 0.98) 100%);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+    }
+
+    .status-overlay.active {
+      display: block;
+    }
+
+    .status-overlay.not-opened {
+      border-color: #2563eb;
+      background: linear-gradient(180deg, rgba(23, 56, 119, 0.95) 0%, rgba(15, 34, 72, 0.98) 100%);
+    }
+
+    .status-overlay.closed {
+      border-color: #8d4d54;
+      background: linear-gradient(180deg, rgba(74, 27, 34, 0.95) 0%, rgba(49, 20, 24, 0.98) 100%);
+    }
+
+    .status-overlay-title {
+      margin: 0 0 8px;
+      color: #fff4f6;
+      font-size: 16px;
+      font-weight: 800;
+    }
+
+    .status-overlay-text {
+      margin: 0;
+      color: #f9e7ea;
+      font-size: 15px;
+      line-height: 1.55;
+      font-weight: 700;
+    }
+
     .action-btn {
       margin: 0;
       border: 1px solid #f59e0b;
@@ -246,6 +285,12 @@
       border-color: #8d4d54;
       background: rgba(56, 24, 29, 0.86);
       color: #f4e2e6;
+    }
+
+    .action-btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+      filter: grayscale(0.2);
     }
 
     .requirement-brand {
@@ -455,6 +500,11 @@
             </div>
           </div>
 
+          <div id="statusOverlayS1" class="status-overlay">
+            <p class="status-overlay-title">Status Pendaftaran</p>
+            <p id="statusOverlayTextS1" class="status-overlay-text"></p>
+          </div>
+
           <div class="action-row">
             <button id="registerSeries1Btn" type="button" class="action-btn">DAFTAR WEBINAR SIRI 1</button>
             <button id="registerNextBtn" type="button" class="action-btn secondary">DAFTAR NEXTexclusive</button>
@@ -543,6 +593,11 @@
               <p><strong><span class="inline-brand"><img src="nextexc.png" alt="NEXTexclusive" /></span> member didaftarkan secara automatik untuk akses live.</strong></p>
               <p>Pelanggan NEXTeVideo26 masih boleh menonton rakaman untuk SIRI 2.</p>
             </div>
+          </div>
+
+          <div id="statusOverlayS2" class="status-overlay">
+            <p class="status-overlay-title">Status Pendaftaran</p>
+            <p id="statusOverlayTextS2" class="status-overlay-text"></p>
           </div>
 
           <div class="action-row">
@@ -634,6 +689,11 @@
             </div>
           </div>
 
+          <div id="statusOverlayS3" class="status-overlay">
+            <p class="status-overlay-title">Status Pendaftaran</p>
+            <p id="statusOverlayTextS3" class="status-overlay-text"></p>
+          </div>
+
           <div class="action-row">
             <button id="registerSeries3Btn" type="button" class="action-btn">DAFTAR WEBINAR SIRI 3</button>
             <button id="registerNextBtnS3" type="button" class="action-btn secondary">DAFTAR NEXTexclusive</button>
@@ -669,12 +729,30 @@
       var registerNextBtnS2 = document.getElementById("registerNextBtnS2");
       var registerSeries3Btn = document.getElementById("registerSeries3Btn");
       var registerNextBtnS3 = document.getElementById("registerNextBtnS3");
+      var overlayS1 = document.getElementById("statusOverlayS1");
+      var overlayTextS1 = document.getElementById("statusOverlayTextS1");
+      var overlayS2 = document.getElementById("statusOverlayS2");
+      var overlayTextS2 = document.getElementById("statusOverlayTextS2");
+      var overlayS3 = document.getElementById("statusOverlayS3");
+      var overlayTextS3 = document.getElementById("statusOverlayTextS3");
 
       function getNextRegisterUrl() {
         try {
           return String(new URLSearchParams(window.location.search).get("next_register_url") || "").trim();
         } catch (err) {
           return "";
+        }
+      }
+
+      function getWebinarStatusPayload() {
+        try {
+          var raw = new URLSearchParams(window.location.search).get("webinar_status_payload");
+          if (!raw) return { series: {} };
+          var parsed = JSON.parse(raw);
+          if (!parsed || typeof parsed !== "object") return { series: {} };
+          return parsed;
+        } catch (err) {
+          return { series: {} };
         }
       }
 
@@ -731,6 +809,28 @@
         window.location.href = nextRegisterUrl;
       }
 
+      function applySeriesStatus(seriesId, statusValue, registerBtn, overlayEl, overlayTextEl) {
+        var value = String(statusValue || "opened");
+        if (!overlayEl || !overlayTextEl || !registerBtn) {
+          return;
+        }
+        overlayEl.classList.remove("active", "closed", "not-opened");
+        registerBtn.disabled = false;
+        if (value === "opened") {
+          overlayTextEl.textContent = "";
+          return;
+        }
+        if (value === "not_opened") {
+          overlayEl.classList.add("active", "not-opened");
+          overlayTextEl.textContent = "Pendaftaran belum dibuka";
+          registerBtn.disabled = true;
+          return;
+        }
+        overlayEl.classList.add("active", "closed");
+        overlayTextEl.textContent = "Pendaftaran ditutup";
+        registerBtn.disabled = true;
+      }
+
       tabs.forEach(function (item, index) {
         item.btn.addEventListener("click", function () {
           activate(index);
@@ -760,6 +860,17 @@
       }
       if (registerNextBtnS3) {
         registerNextBtnS3.addEventListener("click", openNextRegister);
+      }
+
+      var webinarStatus = getWebinarStatusPayload();
+      var webinarSeries = webinarStatus && typeof webinarStatus === "object" ? webinarStatus.series : null;
+      if (webinarSeries && typeof webinarSeries === "object") {
+        var s1 = webinarSeries["1"] && typeof webinarSeries["1"] === "object" ? String(webinarSeries["1"].status || "opened") : "opened";
+        var s2 = webinarSeries["2"] && typeof webinarSeries["2"] === "object" ? String(webinarSeries["2"].status || "opened") : "opened";
+        var s3 = webinarSeries["3"] && typeof webinarSeries["3"] === "object" ? String(webinarSeries["3"].status || "opened") : "opened";
+        applySeriesStatus("1", s1, registerSeries1Btn, overlayS1, overlayTextS1);
+        applySeriesStatus("2", s2, registerSeries2Btn, overlayS2, overlayTextS2);
+        applySeriesStatus("3", s3, registerSeries3Btn, overlayS3, overlayTextS3);
       }
 
       activate(0);
