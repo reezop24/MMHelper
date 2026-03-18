@@ -268,6 +268,16 @@
     seriesStatusBox.classList.toggle("not-opened", status === "not_opened");
   }
 
+  function resetSeriesSelectionView() {
+    selectedSeries = String(seriesSelect.value || "1");
+    refreshSeriesTexts();
+    seriesHighlight.classList.add("hidden");
+    seriesStatusBox.classList.add("hidden");
+    seriesStatusBox.classList.remove("not-opened");
+    seriesActionList.classList.add("hidden");
+    statusEl.textContent = "";
+  }
+
   function submitVerification() {
     var walletId = readText(walletIdInput);
     var fullName = readText(fullNameInput);
@@ -385,6 +395,7 @@
   }
 
   btnStartRegister.addEventListener("click", renderSeriesActions);
+  seriesSelect.addEventListener("change", resetSeriesSelectionView);
   btnHomeNewRegistration.addEventListener("click", function () { showView("new_registration"); openTab("new"); });
   btnHomeIbTransfer.addEventListener("click", function () { showView("ib_transfer"); openIbTab("transfer"); openIbGuideTab("web"); });
   btnHomeUnderIbReezo.addEventListener("click", function () { showView("under_ib_reezo"); });
@@ -428,5 +439,6 @@
   bottomBackBtn.addEventListener("click", sendToMainMenu);
 
   refreshSeriesTexts();
+  resetSeriesSelectionView();
   updateBottomPrevState();
 })();
