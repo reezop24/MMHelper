@@ -68,6 +68,7 @@ VIDEO_HAPPY_HOUR_RULES_KEY = "video_happy_hour_rules"
 VIDEO_HAPPY_HOUR_RUNTIME_KEY = "video_happy_hour_runtime"
 VIDEO_HAPPY_HOUR_RESET_REQUEST_KEY = "video_happy_hour_reset_request"
 VIDEO_HAPPY_HOUR_ANNOUNCE_REQUEST_KEY = "video_happy_hour_announce_request"
+WEBINAR_STATUS_STATE_KEY = "webinar_status_state"
 VIP2_SUBSCRIPTION_DAYS = 45
 VIP2_REMINDER_DAYS_BEFORE = 7
 
@@ -83,6 +84,7 @@ MENU_ADMIN_PANEL = "🛡️ Admin Panel"
 MENU_ADMIN_USERS = "👥 User Directory"
 MENU_HAPPY_HOUR = "⏰ Happy Hour"
 MENU_HAPPY_HOUR_STATUS = "📊 Happy Hour Status"
+MENU_WEBINAR_STATUS = "🗂️ Status Webinar"
 MENU_BETA_RESET = "🧪 BETA RESET"
 MENU_CHECK_UNDER_IB = "🔎 Check Under IB"
 MENU_BACK_MAIN = "⬅️ Back to Main Menu"
@@ -870,6 +872,40 @@ def get_happy_hour_status_webapp_base_url() -> str:
         return f"{base}/happy-hour-status.html"
 
 
+def get_webinar_status_webapp_url() -> str:
+    explicit = (os.getenv("SIDEBOT_WEBINAR_STATUS_WEBAPP_URL") or "").strip()
+    built = ""
+    if explicit.lower().startswith("https://"):
+        built = explicit
+
+    if not built:
+        base = get_register_next_webapp_url()
+        if not base:
+            return ""
+        try:
+            parts = urlsplit(base)
+            path = parts.path or "/"
+            if path.endswith("/"):
+                new_path = f"{path}webinar-status.html"
+            elif path.endswith(".html"):
+                parent = path.rsplit("/", 1)[0] if "/" in path else ""
+                new_path = f"{parent}/webinar-status.html" if parent else "/webinar-status.html"
+            else:
+                new_path = f"{path}/webinar-status.html"
+            built = urlunsplit((parts.scheme, parts.netloc, new_path, parts.query, parts.fragment))
+        except Exception:
+            if base.endswith("/"):
+                built = f"{base}webinar-status.html"
+            elif base.endswith(".html"):
+                built = f"{base.rsplit('/', 1)[0]}/webinar-status.html"
+            else:
+                built = f"{base}/webinar-status.html"
+
+    payload = quote(_webinar_status_payload(), safe="")
+    sep = "&" if "?" in built else "?"
+    return f"{built}{sep}webinar_status_payload={payload}"
+
+
 def _parse_iso_dt(value: str) -> datetime | None:
     raw = str(value or "").strip()
     if not raw:
@@ -977,6 +1013,61 @@ def get_happy_hour_status_webapp_url() -> str:
     payload = quote(_happy_hour_status_payload(), safe="")
     sep = "&" if "?" in base else "?"
     return f"{base}{sep}happy_hour_status_payload={payload}"
+
+
+def _default_webinar_status_state() -> dict[str, object]:
+    return {
+        "series": {
+            "1": {"status": "closed"},
+            "2": {"status": "closed"},
+            "3": {"status": "closed"},
+        },
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def _normalize_webinar_status_value(value: object) -> str:
+    raw = str(value or "").strip().lower()
+    if raw == "opened":
+        return "opened"
+    if raw == "not_opened":
+        return "not_opened"
+    return "closed"
+
+
+def _read_webinar_status_state() -> dict[str, object]:
+    default = _default_webinar_status_state()
+    try:
+        with _connect_shared_db() as conn:
+            _ensure_state_table(conn)
+            data = _read_generic_kv_json(conn, WEBINAR_STATUS_STATE_KEY, default)
+    except sqlite3.Error:
+        logger.warning("Failed to read webinar status state", exc_info=True)
+        return default
+
+    series = data.get("series")
+    normalized_series: dict[str, dict[str, str]] = {}
+    if isinstance(series, dict):
+        for key in ("1", "2", "3"):
+            row = series.get(key)
+            if isinstance(row, dict):
+                normalized_series[key] = {"status": _normalize_webinar_status_value(row.get("status"))}
+            else:
+                normalized_series[key] = {"status": "closed"}
+    else:
+        normalized_series = default["series"]  # type: ignore[assignment]
+
+    updated_at = str(data.get("updated_at") or default["updated_at"])
+    return {"series": normalized_series, "updated_at": updated_at}
+
+
+def _webinar_status_payload() -> str:
+    state = _read_webinar_status_state()
+    out = {
+        "series": state.get("series", {}),
+        "updated_at": _format_dt_display(str(state.get("updated_at") or "")),
+    }
+    return json.dumps(out, ensure_ascii=False)
 
 
 def _format_dt_display(value: str) -> str:
@@ -2354,11 +2445,17 @@ def admin_panel_keyboard() -> ReplyKeyboardMarkup:
         happy_hour_status_button = KeyboardButton(MENU_HAPPY_HOUR_STATUS, web_app=WebAppInfo(url=happy_hour_status_url))
     else:
         happy_hour_status_button = KeyboardButton(MENU_HAPPY_HOUR_STATUS)
+    webinar_status_url = get_webinar_status_webapp_url()
+    if webinar_status_url:
+        webinar_status_button = KeyboardButton(MENU_WEBINAR_STATUS, web_app=WebAppInfo(url=webinar_status_url))
+    else:
+        webinar_status_button = KeyboardButton(MENU_WEBINAR_STATUS)
     return ReplyKeyboardMarkup(
         [
             [KeyboardButton(MENU_CHECK_UNDER_IB)],
             [admin_users_button],
             [happy_hour_button, happy_hour_status_button],
+            [webinar_status_button],
             [KeyboardButton(MENU_BETA_RESET)],
             [KeyboardButton(MENU_BACK_MAIN)],
         ],
@@ -3156,6 +3253,15 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         )
         return
 
+    if text == MENU_WEBINAR_STATUS:
+        if not is_admin_user(user.id):
+            await message.reply_text("❌ Akses ditolak.", reply_markup=main_menu_keyboard(user.id))
+            return
+        await message.reply_text(
+            "Miniapp URL belum diset. Isi SIDEBOT_WEBINAR_STATUS_WEBAPP_URL atau SIDEBOT_REGISTER_WEBAPP_URL dalam .env dulu."
+        )
+        return
+
     if text == MENU_DAFTAR_NEXT_MEMBER:
         if get_register_next_webapp_url():
             await message.reply_text("Buka miniapp melalui butang web app pada menu.")
@@ -3642,6 +3748,49 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
         await message.reply_text(
             "✅ Reset Happy Hour diterima.\nSistem sedang reset semua sesi & setting.",
+            reply_markup=admin_panel_keyboard(),
+        )
+        return
+
+    if payload_type == "sidebot_admin_webinar_status_save":
+        if not is_admin_user(user.id):
+            await message.reply_text("❌ Akses ditolak.")
+            return
+
+        series = str(payload.get("series") or "").strip()
+        if series not in {"1", "2", "3"}:
+            await message.reply_text("❌ Siri webinar tak sah.")
+            return
+        status_value = _normalize_webinar_status_value(payload.get("status"))
+
+        state = _read_webinar_status_state()
+        raw_series = state.get("series")
+        if not isinstance(raw_series, dict):
+            raw_series = _default_webinar_status_state()["series"]  # type: ignore[assignment]
+        row = raw_series.get(series)
+        if not isinstance(row, dict):
+            row = {"status": "closed"}
+        row["status"] = status_value
+        raw_series[series] = row
+        state["series"] = raw_series
+        state["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+        try:
+            with _connect_shared_db() as conn:
+                _ensure_state_table(conn)
+                _write_generic_kv_json(conn, WEBINAR_STATUS_STATE_KEY, state)
+        except sqlite3.Error:
+            logger.exception("Failed to save webinar status")
+            await message.reply_text("❌ Gagal simpan status webinar.")
+            return
+
+        labels = {
+            "opened": "Pendaftaran dibuka",
+            "not_opened": "Pendaftaran belum dibuka",
+            "closed": "Pendaftaran ditutup",
+        }
+        await message.reply_text(
+            f"✅ Status webinar SIRI {series} disimpan: {labels.get(status_value, 'Pendaftaran ditutup')}.",
             reply_markup=admin_panel_keyboard(),
         )
         return
