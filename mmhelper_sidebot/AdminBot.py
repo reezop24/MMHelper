@@ -4380,6 +4380,27 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
             await message.reply_text("❌ Gagal tebus invite code. Cuba lagi.")
             return
 
+        admin_group_id = get_admin_group_id()
+        if admin_group_id:
+            username_text = f"@{user.username}" if str(user.username or "").strip() else "-"
+            admin_text = (
+                "📚 Webinar Special Invitation Approved\n\n"
+                f"Campaign: {get_current_webinar_campaign()}\n"
+                f"Siri: SIRI {series}\n"
+                "Flow: Special Invitation\n"
+                f"User ID: {user.id}\n"
+                f"Username: {username_text}\n"
+                f"Nama: {full_name}\n"
+                f"Wallet ID: {wallet_id}\n"
+                f"No Telefon: {phone_number}\n"
+                f"Invite Code: {invite_code}\n"
+                "Status: ✅ AUTO APPROVED"
+            )
+            try:
+                await context.bot.send_message(chat_id=admin_group_id, text=admin_text)
+            except Exception:
+                logger.exception("Failed sending webinar special invitation admin notification")
+
         await message.reply_text(
             f"✅ Special invitation berjaya disahkan.\nAkses webinar {get_current_webinar_campaign()} SIRI {series} telah direkod.",
             reply_markup=main_menu_keyboard(user.id),
