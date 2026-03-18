@@ -808,11 +808,13 @@ def get_happy_hour_webapp_url() -> str:
 def get_webinar_info_webapp_url() -> str:
     explicit = (os.getenv("SIDEBOT_WEBINAR_INFO_WEBAPP_URL") or "").strip()
     register_url = get_register_next_webapp_url()
+    webinar_status_payload = quote(_webinar_status_payload(), safe="")
     if explicit.lower().startswith("https://"):
-        if not register_url:
-            return explicit
+        params: dict[str, str] = {"webinar_status_payload": webinar_status_payload}
+        if register_url:
+            params["next_register_url"] = register_url
         sep = "&" if "?" in explicit else "?"
-        return f"{explicit}{sep}{urlencode({'next_register_url': register_url})}"
+        return f"{explicit}{sep}{urlencode(params)}"
 
     base = get_register_next_webapp_url()
     if not base:
@@ -828,10 +830,11 @@ def get_webinar_info_webapp_url() -> str:
         else:
             new_path = f"{path}/webinar-info.html"
         built = urlunsplit((parts.scheme, parts.netloc, new_path, parts.query, parts.fragment))
-        if not register_url:
-            return built
+        params = {"webinar_status_payload": webinar_status_payload}
+        if register_url:
+            params["next_register_url"] = register_url
         sep = "&" if "?" in built else "?"
-        return f"{built}{sep}{urlencode({'next_register_url': register_url})}"
+        return f"{built}{sep}{urlencode(params)}"
     except Exception:
         if base.endswith("/"):
             built = f"{base}webinar-info.html"
@@ -839,10 +842,11 @@ def get_webinar_info_webapp_url() -> str:
             built = f"{base.rsplit('/', 1)[0]}/webinar-info.html"
         else:
             built = f"{base}/webinar-info.html"
-        if not register_url:
-            return built
+        params = {"webinar_status_payload": webinar_status_payload}
+        if register_url:
+            params["next_register_url"] = register_url
         sep = "&" if "?" in built else "?"
-        return f"{built}{sep}{urlencode({'next_register_url': register_url})}"
+        return f"{built}{sep}{urlencode(params)}"
 
 
 def get_happy_hour_status_webapp_base_url() -> str:
