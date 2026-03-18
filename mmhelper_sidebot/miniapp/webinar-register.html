@@ -43,6 +43,7 @@
     .status-box.not-opened { border-color: #2563eb; background: rgba(18, 41, 86, 0.95); }
     .status-box p { margin: 0; }
     .status-box p + p { margin-top: 8px; }
+    .status-note { margin-top: 12px; min-height: 22px; color: #f8e9ec; font-size: 13px; line-height: 1.45; }
   </style>
 </head>
 <body>
@@ -280,6 +281,27 @@
       <button id="submitReezoVerificationBtn" type="button" class="submit-btn">Hantar Pengesahan Deposit</button>
       <div class="inline-actions">
         <button id="btnBackFromUnderIbReezo" type="button" class="back-btn hidden">⬅️ Back to Pilihan Siri</button>
+      </div>
+    </section>
+
+    <section id="specialInvitationView" class="card content-card hidden">
+      <img class="screen-logo" src="logo.png" alt="Webinar Logo" />
+      <h2 class="section-title">Special Invitation</h2>
+      <p>Masukkan invite code untuk aktifkan akses webinar bagi siri yang dipilih.</p>
+      <div class="series-highlight">
+        <strong id="specialSeriesLabel">SIRI 1</strong>
+        <p id="specialSeriesDate"></p>
+      </div>
+      <div class="form-grid">
+        <div>
+          <label for="inviteCodeInput" class="field-label">Invite Code</label>
+          <input id="inviteCodeInput" class="field-input" type="text" inputmode="numeric" placeholder="Masukkan 8-10 angka code" />
+        </div>
+      </div>
+      <p id="specialInviteStatus" class="status-note" aria-live="polite"></p>
+      <button id="submitInviteCodeBtn" type="button" class="submit-btn">Sahkan Invite Code</button>
+      <div class="inline-actions">
+        <button id="btnBackFromSpecialInvitation" type="button" class="back-btn">⬅️ Back to Pilihan Siri</button>
       </div>
     </section>
 

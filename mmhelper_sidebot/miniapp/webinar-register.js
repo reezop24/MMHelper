@@ -14,6 +14,7 @@
   var newRegistrationView = document.getElementById("newRegistrationView");
   var ibTransferView = document.getElementById("ibTransferView");
   var underIbReezoView = document.getElementById("underIbReezoView");
+  var specialInvitationView = document.getElementById("specialInvitationView");
 
   var seriesSelect = document.getElementById("seriesSelect");
   var btnStartRegister = document.getElementById("btnStartRegister");
@@ -29,6 +30,12 @@
   var btnHomeIbTransfer = document.getElementById("btnHomeIbTransfer");
   var btnHomeUnderIbReezo = document.getElementById("btnHomeUnderIbReezo");
   var btnHomeSpecialInvitation = document.getElementById("btnHomeSpecialInvitation");
+  var specialSeriesLabel = document.getElementById("specialSeriesLabel");
+  var specialSeriesDate = document.getElementById("specialSeriesDate");
+  var inviteCodeInput = document.getElementById("inviteCodeInput");
+  var specialInviteStatus = document.getElementById("specialInviteStatus");
+  var submitInviteCodeBtn = document.getElementById("submitInviteCodeBtn");
+  var btnBackFromSpecialInvitation = document.getElementById("btnBackFromSpecialInvitation");
 
   var tabNewRegistration = document.getElementById("tabNewRegistration");
   var tabVerification = document.getElementById("tabVerification");
@@ -144,6 +151,7 @@
     newRegistrationView.classList.add("hidden");
     ibTransferView.classList.add("hidden");
     underIbReezoView.classList.add("hidden");
+    specialInvitationView.classList.add("hidden");
 
     if (name === "new_registration") {
       newRegistrationView.classList.remove("hidden");
@@ -159,6 +167,12 @@
     }
     if (name === "under_ib_reezo") {
       underIbReezoView.classList.remove("hidden");
+      activeView = name;
+      updateBottomPrevState();
+      return;
+    }
+    if (name === "special_invitation") {
+      specialInvitationView.classList.remove("hidden");
       activeView = name;
       updateBottomPrevState();
       return;
@@ -254,6 +268,8 @@
     ibTransferTitle.textContent = "Penukaran IB untuk Webinar " + meta.label;
     ibVerificationTitle.textContent = "Pengesahan Penukaran IB Webinar " + meta.label;
     reezoTitle.textContent = "Client AMarkets under IB Reezo - Webinar " + meta.label;
+    specialSeriesLabel.textContent = meta.label;
+    specialSeriesDate.textContent = meta.date;
   }
 
   function renderSeriesActions() {
@@ -287,6 +303,27 @@
     seriesStatusBox.classList.remove("not-opened");
     seriesActionList.classList.add("hidden");
     statusEl.textContent = "";
+    specialInviteStatus.textContent = "";
+    inviteCodeInput.value = "";
+  }
+
+  function submitSpecialInvitation() {
+    var inviteCode = String(readText(inviteCodeInput) || "").replace(/\D/g, "");
+    if (inviteCode.length < 8 || inviteCode.length > 10) {
+      specialInviteStatus.textContent = "Invite code mesti 8 hingga 10 angka.";
+      return;
+    }
+    var payload = {
+      type: "sidebot_webinar_special_invite_redeem",
+      series: selectedSeries,
+      invite_code: inviteCode
+    };
+    if (tg) {
+      try { tg.sendData(JSON.stringify(payload)); } catch (err) {}
+      tg.close();
+      return;
+    }
+    specialInviteStatus.textContent = "Preview mode: invite code dihantar untuk semakan.";
   }
 
   function submitVerification() {
@@ -411,7 +448,9 @@
   btnHomeIbTransfer.addEventListener("click", function () { showView("ib_transfer"); openIbTab("transfer"); openIbGuideTab("web"); });
   btnHomeUnderIbReezo.addEventListener("click", function () { showView("under_ib_reezo"); });
   btnHomeSpecialInvitation.addEventListener("click", function () {
-    statusEl.textContent = "Special Invitation masih placeholder. Flow ini belum dibuka lagi.";
+    specialInviteStatus.textContent = "";
+    inviteCodeInput.value = "";
+    showView("special_invitation");
   });
   if (btnDaftarAmarkets) {
     btnDaftarAmarkets.addEventListener("click", function () {
@@ -444,6 +483,12 @@
   btnCheckUnderIbReezoMiniapp.addEventListener("click", checkUnderIbReezo);
   if (btnBackFromUnderIbReezo) {
     btnBackFromUnderIbReezo.addEventListener("click", function () { showView("home"); });
+  }
+  if (submitInviteCodeBtn) {
+    submitInviteCodeBtn.addEventListener("click", submitSpecialInvitation);
+  }
+  if (btnBackFromSpecialInvitation) {
+    btnBackFromSpecialInvitation.addEventListener("click", function () { showView("home"); });
   }
   topBackBtn.addEventListener("click", backToPreviousMenu);
   bottomPrevBtn.addEventListener("click", backToPreviousMenu);

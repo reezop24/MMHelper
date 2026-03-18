@@ -70,6 +70,8 @@ VIDEO_HAPPY_HOUR_RUNTIME_KEY = "video_happy_hour_runtime"
 VIDEO_HAPPY_HOUR_RESET_REQUEST_KEY = "video_happy_hour_reset_request"
 VIDEO_HAPPY_HOUR_ANNOUNCE_REQUEST_KEY = "video_happy_hour_announce_request"
 WEBINAR_STATUS_STATE_KEY = "webinar_status_state"
+WEBINAR_ACCESS_STATE_KEY = "webinar_access_state"
+WEBINAR_INVITE_CODES_STATE_KEY = "webinar_invite_codes_state"
 VIP2_SUBSCRIPTION_DAYS = 45
 VIP2_REMINDER_DAYS_BEFORE = 7
 
@@ -86,6 +88,7 @@ MENU_ADMIN_USERS = "👥 User Directory"
 MENU_HAPPY_HOUR = "⏰ Happy Hour"
 MENU_HAPPY_HOUR_STATUS = "📊 Happy Hour Status"
 MENU_WEBINAR_STATUS = "🗂️ Status Webinar"
+MENU_INVITE_CODE = "🎟️ Invite Code"
 MENU_BETA_RESET = "🧪 BETA RESET"
 MENU_CHECK_UNDER_IB = "🔎 Check Under IB"
 MENU_BACK_MAIN = "⬅️ Back to Main Menu"
@@ -952,6 +955,75 @@ def get_webinar_register_webapp_url() -> str:
     return f"{built}{sep}{urlencode({'webinar_status_payload': payload})}"
 
 
+def _invite_codes_payload() -> str:
+    out: dict[str, object] = {"campaign": get_current_webinar_campaign(), "codes": []}
+    try:
+        with _connect_shared_db() as conn:
+            _ensure_state_table(conn)
+            data = _read_generic_kv_json(conn, WEBINAR_INVITE_CODES_STATE_KEY, {"codes": {}})
+    except sqlite3.Error:
+        logger.warning("Failed to build invite code payload", exc_info=True)
+        return json.dumps(out, ensure_ascii=False)
+
+    codes = data.get("codes")
+    if not isinstance(codes, dict):
+        return json.dumps(out, ensure_ascii=False)
+
+    rows: list[dict[str, str]] = []
+    current_campaign = get_current_webinar_campaign()
+    for code, row in codes.items():
+        if not isinstance(row, dict):
+            continue
+        if str(row.get("campaign") or "") != current_campaign:
+            continue
+        if str(row.get("status") or "") != "active":
+            continue
+        rows.append(
+            {
+                "code": str(code),
+                "series": f"SIRI {str(row.get('series') or '-')}",
+                "status": str(row.get("status") or "active"),
+                "created_at": _format_dt_display(str(row.get("created_at") or "")),
+                "used_by": str(row.get("used_by") or ""),
+            }
+        )
+    rows.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    out["codes"] = rows[:20]
+    return json.dumps(out, ensure_ascii=False)
+
+
+def get_invite_code_webapp_url() -> str:
+    explicit = (os.getenv("SIDEBOT_INVITE_CODE_WEBAPP_URL") or "").strip()
+    built = ""
+    if explicit.lower().startswith("https://"):
+        built = explicit
+    if not built:
+        base = get_register_next_webapp_url()
+        if not base:
+            return ""
+        try:
+            parts = urlsplit(base)
+            path = parts.path or "/"
+            if path.endswith("/"):
+                new_path = f"{path}invite-code.html"
+            elif path.endswith(".html"):
+                parent = path.rsplit("/", 1)[0] if "/" in path else ""
+                new_path = f"{parent}/invite-code.html" if parent else "/invite-code.html"
+            else:
+                new_path = f"{path}/invite-code.html"
+            built = urlunsplit((parts.scheme, parts.netloc, new_path, parts.query, parts.fragment))
+        except Exception:
+            if base.endswith("/"):
+                built = f"{base}invite-code.html"
+            elif base.endswith(".html"):
+                built = f"{base.rsplit('/', 1)[0]}/invite-code.html"
+            else:
+                built = f"{base}/invite-code.html"
+    payload = _invite_codes_payload()
+    sep = "&" if "?" in built else "?"
+    return f"{built}{sep}{urlencode({'invite_codes_payload': payload})}"
+
+
 def _parse_iso_dt(value: str) -> datetime | None:
     raw = str(value or "").strip()
     if not raw:
@@ -1114,6 +1186,147 @@ def _webinar_status_payload() -> str:
         "updated_at": _format_dt_display(str(state.get("updated_at") or "")),
     }
     return json.dumps(out, ensure_ascii=False)
+
+
+def _default_webinar_access_state() -> dict[str, object]:
+    return {
+        "campaigns": {
+            get_current_webinar_campaign(): {
+                "series": {
+                    "1": {"users": {}},
+                    "2": {"users": {}},
+                    "3": {"users": {}},
+                }
+            }
+        },
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def _read_webinar_access_state() -> dict[str, object]:
+    default = _default_webinar_access_state()
+    try:
+        with _connect_shared_db() as conn:
+            _ensure_state_table(conn)
+            data = _read_generic_kv_json(conn, WEBINAR_ACCESS_STATE_KEY, default)
+    except sqlite3.Error:
+        logger.warning("Failed reading webinar access state", exc_info=True)
+        return default
+    if not isinstance(data.get("campaigns"), dict):
+        data["campaigns"] = default["campaigns"]
+    if not str(data.get("updated_at") or "").strip():
+        data["updated_at"] = default["updated_at"]
+    return data
+
+
+def _write_webinar_access_state(data: dict) -> None:
+    data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    with _connect_shared_db() as conn:
+        _ensure_state_table(conn)
+        _write_generic_kv_json(conn, WEBINAR_ACCESS_STATE_KEY, data)
+
+
+def grant_webinar_series_access(
+    *,
+    user_id: int,
+    series: str,
+    source: str,
+    registration_flow: str = "",
+    submission_id: str = "",
+    invite_code: str = "",
+    telegram_username: str = "",
+    full_name: str = "",
+) -> None:
+    if str(series) not in {"1", "2", "3"}:
+        return
+    data = _read_webinar_access_state()
+    campaigns = data.setdefault("campaigns", {})
+    if not isinstance(campaigns, dict):
+        campaigns = {}
+        data["campaigns"] = campaigns
+    campaign_key = get_current_webinar_campaign()
+    campaign = campaigns.setdefault(campaign_key, {})
+    if not isinstance(campaign, dict):
+        campaign = {}
+        campaigns[campaign_key] = campaign
+    series_bucket = campaign.setdefault("series", {})
+    if not isinstance(series_bucket, dict):
+        series_bucket = {}
+        campaign["series"] = series_bucket
+    series_row = series_bucket.setdefault(str(series), {"users": {}})
+    if not isinstance(series_row, dict):
+        series_row = {"users": {}}
+        series_bucket[str(series)] = series_row
+    users = series_row.setdefault("users", {})
+    if not isinstance(users, dict):
+        users = {}
+        series_row["users"] = users
+    users[str(user_id)] = {
+        "granted_at": datetime.now(timezone.utc).isoformat(),
+        "source": str(source or "approved"),
+        "registration_flow": str(registration_flow or ""),
+        "submission_id": str(submission_id or ""),
+        "invite_code": str(invite_code or ""),
+        "telegram_username": str(telegram_username or ""),
+        "full_name": str(full_name or ""),
+    }
+    _write_webinar_access_state(data)
+
+
+def revoke_webinar_series_access(*, user_id: int, series: str) -> None:
+    if str(series) not in {"1", "2", "3"}:
+        return
+    data = _read_webinar_access_state()
+    campaigns = data.get("campaigns")
+    if not isinstance(campaigns, dict):
+        return
+    campaign = campaigns.get(get_current_webinar_campaign())
+    if not isinstance(campaign, dict):
+        return
+    series_bucket = campaign.get("series")
+    if not isinstance(series_bucket, dict):
+        return
+    row = series_bucket.get(str(series))
+    if not isinstance(row, dict):
+        return
+    users = row.get("users")
+    if not isinstance(users, dict):
+        return
+    if users.pop(str(user_id), None) is not None:
+        _write_webinar_access_state(data)
+
+
+def _default_invite_codes_state() -> dict[str, object]:
+    return {"codes": {}, "updated_at": datetime.now(timezone.utc).isoformat()}
+
+
+def _read_invite_codes_state() -> dict[str, object]:
+    default = _default_invite_codes_state()
+    try:
+        with _connect_shared_db() as conn:
+            _ensure_state_table(conn)
+            data = _read_generic_kv_json(conn, WEBINAR_INVITE_CODES_STATE_KEY, default)
+    except sqlite3.Error:
+        logger.warning("Failed reading invite codes state", exc_info=True)
+        return default
+    if not isinstance(data.get("codes"), dict):
+        data["codes"] = {}
+    if not str(data.get("updated_at") or "").strip():
+        data["updated_at"] = default["updated_at"]
+    return data
+
+
+def _write_invite_codes_state(data: dict) -> None:
+    data["updated_at"] = datetime.now(timezone.utc).isoformat()
+    with _connect_shared_db() as conn:
+        _ensure_state_table(conn)
+        _write_generic_kv_json(conn, WEBINAR_INVITE_CODES_STATE_KEY, data)
+
+
+def _generate_numeric_invite_code(length: int = 8) -> str:
+    import secrets
+    digits = "0123456789"
+    return "".join(secrets.choice(digits) for _ in range(max(8, min(length, 10))))
 
 
 def _format_dt_display(value: str) -> str:
@@ -1594,6 +1807,11 @@ def _base_registration_flow(registration_flow: str) -> str:
 def _webinar_series_label_from_flow(registration_flow: str) -> str:
     number = _webinar_series_number_from_flow(registration_flow)
     return f"SIRI {number}" if number else "siri webinar"
+
+
+def get_current_webinar_campaign() -> str:
+    raw = str(os.getenv("SIDEBOT_WEBINAR_CAMPAIGN") or "webinar_april").strip().lower()
+    return raw or "webinar_april"
 
 
 def _parse_iso_datetime(value: str) -> datetime | None:
@@ -2556,12 +2774,17 @@ def admin_panel_keyboard() -> ReplyKeyboardMarkup:
         webinar_status_button = KeyboardButton(MENU_WEBINAR_STATUS, web_app=WebAppInfo(url=webinar_status_url))
     else:
         webinar_status_button = KeyboardButton(MENU_WEBINAR_STATUS)
+    invite_code_url = get_invite_code_webapp_url()
+    if invite_code_url:
+        invite_code_button = KeyboardButton(MENU_INVITE_CODE, web_app=WebAppInfo(url=invite_code_url))
+    else:
+        invite_code_button = KeyboardButton(MENU_INVITE_CODE)
     return ReplyKeyboardMarkup(
         [
             [KeyboardButton(MENU_CHECK_UNDER_IB)],
             [admin_users_button],
             [happy_hour_button, happy_hour_status_button],
-            [webinar_status_button],
+            [webinar_status_button, invite_code_button],
             [KeyboardButton(MENU_BETA_RESET)],
             [KeyboardButton(MENU_BACK_MAIN)],
         ],
@@ -2851,6 +3074,8 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
             tier = _tier_for_registration_flow(registration_flow)
             if tier:
                 remove_user_from_vip_tier(user_id, tier)
+            if _is_webinar_registration_flow(registration_flow):
+                revoke_webinar_series_access(user_id=user_id, series=_webinar_series_number_from_flow(registration_flow))
             update_submission_fields(
                 submission_id=submission_id,
                 fields={
@@ -2930,6 +3155,16 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                     tier = _tier_for_registration_flow(registration_flow)
                     if tier:
                         add_user_to_vip_tier(updated, tier)
+                    if _is_webinar_registration_flow(registration_flow):
+                        grant_webinar_series_access(
+                            user_id=target_user_id,
+                            series=_webinar_series_number_from_flow(registration_flow),
+                            source="approved",
+                            registration_flow=registration_flow,
+                            submission_id=submission_id,
+                            telegram_username=str(updated.get("telegram_username") or ""),
+                            full_name=str(updated.get("full_name") or ""),
+                        )
                     approved_text = (
                         "Tahniah! Pembayaran one-time purchase NEXT eVideo26 anda telah diluluskan.\n"
                         "Sila tunggu arahan akses seterusnya daripada admin."
@@ -3387,6 +3622,15 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             return
         await message.reply_text(
             "Miniapp URL belum diset. Isi SIDEBOT_WEBINAR_STATUS_WEBAPP_URL atau SIDEBOT_REGISTER_WEBAPP_URL dalam .env dulu."
+        )
+        return
+
+    if text == MENU_INVITE_CODE:
+        if not is_admin_user(user.id):
+            await message.reply_text("❌ Akses ditolak.", reply_markup=main_menu_keyboard(user.id))
+            return
+        await message.reply_text(
+            "Miniapp URL belum diset. Isi SIDEBOT_INVITE_CODE_WEBAPP_URL atau SIDEBOT_REGISTER_WEBAPP_URL dalam .env dulu."
         )
         return
 
@@ -3937,6 +4181,183 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await message.reply_text(
             f"✅ Status webinar SIRI {series} disimpan: {labels.get(status_value, 'Pendaftaran ditutup')}.",
             reply_markup=admin_panel_keyboard(),
+        )
+        return
+
+    if payload_type == "sidebot_admin_invite_code_generate":
+        if not is_admin_user(user.id):
+            await message.reply_text("❌ Akses ditolak.")
+            return
+        purpose = str(payload.get("purpose") or "").strip().lower()
+        series = str(payload.get("series") or "").strip()
+        requested_code = re.sub(r"\D", "", str(payload.get("code") or ""))
+        if purpose != "webinar":
+            await message.reply_text("❌ Purpose invite code tak sah.")
+            return
+        if series not in {"1", "2", "3"}:
+            await message.reply_text("❌ Siri webinar tak sah.")
+            return
+        data = _read_invite_codes_state()
+        codes = data.get("codes")
+        if not isinstance(codes, dict):
+            codes = {}
+            data["codes"] = codes
+        code = requested_code if 8 <= len(requested_code) <= 10 else _generate_numeric_invite_code(8)
+        while code in codes:
+            code = _generate_numeric_invite_code(8)
+        codes[code] = {
+            "purpose": "webinar",
+            "campaign": get_current_webinar_campaign(),
+            "series": series,
+            "status": "active",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "created_by": int(user.id),
+            "used_by": "",
+            "used_at": "",
+        }
+        try:
+            _write_invite_codes_state(data)
+        except sqlite3.Error:
+            logger.exception("Failed to write invite code")
+            await message.reply_text("❌ Gagal simpan invite code.")
+            return
+        await message.reply_text(
+            f"✅ Invite code berjaya dijana.\nCampaign: {get_current_webinar_campaign()}\nSiri: SIRI {series}\nCode: {code}",
+            reply_markup=admin_panel_keyboard(),
+        )
+        return
+
+    if payload_type == "sidebot_admin_invite_code_revoke":
+        if not is_admin_user(user.id):
+            await message.reply_text("❌ Akses ditolak.")
+            return
+        invite_code = re.sub(r"\D", "", str(payload.get("code") or ""))
+        if len(invite_code) < 8 or len(invite_code) > 10:
+            await message.reply_text("❌ Invite code tak sah.")
+            return
+        data = _read_invite_codes_state()
+        codes = data.get("codes")
+        if not isinstance(codes, dict):
+            await message.reply_text("❌ Tiada invite code untuk direvoke.")
+            return
+        row = codes.get(invite_code)
+        if not isinstance(row, dict):
+            await message.reply_text("❌ Invite code tidak dijumpai.")
+            return
+        if str(row.get("campaign") or "") != get_current_webinar_campaign():
+            await message.reply_text("❌ Invite code ini bukan untuk campaign webinar semasa.")
+            return
+        if str(row.get("status") or "") != "active":
+            await message.reply_text("❌ Invite code ini sudah tidak aktif.")
+            return
+        row["status"] = "revoked"
+        row["revoked_by"] = int(user.id)
+        row["revoked_at"] = datetime.now(timezone.utc).isoformat()
+        codes[invite_code] = row
+        data["codes"] = codes
+        try:
+            _write_invite_codes_state(data)
+        except sqlite3.Error:
+            logger.exception("Failed to revoke invite code")
+            await message.reply_text("❌ Gagal revoke invite code.")
+            return
+        await message.reply_text(
+            f"✅ Invite code {invite_code} telah direvoke.",
+            reply_markup=admin_panel_keyboard(),
+        )
+        return
+
+    if payload_type == "sidebot_admin_invite_code_revoke_all":
+        if not is_admin_user(user.id):
+            await message.reply_text("❌ Akses ditolak.")
+            return
+        data = _read_invite_codes_state()
+        codes = data.get("codes")
+        if not isinstance(codes, dict):
+            await message.reply_text("❌ Tiada invite code untuk direvoke.")
+            return
+        current_campaign = get_current_webinar_campaign()
+        revoked_count = 0
+        now_iso = datetime.now(timezone.utc).isoformat()
+        for code, row in list(codes.items()):
+            if not isinstance(row, dict):
+                continue
+            if str(row.get("campaign") or "") != current_campaign:
+                continue
+            if str(row.get("status") or "") != "active":
+                continue
+            row["status"] = "revoked"
+            row["revoked_by"] = int(user.id)
+            row["revoked_at"] = now_iso
+            codes[code] = row
+            revoked_count += 1
+        if revoked_count == 0:
+            await message.reply_text("ℹ️ Tiada invite code aktif untuk direvoke.", reply_markup=admin_panel_keyboard())
+            return
+        data["codes"] = codes
+        try:
+            _write_invite_codes_state(data)
+        except sqlite3.Error:
+            logger.exception("Failed to revoke all invite codes")
+            await message.reply_text("❌ Gagal revoke semua invite code.")
+            return
+        await message.reply_text(
+            f"✅ {revoked_count} invite code aktif telah direvoke untuk campaign {current_campaign}.",
+            reply_markup=admin_panel_keyboard(),
+        )
+        return
+
+    if payload_type == "sidebot_webinar_special_invite_redeem":
+        series = str(payload.get("series") or "").strip()
+        invite_code = re.sub(r"\\D", "", str(payload.get("invite_code") or ""))
+        if series not in {"1", "2", "3"}:
+            await message.reply_text("❌ Siri webinar tak sah.")
+            return
+        if len(invite_code) < 8 or len(invite_code) > 10:
+            await message.reply_text("❌ Invite code mesti 8 hingga 10 angka.")
+            return
+        data = _read_invite_codes_state()
+        codes = data.get("codes")
+        if not isinstance(codes, dict):
+            await message.reply_text("❌ Invite code tidak sah.")
+            return
+        row = codes.get(invite_code)
+        if not isinstance(row, dict):
+            await message.reply_text("❌ Invite code tidak sah atau tidak dijumpai.")
+            return
+        if str(row.get("purpose") or "") != "webinar" or str(row.get("campaign") or "") != get_current_webinar_campaign():
+            await message.reply_text("❌ Invite code ini bukan untuk webinar semasa.")
+            return
+        if str(row.get("series") or "") != series:
+            await message.reply_text(f"❌ Invite code ini bukan untuk SIRI {series}.")
+            return
+        if str(row.get("status") or "") != "active":
+            await message.reply_text("❌ Invite code ini sudah digunakan atau tidak aktif.")
+            return
+
+        row["status"] = "used"
+        row["used_by"] = int(user.id)
+        row["used_at"] = datetime.now(timezone.utc).isoformat()
+        codes[invite_code] = row
+        data["codes"] = codes
+        try:
+            _write_invite_codes_state(data)
+            grant_webinar_series_access(
+                user_id=user.id,
+                series=series,
+                source="special_invitation",
+                invite_code=invite_code,
+                telegram_username=str(user.username or ""),
+                full_name=str(user.full_name or ""),
+            )
+        except sqlite3.Error:
+            logger.exception("Failed redeeming webinar invite code")
+            await message.reply_text("❌ Gagal tebus invite code. Cuba lagi.")
+            return
+
+        await message.reply_text(
+            f"✅ Special invitation berjaya disahkan.\nAkses webinar {get_current_webinar_campaign()} SIRI {series} telah direkod.",
+            reply_markup=main_menu_keyboard(user.id),
         )
         return
 
