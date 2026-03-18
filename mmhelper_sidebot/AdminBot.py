@@ -803,6 +803,33 @@ def get_happy_hour_webapp_url() -> str:
         return f"{base}/happy-hour.html"
 
 
+def get_webinar_info_webapp_url() -> str:
+    explicit = (os.getenv("SIDEBOT_WEBINAR_INFO_WEBAPP_URL") or "").strip()
+    if explicit.lower().startswith("https://"):
+        return explicit
+
+    base = get_register_next_webapp_url()
+    if not base:
+        return ""
+    try:
+        parts = urlsplit(base)
+        path = parts.path or "/"
+        if path.endswith("/"):
+            new_path = f"{path}webinar-info.html"
+        elif path.endswith(".html"):
+            parent = path.rsplit("/", 1)[0] if "/" in path else ""
+            new_path = f"{parent}/webinar-info.html" if parent else "/webinar-info.html"
+        else:
+            new_path = f"{path}/webinar-info.html"
+        return urlunsplit((parts.scheme, parts.netloc, new_path, parts.query, parts.fragment))
+    except Exception:
+        if base.endswith("/"):
+            return f"{base}webinar-info.html"
+        if base.endswith(".html"):
+            return f"{base.rsplit('/', 1)[0]}/webinar-info.html"
+        return f"{base}/webinar-info.html"
+
+
 def get_happy_hour_status_webapp_base_url() -> str:
     explicit = (os.getenv("SIDEBOT_HAPPY_HOUR_STATUS_WEBAPP_URL") or "").strip()
     if explicit.lower().startswith("https://"):
@@ -2283,9 +2310,14 @@ def main_menu_keyboard(user_id: int | None) -> ReplyKeyboardMarkup:
 
 
 def webinar_menu_keyboard() -> ReplyKeyboardMarkup:
+    webinar_info_url = get_webinar_info_webapp_url()
+    if webinar_info_url:
+        webinar_info_button = KeyboardButton(MENU_WEBINAR_INFO, web_app=WebAppInfo(url=webinar_info_url))
+    else:
+        webinar_info_button = KeyboardButton(MENU_WEBINAR_INFO)
     return ReplyKeyboardMarkup(
         [
-            [KeyboardButton(MENU_WEBINAR_INFO)],
+            [webinar_info_button],
             [KeyboardButton(MENU_WEBINAR_REGISTER)],
             [KeyboardButton(MENU_BACK_MAIN)],
         ],

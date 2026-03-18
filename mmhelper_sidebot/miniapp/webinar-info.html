@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Maklumat Webinar</title>
+  <link rel="stylesheet" href="global.css" />
+  <style>
+    .content-card p {
+      margin: 0;
+      line-height: 1.58;
+      color: #f0dde1;
+      font-size: 14px;
+    }
+
+    .content-card p + p {
+      margin-top: 10px;
+    }
+
+    .lead {
+      color: #ffeef1;
+    }
+
+    .note-box {
+      margin-top: 12px;
+      border: 1px solid #5a3035;
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(27, 18, 20, 0.92);
+    }
+
+    .note-box strong {
+      color: #ffeef1;
+    }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    .tab-btn {
+      margin: 0;
+      width: 100%;
+      border: 1px solid #8d4d54;
+      border-radius: 12px;
+      padding: 10px 10px;
+      background: rgba(56, 24, 29, 0.86);
+      color: #f4e2e6;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.2;
+      text-align: center;
+    }
+
+    .tab-btn.active {
+      background: linear-gradient(90deg, #f59e0b 0%, #f97316 100%);
+      color: #2e1400;
+      border-color: #f59e0b;
+    }
+
+    .tab-panels {
+      margin-top: 12px;
+    }
+
+    .tab-panel {
+      display: none;
+      border: 1px solid #5a3035;
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(27, 18, 20, 0.92);
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    .panel-title {
+      margin: 0 0 8px;
+      color: #ffeef1;
+      font-size: 18px;
+    }
+
+    .date-pill {
+      display: inline-block;
+      margin-top: 2px;
+      border: 1px solid #8d4d54;
+      border-radius: 999px;
+      padding: 5px 10px;
+      font-size: 12px;
+      color: #f4e2e6;
+      background: rgba(56, 24, 29, 0.86);
+    }
+
+    .feature-list {
+      margin: 10px 0 0;
+      padding-left: 18px;
+      color: #f0dde1;
+      line-height: 1.55;
+      font-size: 14px;
+    }
+
+    .feature-list li + li {
+      margin-top: 6px;
+    }
+
+    .inline-actions {
+      margin-top: 12px;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .back-btn {
+      margin: 0;
+      width: auto;
+      min-width: 210px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid #5a3035;
+      background: rgba(27, 18, 20, 0.92);
+      color: #ffeef1;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    @media (max-width: 640px) {
+      .tabs {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="top-nav">
+      <button id="topBackBtn" type="button" class="top-back-btn">← Back</button>
+    </div>
+
+    <header class="hero">
+      <img class="logo" src="logo.png" alt="NEXTexclusive Logo" />
+      <h1>Maklumat Webinar</h1>
+      <p>Pendaftaran Webinar</p>
+    </header>
+
+    <section class="card content-card">
+      <p class="lead">Webinar ini terbahagi kepada 3 siri berbeza. Fokus webinar ini adalah pada flow pergerakan harga menyeluruh untuk membantu anda mengenal pasti price berada pada fasa apa.</p>
+
+      <div class="note-box">
+        <p><strong>Siri 1:</strong> 7 &amp; 8 April 2026</p>
+        <p><strong>Siri 2:</strong> 22 &amp; 23 April 2026</p>
+        <p><strong>Siri 3:</strong> 14 &amp; 15 May 2026</p>
+      </div>
+
+      <p>Anda perlu mendaftar untuk setiap siri yang diadakan.</p>
+      <p><strong>NEXTexclusive member</strong> yang masih aktif, layak secara automatik untuk semua SIRI.</p>
+      <p><strong>NEXTeVideo26 subscriber</strong> layak secara automatik untuk SIRI 1, serta akses untuk semua rakaman bagi semua SIRI.</p>
+      <p>Butiran topik dan cara pendaftaran boleh semak pada tab di bawah.</p>
+
+      <div class="tabs">
+        <button id="tabS1" type="button" class="tab-btn active">SIRI 1</button>
+        <button id="tabS2" type="button" class="tab-btn">SIRI 2</button>
+        <button id="tabS3" type="button" class="tab-btn">SIRI 3</button>
+      </div>
+
+      <div class="tab-panels">
+        <section id="panelS1" class="tab-panel active">
+          <h2 class="panel-title">SIRI 1</h2>
+          <span class="date-pill">7 &amp; 8 April 2026</span>
+          <ul class="feature-list">
+            <li>Fokus kepada flow pergerakan harga secara menyeluruh.</li>
+            <li>Sesuai sebagai siri permulaan untuk memahami fasa market yang sedang berlaku.</li>
+            <li>NEXTeVideo26 subscriber layak automatik untuk siri ini.</li>
+            <li>Cara daftar: buka menu <code>Daftar webinar</code> dan lengkapkan pendaftaran untuk SIRI 1.</li>
+          </ul>
+        </section>
+
+        <section id="panelS2" class="tab-panel">
+          <h2 class="panel-title">SIRI 2</h2>
+          <span class="date-pill">22 &amp; 23 April 2026</span>
+          <ul class="feature-list">
+            <li>Sambungan kepada flow price action dan kesinambungan fasa pergerakan harga.</li>
+            <li>Penekanan lebih mendalam pada bacaan struktur dan kesinambungan market behavior.</li>
+            <li>NEXTexclusive member aktif layak automatik.</li>
+            <li>Cara daftar: buka menu <code>Daftar webinar</code> dan lengkapkan pendaftaran untuk SIRI 2.</li>
+          </ul>
+        </section>
+
+        <section id="panelS3" class="tab-panel">
+          <h2 class="panel-title">SIRI 3</h2>
+          <span class="date-pill">14 &amp; 15 May 2026</span>
+          <ul class="feature-list">
+            <li>Penutup keseluruhan siri webinar dengan fokus pada pemahaman flow harga dari awal hingga lanjutan.</li>
+            <li>Membantu anda membezakan kedudukan price dalam fasa semasa dengan lebih jelas.</li>
+            <li>NEXTexclusive member aktif layak automatik.</li>
+            <li>Cara daftar: buka menu <code>Daftar webinar</code> dan lengkapkan pendaftaran untuk SIRI 3.</li>
+          </ul>
+        </section>
+      </div>
+
+      <div class="inline-actions">
+        <button id="bottomBackBtn" type="button" class="back-btn">⬅️ Back</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    (function () {
+      var tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+      if (tg) {
+        tg.ready();
+        tg.expand();
+      }
+
+      var tabs = [
+        { btn: document.getElementById("tabS1"), panel: document.getElementById("panelS1") },
+        { btn: document.getElementById("tabS2"), panel: document.getElementById("panelS2") },
+        { btn: document.getElementById("tabS3"), panel: document.getElementById("panelS3") }
+      ];
+      var topBackBtn = document.getElementById("topBackBtn");
+      var bottomBackBtn = document.getElementById("bottomBackBtn");
+
+      function activate(index) {
+        tabs.forEach(function (item, idx) {
+          var active = idx === index;
+          item.btn.classList.toggle("active", active);
+          item.panel.classList.toggle("active", active);
+        });
+      }
+
+      function backToMainMenu() {
+        var payload = { type: "sidebot_back_to_main_menu" };
+        if (tg) {
+          tg.sendData(JSON.stringify(payload));
+          tg.close();
+          return;
+        }
+        window.history.back();
+      }
+
+      tabs.forEach(function (item, index) {
+        item.btn.addEventListener("click", function () {
+          activate(index);
+        });
+      });
+
+      if (topBackBtn) {
+        topBackBtn.addEventListener("click", backToMainMenu);
+      }
+      if (bottomBackBtn) {
+        bottomBackBtn.addEventListener("click", backToMainMenu);
+      }
+
+      activate(0);
+    })();
+  </script>
+</body>
+</html>
