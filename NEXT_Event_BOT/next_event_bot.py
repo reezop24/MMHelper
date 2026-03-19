@@ -114,6 +114,16 @@ def get_current_webinar_campaign() -> str:
     return raw or "webinar_april"
 
 
+def get_admin_bot_url() -> str:
+    url = (
+        os.getenv("NEXT_EVENT_ADMIN_BOT_URL")
+        or os.getenv("SIDEBOT_ADMIN_BOT_URL")
+        or "https://t.me/ReezoAdmin_Bot"
+    )
+    url = str(url or "").strip()
+    return url if url.startswith("https://t.me/") else ""
+
+
 def _connect_shared_db() -> sqlite3.Connection:
     conn = sqlite3.connect(get_shared_db_path())
     conn.row_factory = sqlite3.Row
@@ -566,10 +576,13 @@ def build_start_welcome_text(user_id: int | None) -> str:
         "Akses kandungan dalam bot ini bergantung pada kategori akaun dan whitelist webinar anda.",
     ]
     if s1 == s2 == s3 == "none":
+        admin_bot_url = get_admin_bot_url()
         lines.extend(
             [
                 "",
                 "Akaun anda belum mempunyai akses webinar buat masa ini.",
+                "Anda boleh pergi ke bot admin untuk mendaftar webinar.",
+                f"Bot admin: {admin_bot_url}" if admin_bot_url else "Bot admin belum disetkan.",
                 "Jika anda telah diluluskan untuk webinar, sila pastikan anda menggunakan akaun Telegram yang sama.",
             ]
         )
