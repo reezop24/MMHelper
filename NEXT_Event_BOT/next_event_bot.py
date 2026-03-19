@@ -8,6 +8,7 @@ import os
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlencode
 
 from telegram import KeyboardButton, ReplyKeyboardMarkup, Update, WebAppInfo
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
@@ -216,7 +217,8 @@ def get_zoom_update_webapp_url() -> str:
     else:
         built = f"{base}/zoom-update.html"
     sep = "&" if "?" in built else "?"
-    return f"{built}{sep}campaign={get_current_webinar_campaign()}"
+    payload = _zoom_entries_payload()
+    return f"{built}{sep}{urlencode({'campaign': get_current_webinar_campaign(), 'zoom_entries_payload': payload})}"
 
 
 def get_zoom_entry(campaign: str, series_number: str, session_number: str) -> dict | None:
@@ -238,6 +240,43 @@ def get_zoom_entry(campaign: str, series_number: str, session_number: str) -> di
         return None
     session_row = sessions.get(str(session_number))
     return session_row if isinstance(session_row, dict) else None
+
+
+def _zoom_entries_payload() -> str:
+    out: dict[str, object] = {"campaign": get_current_webinar_campaign(), "entries": []}
+    data = _read_zoom_state()
+    campaigns = data.get("campaigns")
+    if not isinstance(campaigns, dict):
+        return json.dumps(out, ensure_ascii=False)
+    campaign_row = campaigns.get(get_current_webinar_campaign())
+    if not isinstance(campaign_row, dict):
+        return json.dumps(out, ensure_ascii=False)
+    series = campaign_row.get("series")
+    if not isinstance(series, dict):
+        return json.dumps(out, ensure_ascii=False)
+    entries: list[dict[str, str]] = []
+    for series_number, series_row in series.items():
+        if not isinstance(series_row, dict):
+            continue
+        sessions = series_row.get("sessions")
+        if not isinstance(sessions, dict):
+            continue
+        for session_number, session_row in sessions.items():
+            if not isinstance(session_row, dict):
+                continue
+            entries.append(
+                {
+                    "series": str(series_number),
+                    "session": str(session_number),
+                    "start_at": str(session_row.get("start_at") or ""),
+                    "link": str(session_row.get("link") or ""),
+                    "message": str(session_row.get("message") or ""),
+                    "status": str(session_row.get("status") or "active"),
+                }
+            )
+    entries.sort(key=lambda row: (row.get("series", ""), row.get("session", "")))
+    out["entries"] = entries
+    return json.dumps(out, ensure_ascii=False)
 
 
 def get_series_access_level(user_id: int, series_number: str) -> str:
@@ -448,6 +487,9 @@ def build_zoom_series_text(series_number: str) -> str:
         row = get_zoom_entry(campaign, series_number, session_number)
         if not isinstance(row, dict):
             continue
+        status = str(row.get("status") or "active").strip().lower()
+        if status == "revoked":
+            continue
         session_label = f"Sesi {session_number}"
         start_at = str(row.get("start_at") or "").strip()
         link = str(row.get("link") or "").strip()
@@ -455,7 +497,9 @@ def build_zoom_series_text(series_number: str) -> str:
         parts = [f"{session_label}"]
         if start_at:
             parts.append(f"Mula: {start_at}")
-        if link:
+        if status == "finished":
+            parts.append("Sesi tersebut telah tamat.")
+        elif link:
             parts.append(f"Link: {link}")
         if message_text:
             parts.append(message_text)
@@ -656,7 +700,12 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await message.reply_text("❌ Data miniapp tak sah.", reply_markup=build_admin_menu())
         return
 
-    if str(payload.get("type") or "") != "next_event_admin_zoom_submit":
+    payload_type = str(payload.get("type") or "")
+    if payload_type not in {
+        "next_event_admin_zoom_submit",
+        "next_event_admin_zoom_revoke",
+        "next_event_admin_zoom_finish",
+    }:
         await message.reply_text("ℹ️ Miniapp event diterima.", reply_markup=build_admin_menu())
         return
 
@@ -667,9 +716,6 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
     campaign = str(payload.get("campaign") or get_current_webinar_campaign()).strip().lower()
     series_number = str(payload.get("series") or "").strip()
     session_number = str(payload.get("session") or "").strip()
-    start_at = str(payload.get("start_at") or "").strip()
-    link = str(payload.get("link") or "").strip()
-    message_text = str(payload.get("message") or "").strip()
 
     if not campaign:
         await message.reply_text("❌ Campaign webinar tak sah.", reply_markup=build_admin_menu())
@@ -680,10 +726,6 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if session_number not in {"1", "2"}:
         await message.reply_text("❌ Sesi webinar tak sah.", reply_markup=build_admin_menu())
         return
-    if not start_at or not link:
-        await message.reply_text("❌ Masa mula sesi dan link wajib diisi.", reply_markup=build_admin_menu())
-        return
-
     data = _read_zoom_state()
     campaigns = data.setdefault("campaigns", {})
     if not isinstance(campaigns, dict):
@@ -705,13 +747,34 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not isinstance(sessions, dict):
         sessions = {}
         series_row["sessions"] = sessions
-    sessions[session_number] = {
-        "start_at": start_at,
-        "link": link,
-        "message": message_text,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-        "updated_by": int(user.id),
-    }
+
+    if payload_type == "next_event_admin_zoom_submit":
+        start_at = str(payload.get("start_at") or "").strip()
+        link = str(payload.get("link") or "").strip()
+        message_text = str(payload.get("message") or "").strip()
+        if not start_at or not link:
+            await message.reply_text("❌ Masa mula sesi dan link wajib diisi.", reply_markup=build_admin_menu())
+            return
+        sessions[session_number] = {
+            "start_at": start_at,
+            "link": link,
+            "message": message_text,
+            "status": "active",
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_by": int(user.id),
+        }
+    else:
+        existing = sessions.get(session_number)
+        if not isinstance(existing, dict):
+            await message.reply_text("❌ Rekod Zoom Link untuk siri/sesi ini belum wujud.", reply_markup=build_admin_menu())
+            return
+        if payload_type == "next_event_admin_zoom_revoke":
+            existing["status"] = "revoked"
+        elif payload_type == "next_event_admin_zoom_finish":
+            existing["status"] = "finished"
+        existing["updated_at"] = datetime.now(timezone.utc).isoformat()
+        existing["updated_by"] = int(user.id)
+        sessions[session_number] = existing
 
     try:
         _write_zoom_state(data)
@@ -720,27 +783,45 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await message.reply_text("❌ Gagal simpan Zoom Link.", reply_markup=build_admin_menu())
         return
 
-    notify_ids = get_full_access_user_ids_for_series(campaign, series_number)
-    notify_text = (
-        f"📡 Update Webinar FULLFLOW ({campaign})\n\n"
-        f"Siri: SIRI {series_number}\n"
-        f"Sesi: Sesi {session_number}\n"
-        f"Masa mula: {start_at}\n"
-        f"Link: {link}\n"
-        f"{message_text}".strip()
-    )
-    sent_count = 0
-    for target_user_id in sorted(notify_ids):
-        try:
-            await context.bot.send_message(chat_id=target_user_id, text=notify_text)
-            sent_count += 1
-        except Exception:
-            logger.exception("Failed sending zoom notification user_id=%s", target_user_id)
+    if payload_type == "next_event_admin_zoom_submit":
+        start_at = str(payload.get("start_at") or "").strip()
+        link = str(payload.get("link") or "").strip()
+        message_text = str(payload.get("message") or "").strip()
+        notify_ids = get_full_access_user_ids_for_series(campaign, series_number)
+        notify_text = (
+            f"📡 Update Webinar FULLFLOW ({campaign})\n\n"
+            f"Siri: SIRI {series_number}\n"
+            f"Sesi: Sesi {session_number}\n"
+            f"Masa mula: {start_at}\n"
+            f"Link: {link}\n"
+            f"{message_text}".strip()
+        )
+        sent_count = 0
+        for target_user_id in sorted(notify_ids):
+            try:
+                await context.bot.send_message(chat_id=target_user_id, text=notify_text)
+                sent_count += 1
+            except Exception:
+                logger.exception("Failed sending zoom notification user_id=%s", target_user_id)
 
-    await message.reply_text(
-        f"✅ Zoom Link berjaya disimpan.\nCampaign: {campaign}\nSiri: SIRI {series_number}\nSesi: Sesi {session_number}\nNotifikasi dihantar kepada {sent_count} user.",
-        reply_markup=build_admin_menu(),
-    )
+        await message.reply_text(
+            f"✅ Zoom Link berjaya disimpan.\nCampaign: {campaign}\nSiri: SIRI {series_number}\nSesi: Sesi {session_number}\nNotifikasi dihantar kepada {sent_count} user.",
+            reply_markup=build_admin_menu(),
+        )
+        return
+
+    if payload_type == "next_event_admin_zoom_revoke":
+        await message.reply_text(
+            f"✅ Zoom Link untuk SIRI {series_number}, Sesi {session_number} telah direvoke.",
+            reply_markup=build_admin_menu(),
+        )
+        return
+
+    if payload_type == "next_event_admin_zoom_finish":
+        await message.reply_text(
+            f"✅ Sesi {session_number} untuk SIRI {series_number} ditandakan tamat.",
+            reply_markup=build_admin_menu(),
+        )
 
 
 def main() -> None:

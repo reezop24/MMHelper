@@ -13,6 +13,8 @@
       --muted: #e0c7cd;
       --accent: #f59e0b;
       --accent-2: #f97316;
+      --danger: #dc2626;
+      --finish: #2563eb;
     }
     * { box-sizing: border-box; }
     body {
@@ -30,6 +32,24 @@
     }
     h1 { margin: 0 0 8px; font-size: 26px; }
     p { margin: 0; color: var(--muted); line-height: 1.55; }
+    .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px; }
+    .tab-btn {
+      margin: 0;
+      width: 100%;
+      border: 1px solid #8d4d54;
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: rgba(56, 24, 29, 0.86);
+      color: #f4e2e6;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .tab-btn.active {
+      background: linear-gradient(90deg, var(--accent) 0%, var(--accent-2) 100%);
+      color: #2e1400;
+      border-color: var(--accent);
+    }
+    .hidden { display: none !important; }
     .grid { margin-top: 16px; display: grid; gap: 14px; }
     label { display: block; margin: 0 0 6px; font-size: 13px; font-weight: 700; color: var(--text); }
     input, select, textarea {
@@ -43,18 +63,50 @@
       outline: none;
     }
     textarea { min-height: 140px; resize: vertical; }
-    button {
+    .submit-btn, .action-btn {
       width: 100%;
-      border: 1px solid var(--accent);
       border-radius: 12px;
       padding: 12px 14px;
       margin-top: 16px;
       font-size: 14px;
       font-weight: 800;
+    }
+    .submit-btn {
+      border: 1px solid var(--accent);
       color: #2e1400;
       background: linear-gradient(90deg, var(--accent) 0%, var(--accent-2) 100%);
     }
     .status { margin-top: 12px; min-height: 22px; font-size: 13px; color: var(--muted); }
+    .entry-card {
+      margin-top: 14px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      background: rgba(38, 19, 23, 0.92);
+    }
+    .entry-card p + p { margin-top: 8px; }
+    .entry-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+    .danger-btn {
+      border: 1px solid var(--danger);
+      color: #fff1f2;
+      background: rgba(127, 29, 29, 0.96);
+    }
+    .finish-btn {
+      border: 1px solid var(--finish);
+      color: #eff6ff;
+      background: rgba(30, 64, 175, 0.94);
+    }
+    .status-pill {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid #744147;
+      background: rgba(27, 18, 20, 0.92);
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 700;
+    }
   </style>
 </head>
 <body>
@@ -63,48 +115,85 @@
       <h1>Update Zoom Link</h1>
       <p>Kemaskini link Zoom mengikut webinar, siri dan sesi. Data akan disimpan ke DB dan notifikasi akan dihantar kepada user yang layak sahaja.</p>
 
-      <div class="grid">
-        <div>
-          <label for="webinarSelect">Pilih Webinar</label>
-          <select id="webinarSelect">
-            <option value="webinar_april">Webinar April</option>
-          </select>
-        </div>
-
-        <div>
-          <label for="seriesSelect">Pilih Siri</label>
-          <select id="seriesSelect">
-            <option value="1">SIRI 1</option>
-            <option value="2">SIRI 2</option>
-            <option value="3">SIRI 3</option>
-          </select>
-        </div>
-
-        <div>
-          <label for="sessionSelect">Pilih Sesi</label>
-          <select id="sessionSelect">
-            <option value="1">Sesi 1</option>
-            <option value="2">Sesi 2</option>
-          </select>
-        </div>
-
-        <div>
-          <label for="startAtInput">Masa mula sesi</label>
-          <input id="startAtInput" type="datetime-local" />
-        </div>
-
-        <div>
-          <label for="linkInput">Zoom link</label>
-          <input id="linkInput" type="url" placeholder="https://..." />
-        </div>
-
-        <div>
-          <label for="messageInput">Message</label>
-          <textarea id="messageInput" placeholder="Masukkan maklumat tambahan untuk user"></textarea>
-        </div>
+      <div class="tabs">
+        <button id="tabUpdate" type="button" class="tab-btn active">Update Link</button>
+        <button id="tabList" type="button" class="tab-btn">Link List</button>
       </div>
 
-      <button id="submitBtn" type="button">Submit</button>
+      <section id="panelUpdate">
+        <div class="grid">
+          <div>
+            <label for="webinarSelect">Pilih Webinar</label>
+            <select id="webinarSelect">
+              <option value="webinar_april">Webinar April</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="seriesSelect">Pilih Siri</label>
+            <select id="seriesSelect">
+              <option value="1">SIRI 1</option>
+              <option value="2">SIRI 2</option>
+              <option value="3">SIRI 3</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="sessionSelect">Pilih Sesi</label>
+            <select id="sessionSelect">
+              <option value="1">Sesi 1</option>
+              <option value="2">Sesi 2</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="startAtInput">Masa mula sesi</label>
+            <input id="startAtInput" type="datetime-local" />
+          </div>
+
+          <div>
+            <label for="linkInput">Zoom link</label>
+            <input id="linkInput" type="url" placeholder="https://..." />
+          </div>
+
+          <div>
+            <label for="messageInput">Message</label>
+            <textarea id="messageInput" placeholder="Masukkan maklumat tambahan untuk user"></textarea>
+          </div>
+        </div>
+
+        <button id="submitBtn" type="button" class="submit-btn">Submit</button>
+      </section>
+
+      <section id="panelList" class="hidden">
+        <div class="grid">
+          <div>
+            <label for="listSeriesSelect">Pilih Siri</label>
+            <select id="listSeriesSelect">
+              <option value="">-- pilih siri --</option>
+            </select>
+          </div>
+          <div>
+            <label for="listSessionSelect">Pilih Sesi</label>
+            <select id="listSessionSelect">
+              <option value="">-- pilih sesi --</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="entryCard" class="entry-card hidden">
+          <p><strong id="entryTitle"></strong></p>
+          <span id="entryStatus" class="status-pill"></span>
+          <p id="entryStart"></p>
+          <p id="entryLink"></p>
+          <p id="entryMessage"></p>
+          <div class="entry-actions">
+            <button id="revokeBtn" type="button" class="action-btn danger-btn">Revoke</button>
+            <button id="finishBtn" type="button" class="action-btn finish-btn">Finish</button>
+          </div>
+        </div>
+      </section>
+
       <p id="statusText" class="status"></p>
     </section>
   </main>
@@ -127,9 +216,102 @@
       var messageInput = document.getElementById("messageInput");
       var submitBtn = document.getElementById("submitBtn");
       var statusText = document.getElementById("statusText");
+      var tabUpdate = document.getElementById("tabUpdate");
+      var tabList = document.getElementById("tabList");
+      var panelUpdate = document.getElementById("panelUpdate");
+      var panelList = document.getElementById("panelList");
+      var listSeriesSelect = document.getElementById("listSeriesSelect");
+      var listSessionSelect = document.getElementById("listSessionSelect");
+      var entryCard = document.getElementById("entryCard");
+      var entryTitle = document.getElementById("entryTitle");
+      var entryStatus = document.getElementById("entryStatus");
+      var entryStart = document.getElementById("entryStart");
+      var entryLink = document.getElementById("entryLink");
+      var entryMessage = document.getElementById("entryMessage");
+      var revokeBtn = document.getElementById("revokeBtn");
+      var finishBtn = document.getElementById("finishBtn");
 
-      var currentCampaign = String(params.get("campaign") || "webinar_april");
+      function parsePayload() {
+        try {
+          var raw = params.get("zoom_entries_payload");
+          if (!raw) return { campaign: "webinar_april", entries: [] };
+          var parsed = JSON.parse(raw);
+          return parsed && typeof parsed === "object" ? parsed : { campaign: "webinar_april", entries: [] };
+        } catch (err) {
+          return { campaign: "webinar_april", entries: [] };
+        }
+      }
+
+      var payloadData = parsePayload();
+      var currentCampaign = String(params.get("campaign") || payloadData.campaign || "webinar_april");
       webinarSelect.value = currentCampaign;
+      var entries = Array.isArray(payloadData.entries) ? payloadData.entries : [];
+
+      function openTab(name) {
+        var isUpdate = name === "update";
+        panelUpdate.classList.toggle("hidden", !isUpdate);
+        panelList.classList.toggle("hidden", isUpdate);
+        tabUpdate.classList.toggle("active", isUpdate);
+        tabList.classList.toggle("active", !isUpdate);
+      }
+
+      function sendPayload(payload) {
+        statusText.textContent = "Data dihantar ke bot.";
+        if (tg) {
+          tg.sendData(JSON.stringify(payload));
+          tg.close();
+        }
+      }
+
+      function selectedEntry() {
+        var series = String(listSeriesSelect.value || "");
+        var session = String(listSessionSelect.value || "");
+        return entries.find(function (entry) {
+          return String(entry.series) === series && String(entry.session) === session;
+        }) || null;
+      }
+
+      function renderEntry() {
+        var entry = selectedEntry();
+        if (!entry) {
+          entryCard.classList.add("hidden");
+          return;
+        }
+        entryCard.classList.remove("hidden");
+        entryTitle.textContent = "SIRI " + entry.series + " · Sesi " + entry.session;
+        entryStatus.textContent = "Status: " + String(entry.status || "active").toUpperCase();
+        entryStart.textContent = "Masa mula: " + String(entry.start_at || "-");
+        entryLink.textContent = "Link: " + String(entry.link || "-");
+        entryMessage.textContent = String(entry.message || "-");
+      }
+
+      function populateSessions() {
+        var series = String(listSeriesSelect.value || "");
+        listSessionSelect.innerHTML = '<option value="">-- pilih sesi --</option>';
+        entries
+          .filter(function (entry) { return String(entry.series) === series; })
+          .forEach(function (entry) {
+            var opt = document.createElement("option");
+            opt.value = String(entry.session);
+            opt.textContent = "Sesi " + String(entry.session);
+            listSessionSelect.appendChild(opt);
+          });
+        renderEntry();
+      }
+
+      function populateSeries() {
+        var seen = {};
+        listSeriesSelect.innerHTML = '<option value="">-- pilih siri --</option>';
+        entries.forEach(function (entry) {
+          var series = String(entry.series || "");
+          if (!series || seen[series]) return;
+          seen[series] = true;
+          var opt = document.createElement("option");
+          opt.value = series;
+          opt.textContent = "SIRI " + series;
+          listSeriesSelect.appendChild(opt);
+        });
+      }
 
       submitBtn.addEventListener("click", function () {
         var startAt = String(startAtInput.value || "").trim();
@@ -138,7 +320,7 @@
           statusText.textContent = "Masa mula sesi dan Zoom link wajib diisi.";
           return;
         }
-        var payload = {
+        sendPayload({
           type: "next_event_admin_zoom_submit",
           campaign: String(webinarSelect.value || currentCampaign),
           series: String(seriesSelect.value || "1"),
@@ -146,14 +328,36 @@
           start_at: startAt,
           link: link,
           message: String(messageInput.value || "").trim()
-        };
-        statusText.textContent = "Data dihantar ke bot.";
-        if (tg) {
-          tg.sendData(JSON.stringify(payload));
-          tg.close();
-          return;
-        }
+        });
       });
+
+      revokeBtn.addEventListener("click", function () {
+        var entry = selectedEntry();
+        if (!entry) return;
+        sendPayload({
+          type: "next_event_admin_zoom_revoke",
+          campaign: currentCampaign,
+          series: String(entry.series),
+          session: String(entry.session)
+        });
+      });
+
+      finishBtn.addEventListener("click", function () {
+        var entry = selectedEntry();
+        if (!entry) return;
+        sendPayload({
+          type: "next_event_admin_zoom_finish",
+          campaign: currentCampaign,
+          series: String(entry.series),
+          session: String(entry.session)
+        });
+      });
+
+      tabUpdate.addEventListener("click", function () { openTab("update"); });
+      tabList.addEventListener("click", function () { openTab("list"); });
+      listSeriesSelect.addEventListener("change", populateSessions);
+      listSessionSelect.addEventListener("change", renderEntry);
+      populateSeries();
     })();
   </script>
 </body>
