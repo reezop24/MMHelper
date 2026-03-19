@@ -1463,6 +1463,13 @@ def get_evideo_bot_url() -> str:
     return ""
 
 
+def get_next_event_bot_url() -> str:
+    url = (os.getenv("SIDEBOT_NEXT_EVENT_BOT_URL") or "").strip()
+    if url.startswith("https://t.me/"):
+        return url
+    return ""
+
+
 def get_admin_group_id() -> int | None:
     raw = (os.getenv("SIDEBOT_ADMIN_GROUP_ID") or "").strip()
     if not raw:
@@ -3209,7 +3216,8 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                         if base_flow == "one_time_purchase"
                         else (
                             f"Tahniah! Pendaftaran webinar {_webinar_series_label_from_flow(registration_flow)} anda telah diluluskan.\n"
-                            "Sila tunggu maklumat akses atau arahan seterusnya daripada admin."
+                            "Untuk aktifkan akses webinar, sila tekan butang di bawah dan tekan Start dalam NEXT Event Bot.\n"
+                            "Akses hanya akan tersedia selepas anda mengaktifkan bot tersebut."
                         )
                         if _is_webinar_registration_flow(registration_flow)
                         else (
@@ -3218,9 +3226,17 @@ async def handle_admin_callback(update: Update, context: ContextTypes.DEFAULT_TY
                             "Subscription ini sah selama 45 hari dari tarikh approval."
                         )
                     )
+                    approved_reply_markup = None
+                    if _is_webinar_registration_flow(registration_flow):
+                        next_event_bot_url = get_next_event_bot_url()
+                        if next_event_bot_url:
+                            approved_reply_markup = InlineKeyboardMarkup(
+                                [[InlineKeyboardButton("Aktifkan Akses Webinar", url=next_event_bot_url)]]
+                            )
                     await context.bot.send_message(
                         chat_id=target_user_id,
                         text=approved_text,
+                        reply_markup=approved_reply_markup,
                     )
             except Exception:
                 logger.exception("Failed to send status update to user")
