@@ -509,9 +509,69 @@ def build_zoom_series_text(series_number: str) -> str:
     return "\n\n".join(session_rows)
 
 
+def _series_access_label(access_level: str) -> str:
+    level = str(access_level or "none").strip().lower()
+    if level == "full":
+        return "Akses Penuh"
+    if level == "recording_only":
+        return "Rakaman Sahaja"
+    return "Tiada Akses"
+
+
+def build_start_welcome_text(user_id: int | None) -> str:
+    campaign = get_current_webinar_campaign()
+    if not isinstance(user_id, int):
+        return (
+            "Selamat datang ke NEXT Event Bot.\n\n"
+            f"Campaign semasa: {campaign}\n"
+            "Bot ini digunakan untuk akses webinar, Zoom link, bahan rujukan, dan rakaman mengikut kelayakan akaun anda."
+        )
+
+    if user_id == get_superuser_id():
+        role_line = "Kategori akaun anda: SUPERUSER"
+    else:
+        whitelist = _read_vip_whitelist()
+        vip2_users = whitelist.get("vip2", {}).get("users", {})
+        vip3_users = whitelist.get("vip3", {}).get("users", {})
+        if isinstance(vip2_users, dict) and str(user_id) in vip2_users:
+            role_line = "Kategori akaun anda: VIP2 / NEXTexclusive"
+        elif isinstance(vip3_users, dict) and str(user_id) in vip3_users:
+            role_line = "Kategori akaun anda: VIP3 / NEXTeVideo26"
+        else:
+            role_line = "Kategori akaun anda: Peserta / User Biasa"
+
+    s1 = get_series_access_level(user_id, "1")
+    s2 = get_series_access_level(user_id, "2")
+    s3 = get_series_access_level(user_id, "3")
+
+    lines = [
+        "Selamat datang ke NEXT Event Bot.",
+        "",
+        f"Campaign semasa: {campaign}",
+        role_line,
+        "",
+        "Ringkasan akses anda:",
+        f"SIRI 1: {_series_access_label(s1)}",
+        f"SIRI 2: {_series_access_label(s2)}",
+        f"SIRI 3: {_series_access_label(s3)}",
+        "",
+        "Akses kandungan dalam bot ini bergantung pada kategori akaun dan whitelist webinar anda.",
+    ]
+    if s1 == s2 == s3 == "none":
+        lines.extend(
+            [
+                "",
+                "Akaun anda belum mempunyai akses webinar buat masa ini.",
+                "Jika anda telah diluluskan untuk webinar, sila pastikan anda menggunakan akaun Telegram yang sama.",
+            ]
+        )
+    return "\n".join(lines)
+
+
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data["menu_level"] = LEVEL_MAIN
-    await show_main_menu(update, "Sila pilih menu utama:")
+    user_id = update.effective_user.id if update.effective_user else None
+    await show_main_menu(update, build_start_welcome_text(user_id))
 
 
 async def menu_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
