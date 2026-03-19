@@ -534,11 +534,19 @@ def build_start_welcome_text(user_id: int | None) -> str:
         vip2_users = whitelist.get("vip2", {}).get("users", {})
         vip3_users = whitelist.get("vip3", {}).get("users", {})
         if isinstance(vip2_users, dict) and str(user_id) in vip2_users:
-            role_line = "Kategori akaun anda: VIP2 / NEXTexclusive"
+            role_line = "Kategori akaun anda: NEXTexclusive member"
         elif isinstance(vip3_users, dict) and str(user_id) in vip3_users:
-            role_line = "Kategori akaun anda: VIP3 / NEXTeVideo26"
+            role_line = "Kategori akaun anda: NEXTeVideo26 subscriber"
         else:
-            role_line = "Kategori akaun anda: Peserta / User Biasa"
+            has_any_series_access = any(
+                get_series_access_level(user_id, series_number) != "none"
+                for series_number in ("1", "2", "3")
+            )
+            role_line = (
+                "Kategori akaun anda: Peserta"
+                if has_any_series_access
+                else "Kategori akaun anda: Free User / User Biasa"
+            )
 
     s1 = get_series_access_level(user_id, "1")
     s2 = get_series_access_level(user_id, "2")
