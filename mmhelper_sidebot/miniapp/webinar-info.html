@@ -229,6 +229,31 @@
       gap: 8px;
     }
 
+    .vip-access-box {
+      display: none;
+      margin-top: 14px;
+      border: 1px solid #8d4d54;
+      border-radius: 14px;
+      padding: 14px;
+      background: linear-gradient(135deg, rgba(56, 24, 29, 0.94) 0%, rgba(27, 18, 20, 0.97) 100%);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+    }
+
+    .vip-access-box.active {
+      display: block;
+    }
+
+    .vip-access-box p {
+      margin: 0;
+      color: #ffe4e8;
+      line-height: 1.55;
+      font-size: 14px;
+    }
+
+    .vip-access-box p + p {
+      margin-top: 10px;
+    }
+
     .status-overlay {
       display: none;
       margin-top: 14px;
@@ -517,9 +542,16 @@
             <p id="statusOverlayTextS1" class="status-overlay-text"></p>
           </div>
 
+          <div id="vipAccessBoxS1" class="vip-access-box">
+            <p><strong>Anda didaftarkan secara automatik untuk akses webinar mengikut kategori akaun anda.</strong></p>
+            <p>Untuk aktifkan akses webinar, sila tekan butang di bawah dan tekan Start dalam NEXT Event Bot.</p>
+            <p>Akses hanya akan tersedia selepas anda mengaktifkan bot tersebut.</p>
+          </div>
+
           <div class="action-row">
             <button id="registerSeries1Btn" type="button" class="action-btn">DAFTAR WEBINAR SIRI 1</button>
             <button id="registerNextBtn" type="button" class="action-btn secondary">DAFTAR NEXTexclusive</button>
+            <button id="activateEventBtnS1" type="button" class="action-btn secondary hidden">AKTIFKAN AKSES WEBINAR</button>
           </div>
         </section>
 
@@ -612,9 +644,16 @@
             <p id="statusOverlayTextS2" class="status-overlay-text"></p>
           </div>
 
+          <div id="vipAccessBoxS2" class="vip-access-box">
+            <p><strong>Anda didaftarkan secara automatik untuk akses webinar mengikut kategori akaun anda.</strong></p>
+            <p>Untuk aktifkan akses webinar, sila tekan butang di bawah dan tekan Start dalam NEXT Event Bot.</p>
+            <p>Akses hanya akan tersedia selepas anda mengaktifkan bot tersebut.</p>
+          </div>
+
           <div class="action-row">
             <button id="registerSeries2Btn" type="button" class="action-btn">DAFTAR WEBINAR SIRI 2</button>
             <button id="registerNextBtnS2" type="button" class="action-btn secondary">DAFTAR NEXTexclusive</button>
+            <button id="activateEventBtnS2" type="button" class="action-btn secondary hidden">AKTIFKAN AKSES WEBINAR</button>
           </div>
         </section>
 
@@ -706,9 +745,16 @@
             <p id="statusOverlayTextS3" class="status-overlay-text"></p>
           </div>
 
+          <div id="vipAccessBoxS3" class="vip-access-box">
+            <p><strong>Anda didaftarkan secara automatik untuk akses webinar mengikut kategori akaun anda.</strong></p>
+            <p>Untuk aktifkan akses webinar, sila tekan butang di bawah dan tekan Start dalam NEXT Event Bot.</p>
+            <p>Akses hanya akan tersedia selepas anda mengaktifkan bot tersebut.</p>
+          </div>
+
           <div class="action-row">
             <button id="registerSeries3Btn" type="button" class="action-btn">DAFTAR WEBINAR SIRI 3</button>
             <button id="registerNextBtnS3" type="button" class="action-btn secondary">DAFTAR NEXTexclusive</button>
+            <button id="activateEventBtnS3" type="button" class="action-btn secondary hidden">AKTIFKAN AKSES WEBINAR</button>
           </div>
         </section>
       </div>
@@ -741,6 +787,12 @@
       var registerNextBtnS2 = document.getElementById("registerNextBtnS2");
       var registerSeries3Btn = document.getElementById("registerSeries3Btn");
       var registerNextBtnS3 = document.getElementById("registerNextBtnS3");
+      var activateEventBtnS1 = document.getElementById("activateEventBtnS1");
+      var activateEventBtnS2 = document.getElementById("activateEventBtnS2");
+      var activateEventBtnS3 = document.getElementById("activateEventBtnS3");
+      var vipAccessBoxS1 = document.getElementById("vipAccessBoxS1");
+      var vipAccessBoxS2 = document.getElementById("vipAccessBoxS2");
+      var vipAccessBoxS3 = document.getElementById("vipAccessBoxS3");
       var overlayS1 = document.getElementById("statusOverlayS1");
       var overlayTextS1 = document.getElementById("statusOverlayTextS1");
       var overlayS2 = document.getElementById("statusOverlayS2");
@@ -773,6 +825,26 @@
           return String(new URLSearchParams(window.location.search).get("webinar_register_url") || "").trim();
         } catch (err) {
           return "";
+        }
+      }
+
+      function getNextEventBotUrl() {
+        try {
+          return String(new URLSearchParams(window.location.search).get("next_event_bot_url") || "").trim();
+        } catch (err) {
+          return "";
+        }
+      }
+
+      function getViewerPayload() {
+        try {
+          var raw = new URLSearchParams(window.location.search).get("viewer_payload");
+          if (!raw) return { category: "normal" };
+          var parsed = JSON.parse(raw);
+          if (!parsed || typeof parsed !== "object") return { category: "normal" };
+          return parsed;
+        } catch (err) {
+          return { category: "normal" };
         }
       }
 
@@ -824,6 +896,36 @@
           return;
         }
         window.location.href = nextRegisterUrl;
+      }
+
+      function openNextEventBot() {
+        var nextEventBotUrl = getNextEventBotUrl();
+        if (!nextEventBotUrl) {
+          return;
+        }
+        window.location.href = nextEventBotUrl;
+      }
+
+      function applyViewerAccess() {
+        var viewer = getViewerPayload();
+        var category = String((viewer && viewer.category) || "normal").toLowerCase();
+        var isVipViewer = category === "vip2" || category === "vip3";
+        [registerSeries1Btn, registerSeries2Btn, registerSeries3Btn].forEach(function (el) {
+          if (!el) return;
+          el.classList.toggle("hidden", isVipViewer);
+        });
+        [registerNextBtn, registerNextBtnS2, registerNextBtnS3].forEach(function (el) {
+          if (!el) return;
+          el.classList.toggle("hidden", isVipViewer);
+        });
+        [activateEventBtnS1, activateEventBtnS2, activateEventBtnS3].forEach(function (el) {
+          if (!el) return;
+          el.classList.toggle("hidden", !isVipViewer);
+        });
+        [vipAccessBoxS1, vipAccessBoxS2, vipAccessBoxS3].forEach(function (el) {
+          if (!el) return;
+          el.classList.toggle("active", isVipViewer);
+        });
       }
 
       function applySeriesStatus(seriesId, statusValue, registerBtn, overlayEl, overlayTextEl) {
@@ -878,6 +980,15 @@
       if (registerNextBtnS3) {
         registerNextBtnS3.addEventListener("click", openNextRegister);
       }
+      if (activateEventBtnS1) {
+        activateEventBtnS1.addEventListener("click", openNextEventBot);
+      }
+      if (activateEventBtnS2) {
+        activateEventBtnS2.addEventListener("click", openNextEventBot);
+      }
+      if (activateEventBtnS3) {
+        activateEventBtnS3.addEventListener("click", openNextEventBot);
+      }
 
       var webinarStatus = getWebinarStatusPayload();
       var webinarSeries = webinarStatus && typeof webinarStatus === "object" ? webinarStatus.series : null;
@@ -890,6 +1001,7 @@
         applySeriesStatus("3", s3, registerSeries3Btn, overlayS3, overlayTextS3);
       }
 
+      applyViewerAccess();
       activate(0);
     })();
   </script>

@@ -809,17 +809,41 @@ def get_happy_hour_webapp_url() -> str:
         return f"{base}/happy-hour.html"
 
 
-def get_webinar_info_webapp_url() -> str:
+def _webinar_viewer_payload(user_id: int | str | None) -> str:
+    out = {"category": "normal"}
+    if user_id is None:
+        return json.dumps(out, ensure_ascii=False)
+    user_key = str(user_id).strip()
+    if not user_key:
+        return json.dumps(out, ensure_ascii=False)
+    whitelist = load_vip_whitelist()
+    vip2_users = whitelist.get("vip2", {}).get("users", {}) if isinstance(whitelist.get("vip2"), dict) else {}
+    vip3_users = whitelist.get("vip3", {}).get("users", {}) if isinstance(whitelist.get("vip3"), dict) else {}
+    if isinstance(vip2_users, dict) and user_key in vip2_users:
+        out["category"] = "vip2"
+    elif isinstance(vip3_users, dict) and user_key in vip3_users:
+        out["category"] = "vip3"
+    return json.dumps(out, ensure_ascii=False)
+
+
+def get_webinar_info_webapp_url(user_id: int | str | None = None) -> str:
     explicit = (os.getenv("SIDEBOT_WEBINAR_INFO_WEBAPP_URL") or "").strip()
     register_url = get_register_next_webapp_url()
     webinar_register_url = get_webinar_register_webapp_url()
     webinar_status_payload = _webinar_status_payload()
+    event_bot_url = (os.getenv("SIDEBOT_NEXT_EVENT_BOT_URL") or "").strip()
+    viewer_payload = _webinar_viewer_payload(user_id)
     if explicit.lower().startswith("https://"):
-        params: dict[str, str] = {"webinar_status_payload": webinar_status_payload}
+        params: dict[str, str] = {
+            "webinar_status_payload": webinar_status_payload,
+            "viewer_payload": viewer_payload,
+        }
         if register_url:
             params["next_register_url"] = register_url
         if webinar_register_url:
             params["webinar_register_url"] = webinar_register_url
+        if event_bot_url.startswith("https://t.me/"):
+            params["next_event_bot_url"] = event_bot_url
         sep = "&" if "?" in explicit else "?"
         return f"{explicit}{sep}{urlencode(params)}"
 
@@ -837,11 +861,16 @@ def get_webinar_info_webapp_url() -> str:
         else:
             new_path = f"{path}/webinar-info.html"
         built = urlunsplit((parts.scheme, parts.netloc, new_path, parts.query, parts.fragment))
-        params = {"webinar_status_payload": webinar_status_payload}
+        params = {
+            "webinar_status_payload": webinar_status_payload,
+            "viewer_payload": viewer_payload,
+        }
         if register_url:
             params["next_register_url"] = register_url
         if webinar_register_url:
             params["webinar_register_url"] = webinar_register_url
+        if event_bot_url.startswith("https://t.me/"):
+            params["next_event_bot_url"] = event_bot_url
         sep = "&" if "?" in built else "?"
         return f"{built}{sep}{urlencode(params)}"
     except Exception:
@@ -851,11 +880,16 @@ def get_webinar_info_webapp_url() -> str:
             built = f"{base.rsplit('/', 1)[0]}/webinar-info.html"
         else:
             built = f"{base}/webinar-info.html"
-        params = {"webinar_status_payload": webinar_status_payload}
+        params = {
+            "webinar_status_payload": webinar_status_payload,
+            "viewer_payload": viewer_payload,
+        }
         if register_url:
             params["next_register_url"] = register_url
         if webinar_register_url:
             params["webinar_register_url"] = webinar_register_url
+        if event_bot_url.startswith("https://t.me/"):
+            params["next_event_bot_url"] = event_bot_url
         sep = "&" if "?" in built else "?"
         return f"{built}{sep}{urlencode(params)}"
 
@@ -2736,8 +2770,8 @@ def main_menu_keyboard(user_id: int | None) -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(rows, resize_keyboard=True)
 
 
-def webinar_menu_keyboard() -> ReplyKeyboardMarkup:
-    webinar_info_url = get_webinar_info_webapp_url()
+def webinar_menu_keyboard(user_id: int | str | None = None) -> ReplyKeyboardMarkup:
+    webinar_info_url = get_webinar_info_webapp_url(user_id)
     if webinar_info_url:
         webinar_info_button = KeyboardButton(MENU_WEBINAR_INFO, web_app=WebAppInfo(url=webinar_info_url))
     else:
@@ -3655,14 +3689,14 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if text == MENU_PENDAFTARAN_WEBINAR:
         await message.reply_text(
             "Pilih tindakan untuk webinar.",
-            reply_markup=webinar_menu_keyboard(),
+            reply_markup=webinar_menu_keyboard(user.id),
         )
         return
 
     if text == MENU_WEBINAR_INFO:
         await message.reply_text(
             "Maklumat webinar akan dipaparkan di sini. Flow pendaftaran boleh disambung dalam langkah seterusnya.",
-            reply_markup=webinar_menu_keyboard(),
+            reply_markup=webinar_menu_keyboard(user.id),
         )
         return
 
@@ -3672,7 +3706,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             return
         await message.reply_text(
             "Flow daftar webinar belum dibuka lagi. Saya dah sediakan submenu, next boleh sambung borang atau miniapp pendaftaran.",
-            reply_markup=webinar_menu_keyboard(),
+            reply_markup=webinar_menu_keyboard(user.id),
         )
         return
 
@@ -4412,7 +4446,7 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
         label = f"SIRI {series}" if series else "siri pilihan"
         await message.reply_text(
             f"Flow daftar webinar untuk {label} belum dibuka lagi. Next boleh sambung borang atau miniapp pendaftaran khusus.",
-            reply_markup=webinar_menu_keyboard(),
+            reply_markup=webinar_menu_keyboard(user.id),
         )
         return
 
