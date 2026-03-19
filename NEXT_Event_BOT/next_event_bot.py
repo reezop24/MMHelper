@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlencode
 
-from telegram import KeyboardButton, ReplyKeyboardMarkup, Update, WebAppInfo
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, Update, WebAppInfo
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
 
 logging.basicConfig(
@@ -576,23 +576,39 @@ def build_start_welcome_text(user_id: int | None) -> str:
         "Akses kandungan dalam bot ini bergantung pada kategori akaun dan whitelist webinar anda.",
     ]
     if s1 == s2 == s3 == "none":
-        admin_bot_url = get_admin_bot_url()
         lines.extend(
             [
                 "",
                 "Akaun anda belum mempunyai akses webinar buat masa ini.",
                 "Anda boleh pergi ke bot admin untuk mendaftar webinar.",
-                f"Bot admin: {admin_bot_url}" if admin_bot_url else "Bot admin belum disetkan.",
                 "Jika anda telah diluluskan untuk webinar, sila pastikan anda menggunakan akaun Telegram yang sama.",
             ]
         )
     return "\n".join(lines)
 
 
+def is_free_user(user_id: int | None) -> bool:
+    if not isinstance(user_id, int):
+        return False
+    return all(get_series_access_level(user_id, series_number) == "none" for series_number in ("1", "2", "3"))
+
+
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data["menu_level"] = LEVEL_MAIN
     user_id = update.effective_user.id if update.effective_user else None
     await show_main_menu(update, build_start_welcome_text(user_id))
+    message = update.effective_message
+    if not message or not is_free_user(user_id):
+        return
+    admin_bot_url = get_admin_bot_url()
+    if not admin_bot_url:
+        return
+    await message.reply_text(
+        "Tekan butang di bawah untuk buka bot admin dan mendaftar webinar.",
+        reply_markup=InlineKeyboardMarkup(
+            [[InlineKeyboardButton("Buka Bot Admin", url=admin_bot_url)]]
+        ),
+    )
 
 
 async def menu_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
