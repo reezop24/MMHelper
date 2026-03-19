@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Update Zoom Link</title>
+  <style>
+    :root {
+      --bg: #110b0d;
+      --card: #1d1215;
+      --line: #5a3035;
+      --text: #fff2f5;
+      --muted: #e0c7cd;
+      --accent: #f59e0b;
+      --accent-2: #f97316;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top, #2b1418 0%, var(--bg) 60%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .page { max-width: 720px; margin: 0 auto; padding: 22px 16px 28px; }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 18px;
+      background: rgba(29, 18, 21, 0.94);
+    }
+    h1 { margin: 0 0 8px; font-size: 26px; }
+    p { margin: 0; color: var(--muted); line-height: 1.55; }
+    .grid { margin-top: 16px; display: grid; gap: 14px; }
+    label { display: block; margin: 0 0 6px; font-size: 13px; font-weight: 700; color: var(--text); }
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid #8d4d54;
+      border-radius: 12px;
+      background: #2d181c;
+      color: var(--text);
+      padding: 11px 12px;
+      font-size: 14px;
+      outline: none;
+    }
+    textarea { min-height: 140px; resize: vertical; }
+    button {
+      width: 100%;
+      border: 1px solid var(--accent);
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-top: 16px;
+      font-size: 14px;
+      font-weight: 800;
+      color: #2e1400;
+      background: linear-gradient(90deg, var(--accent) 0%, var(--accent-2) 100%);
+    }
+    .status { margin-top: 12px; min-height: 22px; font-size: 13px; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="card">
+      <h1>Update Zoom Link</h1>
+      <p>Kemaskini link Zoom mengikut webinar, siri dan sesi. Data akan disimpan ke DB dan notifikasi akan dihantar kepada user yang layak sahaja.</p>
+
+      <div class="grid">
+        <div>
+          <label for="webinarSelect">Pilih Webinar</label>
+          <select id="webinarSelect">
+            <option value="webinar_april">Webinar April</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="seriesSelect">Pilih Siri</label>
+          <select id="seriesSelect">
+            <option value="1">SIRI 1</option>
+            <option value="2">SIRI 2</option>
+            <option value="3">SIRI 3</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="sessionSelect">Pilih Sesi</label>
+          <select id="sessionSelect">
+            <option value="1">Sesi 1</option>
+            <option value="2">Sesi 2</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="startAtInput">Masa mula sesi</label>
+          <input id="startAtInput" type="datetime-local" />
+        </div>
+
+        <div>
+          <label for="linkInput">Zoom link</label>
+          <input id="linkInput" type="url" placeholder="https://..." />
+        </div>
+
+        <div>
+          <label for="messageInput">Message</label>
+          <textarea id="messageInput" placeholder="Masukkan maklumat tambahan untuk user"></textarea>
+        </div>
+      </div>
+
+      <button id="submitBtn" type="button">Submit</button>
+      <p id="statusText" class="status"></p>
+    </section>
+  </main>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    (function () {
+      var tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+      if (tg) {
+        tg.ready();
+        tg.expand();
+      }
+
+      var params = new URLSearchParams(window.location.search || "");
+      var webinarSelect = document.getElementById("webinarSelect");
+      var seriesSelect = document.getElementById("seriesSelect");
+      var sessionSelect = document.getElementById("sessionSelect");
+      var startAtInput = document.getElementById("startAtInput");
+      var linkInput = document.getElementById("linkInput");
+      var messageInput = document.getElementById("messageInput");
+      var submitBtn = document.getElementById("submitBtn");
+      var statusText = document.getElementById("statusText");
+
+      var currentCampaign = String(params.get("campaign") || "webinar_april");
+      webinarSelect.value = currentCampaign;
+
+      submitBtn.addEventListener("click", function () {
+        var startAt = String(startAtInput.value || "").trim();
+        var link = String(linkInput.value || "").trim();
+        if (!startAt || !link) {
+          statusText.textContent = "Masa mula sesi dan Zoom link wajib diisi.";
+          return;
+        }
+        var payload = {
+          type: "next_event_admin_zoom_submit",
+          campaign: String(webinarSelect.value || currentCampaign),
+          series: String(seriesSelect.value || "1"),
+          session: String(sessionSelect.value || "1"),
+          start_at: startAt,
+          link: link,
+          message: String(messageInput.value || "").trim()
+        };
+        statusText.textContent = "Data dihantar ke bot.";
+        if (tg) {
+          tg.sendData(JSON.stringify(payload));
+          tg.close();
+          return;
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
