@@ -705,6 +705,7 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
         "next_event_admin_zoom_submit",
         "next_event_admin_zoom_revoke",
         "next_event_admin_zoom_finish",
+        "next_event_admin_zoom_delete",
     }:
         await message.reply_text("ℹ️ Miniapp event diterima.", reply_markup=build_admin_menu())
         return
@@ -772,9 +773,20 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
             existing["status"] = "revoked"
         elif payload_type == "next_event_admin_zoom_finish":
             existing["status"] = "finished"
-        existing["updated_at"] = datetime.now(timezone.utc).isoformat()
-        existing["updated_by"] = int(user.id)
-        sessions[session_number] = existing
+        elif payload_type == "next_event_admin_zoom_delete":
+            sessions.pop(session_number, None)
+            if not sessions:
+                series_row.pop("sessions", None)
+            if not series_row:
+                series.pop(series_number, None)
+            if not series:
+                campaign_row.pop("series", None)
+            if not campaign_row:
+                campaigns.pop(campaign, None)
+        if payload_type != "next_event_admin_zoom_delete":
+            existing["updated_at"] = datetime.now(timezone.utc).isoformat()
+            existing["updated_by"] = int(user.id)
+            sessions[session_number] = existing
 
     try:
         _write_zoom_state(data)
@@ -820,6 +832,13 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if payload_type == "next_event_admin_zoom_finish":
         await message.reply_text(
             f"✅ Sesi {session_number} untuk SIRI {series_number} ditandakan tamat.",
+            reply_markup=build_admin_menu(),
+        )
+        return
+
+    if payload_type == "next_event_admin_zoom_delete":
+        await message.reply_text(
+            f"✅ Rekod Zoom Link untuk SIRI {series_number}, Sesi {session_number} telah dipadam.",
             reply_markup=build_admin_menu(),
         )
 

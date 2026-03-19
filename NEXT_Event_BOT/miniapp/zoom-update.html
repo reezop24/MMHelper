@@ -96,6 +96,12 @@
       color: #eff6ff;
       background: rgba(30, 64, 175, 0.94);
     }
+    .delete-btn {
+      border: 1px solid #991b1b;
+      color: #fff1f2;
+      background: linear-gradient(90deg, #7f1d1d 0%, #991b1b 100%);
+      grid-column: 1 / -1;
+    }
     .status-pill {
       display: inline-block;
       margin-top: 10px;
@@ -190,6 +196,7 @@
           <div class="entry-actions">
             <button id="revokeBtn" type="button" class="action-btn danger-btn">Revoke</button>
             <button id="finishBtn" type="button" class="action-btn finish-btn">Finish</button>
+            <button id="deleteBtn" type="button" class="action-btn delete-btn hidden">Delete</button>
           </div>
         </div>
       </section>
@@ -230,6 +237,7 @@
       var entryMessage = document.getElementById("entryMessage");
       var revokeBtn = document.getElementById("revokeBtn");
       var finishBtn = document.getElementById("finishBtn");
+      var deleteBtn = document.getElementById("deleteBtn");
 
       function parsePayload() {
         try {
@@ -283,6 +291,11 @@
         entryStart.textContent = "Masa mula: " + String(entry.start_at || "-");
         entryLink.textContent = "Link: " + String(entry.link || "-");
         entryMessage.textContent = String(entry.message || "-");
+        var status = String(entry.status || "active").toLowerCase();
+        var isArchived = status === "revoked" || status === "finished";
+        revokeBtn.classList.toggle("hidden", isArchived);
+        finishBtn.classList.toggle("hidden", isArchived);
+        deleteBtn.classList.toggle("hidden", !isArchived);
       }
 
       function populateSessions() {
@@ -347,6 +360,17 @@
         if (!entry) return;
         sendPayload({
           type: "next_event_admin_zoom_finish",
+          campaign: currentCampaign,
+          series: String(entry.series),
+          session: String(entry.session)
+        });
+      });
+
+      deleteBtn.addEventListener("click", function () {
+        var entry = selectedEntry();
+        if (!entry) return;
+        sendPayload({
+          type: "next_event_admin_zoom_delete",
           campaign: currentCampaign,
           series: String(entry.series),
           session: String(entry.session)
