@@ -43,6 +43,9 @@
     .status-box.not-opened { border-color: #2563eb; background: rgba(18, 41, 86, 0.95); }
     .status-box p { margin: 0; }
     .status-box p + p { margin-top: 8px; }
+    .vip-access-box { margin-top: 12px; border-radius: 14px; padding: 14px; border: 1px solid #8d4d54; background: linear-gradient(135deg, rgba(56, 24, 29, 0.94) 0%, rgba(27, 18, 20, 0.97) 100%); color: #fff1f4; }
+    .vip-access-box p { margin: 0; line-height: 1.55; }
+    .vip-access-box p + p { margin-top: 8px; }
     .status-note { margin-top: 12px; min-height: 22px; color: #f8e9ec; font-size: 13px; line-height: 1.45; }
   </style>
 </head>
@@ -82,6 +85,14 @@
         <p><strong id="seriesStatusTitle"></strong></p>
         <p id="seriesStatusText"></p>
       </div>
+
+      <div id="vipAccessBox" class="vip-access-box hidden">
+        <p><strong>Anda didaftarkan secara automatik untuk akses webinar mengikut kategori akaun anda.</strong></p>
+        <p>Untuk aktifkan akses webinar, sila tekan butang di bawah dan tekan Start dalam NEXT Event Bot.</p>
+        <p>Akses hanya akan tersedia selepas anda mengaktifkan bot tersebut.</p>
+      </div>
+
+      <button id="btnActivateEventAccess" type="button" class="submit-btn hidden">Aktifkan Akses Webinar</button>
 
       <div id="seriesActionList" class="action-list hidden">
         <button id="btnHomeNewRegistration" type="button" class="action-btn">Pendaftaran baru AMarkets</button>

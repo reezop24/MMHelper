@@ -1047,7 +1047,6 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
                     "event_name": event_name,
                     "series": series_number,
                     "message": message_text,
-                    "recipient_ids": sorted(recipient_ids),
                     "scheduled_for": scheduled_for,
                     "status": "pending",
                     "created_at": datetime.now(timezone.utc).isoformat(),
@@ -1232,8 +1231,14 @@ async def notification_schedule_worker(context: ContextTypes.DEFAULT_TYPE) -> No
             scheduled_for = scheduled_for.replace(tzinfo=timezone.utc)
         if scheduled_for > now_utc:
             continue
-        recipient_ids = job.get("recipient_ids")
-        recipient_set = {int(uid) for uid in recipient_ids if str(uid).isdigit()} if isinstance(recipient_ids, list) else set()
+        recipient_set = resolve_notification_recipients(
+            target_mode=str(job.get("target_mode") or ""),
+            target_value=str(job.get("target_value") or ""),
+            campaign=str(job.get("campaign") or get_current_webinar_campaign()),
+            event_kind=str(job.get("event_kind") or ""),
+            event_name=str(job.get("event_name") or ""),
+            series_number=str(job.get("series") or ""),
+        )
         sent_count = await send_notification_message(
             context,
             recipient_ids=recipient_set,

@@ -25,6 +25,8 @@
   var seriesStatusTitle = document.getElementById("seriesStatusTitle");
   var seriesStatusText = document.getElementById("seriesStatusText");
   var seriesActionList = document.getElementById("seriesActionList");
+  var vipAccessBox = document.getElementById("vipAccessBox");
+  var btnActivateEventAccess = document.getElementById("btnActivateEventAccess");
 
   var btnHomeNewRegistration = document.getElementById("btnHomeNewRegistration");
   var btnHomeIbTransfer = document.getElementById("btnHomeIbTransfer");
@@ -120,6 +122,33 @@
   }
 
   var webinarStatusPayload = parseWebinarStatusPayload();
+
+  function getViewerPayload() {
+    try {
+      var raw = new URLSearchParams(window.location.search || "").get("viewer_payload");
+      if (!raw) return { category: "normal" };
+      var parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== "object") return { category: "normal" };
+      return parsed;
+    } catch (err) {
+      return { category: "normal" };
+    }
+  }
+
+  function getNextEventBotUrl() {
+    try {
+      return String(new URLSearchParams(window.location.search || "").get("next_event_bot_url") || "").trim();
+    } catch (err) {
+      return "";
+    }
+  }
+
+  var viewerPayload = getViewerPayload();
+
+  function isVipViewer() {
+    var category = String((viewerPayload && viewerPayload.category) || "normal").toLowerCase();
+    return category === "vip2" || category === "vip3";
+  }
 
   function getSeriesParam() {
     try {
@@ -280,15 +309,23 @@
     selectedSeries = String(seriesSelect.value || "1");
     var status = getSeriesStatus(selectedSeries);
     var meta = getSeriesMeta(selectedSeries);
+    var vipViewer = isVipViewer();
 
     refreshSeriesTexts();
     seriesHighlight.classList.remove("hidden");
     seriesStatusBox.classList.add("hidden");
     seriesStatusBox.classList.remove("not-opened");
     seriesActionList.classList.add("hidden");
+    vipAccessBox.classList.add("hidden");
+    btnActivateEventAccess.classList.add("hidden");
     statusEl.textContent = "";
 
     if (status === "opened") {
+      if (vipViewer) {
+        vipAccessBox.classList.remove("hidden");
+        btnActivateEventAccess.classList.remove("hidden");
+        return;
+      }
       seriesActionList.classList.remove("hidden");
       return;
     }
@@ -306,6 +343,8 @@
     seriesStatusBox.classList.add("hidden");
     seriesStatusBox.classList.remove("not-opened");
     seriesActionList.classList.add("hidden");
+    vipAccessBox.classList.add("hidden");
+    btnActivateEventAccess.classList.add("hidden");
     statusEl.textContent = "";
     specialInviteStatus.textContent = "";
     specialWalletIdInput.value = "";
@@ -463,7 +502,27 @@
     reezoCheckStatus.textContent = "Preview mode: semakan under IB Reezo dihantar.";
   }
 
+  function openNextEventBot() {
+    var nextEventBotUrl = getNextEventBotUrl();
+    if (!nextEventBotUrl) {
+      statusEl.textContent = "Link NEXT Event Bot belum diset.";
+      return;
+    }
+    if (tg && typeof tg.openTelegramLink === "function") {
+      tg.openTelegramLink(nextEventBotUrl);
+      return;
+    }
+    if (tg && typeof tg.openLink === "function") {
+      tg.openLink(nextEventBotUrl);
+      return;
+    }
+    window.location.href = nextEventBotUrl;
+  }
+
   btnStartRegister.addEventListener("click", renderSeriesActions);
+  if (btnActivateEventAccess) {
+    btnActivateEventAccess.addEventListener("click", openNextEventBot);
+  }
   seriesSelect.addEventListener("change", resetSeriesSelectionView);
   btnHomeNewRegistration.addEventListener("click", function () { showView("new_registration"); openTab("new"); });
   btnHomeIbTransfer.addEventListener("click", function () { showView("ib_transfer"); openIbTab("transfer"); openIbGuideTab("web"); });

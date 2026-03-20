@@ -955,9 +955,11 @@ def get_webinar_status_webapp_url() -> str:
     return f"{built}{sep}{urlencode({'webinar_status_payload': payload})}"
 
 
-def get_webinar_register_webapp_url() -> str:
+def get_webinar_register_webapp_url(user_id: int | str | None = None) -> str:
     explicit = (os.getenv("SIDEBOT_WEBINAR_REGISTER_WEBAPP_URL") or "").strip()
     built = ""
+    viewer_payload = _webinar_viewer_payload(user_id)
+    next_event_bot_url = get_next_event_bot_url()
     if explicit.lower().startswith("https://"):
         built = explicit
 
@@ -986,7 +988,10 @@ def get_webinar_register_webapp_url() -> str:
 
     payload = _webinar_status_payload()
     sep = "&" if "?" in built else "?"
-    return f"{built}{sep}{urlencode({'webinar_status_payload': payload})}"
+    params = {"webinar_status_payload": payload, "viewer_payload": viewer_payload}
+    if next_event_bot_url:
+        params["next_event_bot_url"] = next_event_bot_url
+    return f"{built}{sep}{urlencode(params)}"
 
 
 def _invite_codes_payload() -> str:
@@ -2783,7 +2788,7 @@ def webinar_menu_keyboard(user_id: int | str | None = None) -> ReplyKeyboardMark
         webinar_info_button = KeyboardButton(MENU_WEBINAR_INFO, web_app=WebAppInfo(url=webinar_info_url))
     else:
         webinar_info_button = KeyboardButton(MENU_WEBINAR_INFO)
-    webinar_register_url = get_webinar_register_webapp_url()
+    webinar_register_url = get_webinar_register_webapp_url(user_id)
     if webinar_register_url:
         webinar_register_button = KeyboardButton(MENU_WEBINAR_REGISTER, web_app=WebAppInfo(url=webinar_register_url))
     else:
@@ -3717,7 +3722,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
 
     if text == MENU_WEBINAR_REGISTER:
-        if get_webinar_register_webapp_url():
+        if get_webinar_register_webapp_url(user.id):
             await message.reply_text("Buka miniapp Daftar Webinar melalui butang web app pada menu.")
             return
         await message.reply_text(
