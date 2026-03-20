@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Notification Sender</title>
+  <style>
+    :root {
+      --bg: #110b0d;
+      --card: #1d1215;
+      --line: #5a3035;
+      --text: #fff2f5;
+      --muted: #e0c7cd;
+      --accent: #f59e0b;
+      --accent-2: #f97316;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top, #2b1418 0%, var(--bg) 60%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .page { max-width: 720px; margin: 0 auto; padding: 22px 16px 28px; }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 18px;
+      background: rgba(29, 18, 21, 0.94);
+    }
+    h1 { margin: 0 0 8px; font-size: 26px; }
+    p { margin: 0; color: var(--muted); line-height: 1.55; }
+    .grid { margin-top: 16px; display: grid; gap: 14px; }
+    label { display: block; margin: 0 0 6px; font-size: 13px; font-weight: 700; color: var(--text); }
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid #8d4d54;
+      border-radius: 12px;
+      background: #2d181c;
+      color: var(--text);
+      padding: 11px 12px;
+      font-size: 14px;
+      outline: none;
+    }
+    textarea { min-height: 170px; resize: vertical; }
+    .submit-btn {
+      width: 100%;
+      border-radius: 12px;
+      padding: 12px 14px;
+      margin-top: 16px;
+      font-size: 14px;
+      font-weight: 800;
+      border: 1px solid var(--accent);
+      color: #2e1400;
+      background: linear-gradient(90deg, var(--accent) 0%, var(--accent-2) 100%);
+    }
+    .hidden { display: none !important; }
+    .status { margin-top: 12px; min-height: 22px; font-size: 13px; color: var(--muted); }
+    .hint {
+      margin-top: 10px;
+      border: 1px solid #744147;
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: rgba(31, 20, 23, 0.95);
+      color: #f0dde1;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="card">
+      <h1>Notification Sender</h1>
+      <p>Hantar notifikasi kepada audience spesifik mengikut group atau event. Bootcamp, Seminar dan Trade Talk belum digunakan lagi.</p>
+
+      <div class="grid">
+        <div>
+          <label for="targetMode">Pilih Target</label>
+          <select id="targetMode">
+            <option value="event">Event</option>
+            <option value="group">Group</option>
+          </select>
+        </div>
+
+        <div id="eventKindWrap">
+          <label for="eventKind">Pilih Event</label>
+          <select id="eventKind">
+            <option value="webinar">Webinar</option>
+            <option value="bootcamp">Bootcamp</option>
+            <option value="seminar">Seminar</option>
+            <option value="tradetalk">Trade Talk</option>
+          </select>
+        </div>
+
+        <div id="eventNameWrap">
+          <label for="eventName">List Event</label>
+          <select id="eventName">
+            <option value="fullflow">Webinar FULLFLOW</option>
+          </select>
+        </div>
+
+        <div id="seriesWrap">
+          <label for="seriesSelect">Pilih Siri</label>
+          <select id="seriesSelect">
+            <option value="1">SIRI 1</option>
+            <option value="2">SIRI 2</option>
+            <option value="3">SIRI 3</option>
+          </select>
+        </div>
+
+        <div id="groupWrap" class="hidden">
+          <label for="groupSelect">Pilih Group</label>
+          <select id="groupSelect"></select>
+        </div>
+
+        <div>
+          <label for="deliveryMode">Bila Hantar</label>
+          <select id="deliveryMode">
+            <option value="immediately">Immediately</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+
+        <div id="customDateWrap" class="hidden">
+          <label for="customDate">Tarikh</label>
+          <input id="customDate" type="date" />
+        </div>
+
+        <div id="customTimeWrap" class="hidden">
+          <label for="customTime">Masa</label>
+          <input id="customTime" type="time" />
+        </div>
+
+        <div>
+          <label for="messageInput">Mesej</label>
+          <textarea id="messageInput" placeholder="Masukkan mesej notifikasi"></textarea>
+        </div>
+      </div>
+
+      <div id="hintBox" class="hint hidden"></div>
+      <button id="submitBtn" type="button" class="submit-btn">Submit</button>
+      <p id="statusText" class="status"></p>
+    </section>
+  </main>
+
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script>
+    (function () {
+      var tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+      if (tg) {
+        tg.ready();
+        tg.expand();
+      }
+
+      var params = new URLSearchParams(window.location.search || "");
+      var campaign = String(params.get("campaign") || "webinar_april").trim().toLowerCase();
+      var campaignLabel = campaign.replace(/_/g, " ").replace(/\b\w/g, function (m) { return m.toUpperCase(); });
+
+      var targetMode = document.getElementById("targetMode");
+      var eventKind = document.getElementById("eventKind");
+      var eventName = document.getElementById("eventName");
+      var seriesSelect = document.getElementById("seriesSelect");
+      var groupSelect = document.getElementById("groupSelect");
+      var deliveryMode = document.getElementById("deliveryMode");
+      var customDate = document.getElementById("customDate");
+      var customTime = document.getElementById("customTime");
+      var messageInput = document.getElementById("messageInput");
+      var submitBtn = document.getElementById("submitBtn");
+      var statusText = document.getElementById("statusText");
+      var eventKindWrap = document.getElementById("eventKindWrap");
+      var eventNameWrap = document.getElementById("eventNameWrap");
+      var seriesWrap = document.getElementById("seriesWrap");
+      var groupWrap = document.getElementById("groupWrap");
+      var customDateWrap = document.getElementById("customDateWrap");
+      var customTimeWrap = document.getElementById("customTimeWrap");
+      var hintBox = document.getElementById("hintBox");
+
+      function fillGroupOptions() {
+        groupSelect.innerHTML = "";
+        [
+          { value: "next", label: "NEXTexclusive" },
+          { value: "evideo", label: "NEXTeVideo" },
+          { value: "webinar_s1", label: campaignLabel + " S1" },
+          { value: "webinar_s2", label: campaignLabel + " S2" },
+          { value: "webinar_s3", label: campaignLabel + " S3" }
+        ].forEach(function (item) {
+          var opt = document.createElement("option");
+          opt.value = item.value;
+          opt.textContent = item.label;
+          groupSelect.appendChild(opt);
+        });
+      }
+
+      function syncView() {
+        var mode = String(targetMode.value || "event");
+        var kind = String(eventKind.value || "webinar");
+        var custom = String(deliveryMode.value || "immediately") === "custom";
+        eventKindWrap.classList.toggle("hidden", mode !== "event");
+        eventNameWrap.classList.toggle("hidden", mode !== "event" || kind !== "webinar");
+        seriesWrap.classList.toggle("hidden", mode !== "event" || kind !== "webinar");
+        groupWrap.classList.toggle("hidden", mode !== "group");
+        customDateWrap.classList.toggle("hidden", !custom);
+        customTimeWrap.classList.toggle("hidden", !custom);
+        hintBox.classList.add("hidden");
+        hintBox.textContent = "";
+        if (mode === "event" && kind !== "webinar") {
+          hintBox.classList.remove("hidden");
+          hintBox.textContent = "Pilihan ini belum dibuka lagi. Buat masa sekarang hanya Webinar digunakan.";
+        }
+      }
+
+      function sendPayload(payload) {
+        statusText.textContent = "Data dihantar ke bot.";
+        if (tg) {
+          tg.sendData(JSON.stringify(payload));
+          tg.close();
+        }
+      }
+
+      fillGroupOptions();
+      syncView();
+
+      targetMode.addEventListener("change", syncView);
+      eventKind.addEventListener("change", syncView);
+      deliveryMode.addEventListener("change", syncView);
+
+      submitBtn.addEventListener("click", function () {
+        var mode = String(targetMode.value || "event");
+        var kind = String(eventKind.value || "webinar");
+        var delivery = String(deliveryMode.value || "immediately");
+        var text = String(messageInput.value || "").trim();
+        if (!text) {
+          statusText.textContent = "Mesej notifikasi wajib diisi.";
+          return;
+        }
+        if (mode === "event" && kind !== "webinar") {
+          statusText.textContent = "Buat masa sekarang hanya Webinar digunakan.";
+          return;
+        }
+        if (delivery === "custom" && (!String(customDate.value || "").trim() || !String(customTime.value || "").trim())) {
+          statusText.textContent = "Tarikh dan masa custom wajib diisi.";
+          return;
+        }
+        sendPayload({
+          type: "next_event_admin_notification_submit",
+          campaign: campaign,
+          target_mode: mode,
+          target_value: mode === "group" ? String(groupSelect.value || "") : "",
+          event_kind: mode === "event" ? kind : "",
+          event_name: mode === "event" ? String(eventName.value || "") : "",
+          series: mode === "event" && kind === "webinar" ? String(seriesSelect.value || "") : "",
+          delivery_mode: delivery,
+          custom_date: String(customDate.value || ""),
+          custom_time: String(customTime.value || ""),
+          message: text
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

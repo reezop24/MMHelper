@@ -9,6 +9,7 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlencode
+from zoneinfo import ZoneInfo
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, Update, WebAppInfo
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
@@ -66,6 +67,8 @@ SERIES_NUMBER_BY_LABEL = {
 }
 DEFAULT_SHARED_DB_PATH = Path(__file__).resolve().parent.parent / "db" / "mmhelper_shared.db"
 NEXT_EVENT_ZOOM_STATE_KEY = "next_event_zoom_state"
+NEXT_EVENT_NOTIFICATION_STATE_KEY = "next_event_notification_state"
+MY_TZ = ZoneInfo("Asia/Kuala_Lumpur")
 
 
 def load_local_env() -> None:
@@ -216,6 +219,21 @@ def _write_zoom_state(data: dict) -> None:
         _write_kv_json(conn, NEXT_EVENT_ZOOM_STATE_KEY, data)
 
 
+def _read_notification_state() -> dict:
+    default = {"jobs": []}
+    try:
+        with _connect_shared_db() as conn:
+            return _read_kv_json(conn, NEXT_EVENT_NOTIFICATION_STATE_KEY, default)
+    except sqlite3.Error:
+        logger.warning("Failed to read notification state for NEXT event bot", exc_info=True)
+        return default
+
+
+def _write_notification_state(data: dict) -> None:
+    with _connect_shared_db() as conn:
+        _write_kv_json(conn, NEXT_EVENT_NOTIFICATION_STATE_KEY, data)
+
+
 def get_zoom_update_webapp_url() -> str:
     base = (os.getenv("NEXT_EVENT_ADMIN_WEBAPP_URL") or os.getenv("NEXT_EVENT_WEBAPP_URL") or "").strip()
     if not base.lower().startswith("https://"):
@@ -229,6 +247,20 @@ def get_zoom_update_webapp_url() -> str:
     sep = "&" if "?" in built else "?"
     payload = _zoom_entries_payload()
     return f"{built}{sep}{urlencode({'campaign': get_current_webinar_campaign(), 'zoom_entries_payload': payload})}"
+
+
+def get_notification_sender_webapp_url() -> str:
+    base = (os.getenv("NEXT_EVENT_ADMIN_WEBAPP_URL") or os.getenv("NEXT_EVENT_WEBAPP_URL") or "").strip()
+    if not base.lower().startswith("https://"):
+        return ""
+    if base.endswith("/"):
+        built = f"{base}notification-sender.html"
+    elif base.endswith(".html"):
+        built = f"{base.rsplit('/', 1)[0]}/notification-sender.html"
+    else:
+        built = f"{base}/notification-sender.html"
+    sep = "&" if "?" in built else "?"
+    return f"{built}{sep}{urlencode({'campaign': get_current_webinar_campaign()})}"
 
 
 def get_zoom_entry(campaign: str, series_number: str, session_number: str) -> dict | None:
@@ -364,6 +396,117 @@ def get_full_access_user_ids_for_series(campaign: str, series_number: str) -> se
     return out
 
 
+def get_vip2_user_ids() -> set[int]:
+    out: set[int] = set()
+    vip2_users = _read_vip_whitelist().get("vip2", {}).get("users", {})
+    if isinstance(vip2_users, dict):
+        for user_id in vip2_users:
+            if str(user_id).isdigit():
+                out.add(int(user_id))
+    return out
+
+
+def get_vip3_user_ids() -> set[int]:
+    out: set[int] = set()
+    vip3_users = _read_vip_whitelist().get("vip3", {}).get("users", {})
+    if isinstance(vip3_users, dict):
+        for user_id in vip3_users:
+            if str(user_id).isdigit():
+                out.add(int(user_id))
+    return out
+
+
+def get_webinar_whitelist_user_ids(campaign: str, series_number: str) -> set[int]:
+    out: set[int] = set()
+    access_state = _read_webinar_access_state()
+    campaigns = access_state.get("campaigns")
+    if not isinstance(campaigns, dict):
+        return out
+    campaign_row = campaigns.get(str(campaign))
+    if not isinstance(campaign_row, dict):
+        return out
+    series = campaign_row.get("series")
+    if not isinstance(series, dict):
+        return out
+    series_row = series.get(str(series_number))
+    if not isinstance(series_row, dict):
+        return out
+    users = series_row.get("users")
+    if isinstance(users, dict):
+        for user_id in users:
+            if str(user_id).isdigit():
+                out.add(int(user_id))
+    return out
+
+
+def resolve_notification_recipients(
+    *,
+    target_mode: str,
+    target_value: str,
+    campaign: str,
+    event_kind: str = "",
+    event_name: str = "",
+    series_number: str = "",
+) -> set[int]:
+    mode = str(target_mode or "").strip().lower()
+    value = str(target_value or "").strip().lower()
+    series = str(series_number or "").strip()
+    if mode == "group":
+        if value == "next":
+            return get_vip2_user_ids()
+        if value == "evideo":
+            return get_vip3_user_ids()
+        if value in {"webinar_s1", "webinar_s2", "webinar_s3"}:
+            return get_webinar_whitelist_user_ids(campaign, value[-1])
+        return set()
+    if mode == "event":
+        if str(event_kind or "").strip().lower() != "webinar":
+            return set()
+        if str(event_name or "").strip().lower() != "fullflow":
+            return set()
+        if series not in {"1", "2", "3"}:
+            return set()
+        return get_full_access_user_ids_for_series(campaign, series)
+    return set()
+
+
+def _notification_target_label(
+    *,
+    target_mode: str,
+    target_value: str,
+    campaign: str,
+    event_kind: str = "",
+    event_name: str = "",
+    series_number: str = "",
+) -> str:
+    mode = str(target_mode or "").strip().lower()
+    value = str(target_value or "").strip().lower()
+    if mode == "group":
+        labels = {
+            "next": "NEXTexclusive",
+            "evideo": "NEXTeVideo",
+            "webinar_s1": f"{campaign} SIRI 1",
+            "webinar_s2": f"{campaign} SIRI 2",
+            "webinar_s3": f"{campaign} SIRI 3",
+        }
+        return labels.get(value, value or "group")
+    if mode == "event":
+        if str(event_kind or "").strip().lower() == "webinar" and str(event_name or "").strip().lower() == "fullflow":
+            return f"Webinar FULLFLOW SIRI {series_number}"
+        return f"{event_kind} {event_name}".strip()
+    return "target"
+
+
+def _parse_custom_schedule_utc(date_value: str, time_value: str) -> str:
+    raw_date = str(date_value or "").strip()
+    raw_time = str(time_value or "").strip()
+    if not raw_date or not raw_time:
+        raise ValueError("Missing date or time")
+    naive = datetime.fromisoformat(f"{raw_date}T{raw_time}")
+    local_dt = naive.replace(tzinfo=MY_TZ)
+    return local_dt.astimezone(timezone.utc).isoformat()
+
+
 def build_main_menu(user_id: int | None = None) -> ReplyKeyboardMarkup:
     keyboard = [
         [KeyboardButton(MENU_BOOTCAMP)],
@@ -436,10 +579,15 @@ def build_admin_menu() -> ReplyKeyboardMarkup:
         zoom_button = KeyboardButton(MENU_UPDATE_ZOOM, web_app=WebAppInfo(url=zoom_update_url))
     else:
         zoom_button = KeyboardButton(MENU_UPDATE_ZOOM)
+    notification_sender_url = get_notification_sender_webapp_url()
+    if notification_sender_url:
+        notification_button = KeyboardButton(MENU_NOTIFICATION_SENDER, web_app=WebAppInfo(url=notification_sender_url))
+    else:
+        notification_button = KeyboardButton(MENU_NOTIFICATION_SENDER)
     return ReplyKeyboardMarkup(
         keyboard=[
             [zoom_button],
-            [KeyboardButton(MENU_NOTIFICATION_SENDER)],
+            [notification_button],
             [KeyboardButton(MENU_BACK), KeyboardButton(MENU_HOME)],
         ],
         resize_keyboard=True,
@@ -488,6 +636,22 @@ async def show_admin_menu(update: Update, text: str) -> None:
     if not message:
         return
     await message.reply_text(text, reply_markup=build_admin_menu())
+
+
+async def send_notification_message(
+    context: ContextTypes.DEFAULT_TYPE,
+    *,
+    recipient_ids: set[int],
+    message_text: str,
+) -> int:
+    sent_count = 0
+    for target_user_id in sorted(recipient_ids):
+        try:
+            await context.bot.send_message(chat_id=target_user_id, text=message_text)
+            sent_count += 1
+        except Exception:
+            logger.exception("Failed sending notification user_id=%s", target_user_id)
+    return sent_count
 
 
 def build_zoom_series_text(series_number: str) -> str:
@@ -750,7 +914,10 @@ async def menu_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             await show_main_menu(update, "Sila gunakan menu yang disediakan.")
             return
         context.user_data["menu_level"] = LEVEL_ADMIN
-        await show_admin_menu(update, "Notification sender belum dibuka lagi.")
+        if get_notification_sender_webapp_url():
+            await show_admin_menu(update, "Buka miniapp untuk Notification sender.")
+        else:
+            await show_admin_menu(update, "Miniapp Notification sender belum dikonfigurasi. Set `NEXT_EVENT_ADMIN_WEBAPP_URL` dalam .env dulu.")
         return
 
     if text == MENU_ADMIN_PANEL:
@@ -803,12 +970,111 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
         "next_event_admin_zoom_revoke",
         "next_event_admin_zoom_finish",
         "next_event_admin_zoom_delete",
+        "next_event_admin_notification_submit",
     }:
         await message.reply_text("ℹ️ Miniapp event diterima.", reply_markup=build_admin_menu())
         return
 
     if user.id != get_superuser_id():
         await message.reply_text("❌ Akses admin tidak dibenarkan.")
+        return
+
+    if payload_type == "next_event_admin_notification_submit":
+        campaign = str(payload.get("campaign") or get_current_webinar_campaign()).strip().lower()
+        target_mode = str(payload.get("target_mode") or "").strip().lower()
+        target_value = str(payload.get("target_value") or "").strip().lower()
+        event_kind = str(payload.get("event_kind") or "").strip().lower()
+        event_name = str(payload.get("event_name") or "").strip().lower()
+        series_number = str(payload.get("series") or "").strip()
+        delivery_mode = str(payload.get("delivery_mode") or "immediately").strip().lower()
+        message_text = str(payload.get("message") or "").strip()
+        custom_date = str(payload.get("custom_date") or "").strip()
+        custom_time = str(payload.get("custom_time") or "").strip()
+        if target_mode not in {"group", "event"}:
+            await message.reply_text("❌ Target mode tak sah.", reply_markup=build_admin_menu())
+            return
+        if not message_text:
+            await message.reply_text("❌ Mesej notifikasi wajib diisi.", reply_markup=build_admin_menu())
+            return
+        if target_mode == "event":
+            if event_kind != "webinar":
+                await message.reply_text("❌ Event ini belum disokong lagi. Buat masa ini hanya Webinar.", reply_markup=build_admin_menu())
+                return
+            if event_name != "fullflow":
+                await message.reply_text("❌ Webinar ini belum disokong lagi.", reply_markup=build_admin_menu())
+                return
+            if series_number not in {"1", "2", "3"}:
+                await message.reply_text("❌ Siri webinar tak sah.", reply_markup=build_admin_menu())
+                return
+        elif target_value not in {"next", "evideo", "webinar_s1", "webinar_s2", "webinar_s3"}:
+            await message.reply_text("❌ Group target tak sah.", reply_markup=build_admin_menu())
+            return
+
+        recipient_ids = resolve_notification_recipients(
+            target_mode=target_mode,
+            target_value=target_value,
+            campaign=campaign,
+            event_kind=event_kind,
+            event_name=event_name,
+            series_number=series_number,
+        )
+        target_label = _notification_target_label(
+            target_mode=target_mode,
+            target_value=target_value,
+            campaign=campaign,
+            event_kind=event_kind,
+            event_name=event_name,
+            series_number=series_number,
+        )
+        if delivery_mode == "custom":
+            try:
+                scheduled_for = _parse_custom_schedule_utc(custom_date, custom_time)
+            except ValueError:
+                await message.reply_text("❌ Tarikh atau masa custom tak sah.", reply_markup=build_admin_menu())
+                return
+            state = _read_notification_state()
+            jobs = state.setdefault("jobs", [])
+            if not isinstance(jobs, list):
+                jobs = []
+                state["jobs"] = jobs
+            jobs.append(
+                {
+                    "job_id": f"notif_{int(datetime.now(timezone.utc).timestamp())}_{user.id}",
+                    "campaign": campaign,
+                    "target_mode": target_mode,
+                    "target_value": target_value,
+                    "event_kind": event_kind,
+                    "event_name": event_name,
+                    "series": series_number,
+                    "message": message_text,
+                    "recipient_ids": sorted(recipient_ids),
+                    "scheduled_for": scheduled_for,
+                    "status": "pending",
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                    "created_by": int(user.id),
+                }
+            )
+            try:
+                _write_notification_state(state)
+            except sqlite3.Error:
+                logger.exception("Failed to save scheduled notification")
+                await message.reply_text("❌ Gagal simpan jadual notifikasi.", reply_markup=build_admin_menu())
+                return
+            await message.reply_text(
+                f"✅ Notifikasi dijadualkan.\nTarget: {target_label}\nCampaign: {campaign}\nMasa hantar: {scheduled_for}\nJumlah penerima: {len(recipient_ids)}",
+                reply_markup=build_admin_menu(),
+            )
+            return
+
+        sent_count = await send_notification_message(
+            context,
+            recipient_ids=recipient_ids,
+            message_text=message_text,
+        )
+        await message.reply_text(
+            f"✅ Notifikasi dihantar segera.\nTarget: {target_label}\nCampaign: {campaign}\nJumlah penerima berjaya: {sent_count}",
+            reply_markup=build_admin_menu(),
+        )
         return
 
     campaign = str(payload.get("campaign") or get_current_webinar_campaign()).strip().lower()
@@ -940,8 +1206,54 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
 
 
+async def notification_schedule_worker(context: ContextTypes.DEFAULT_TYPE) -> None:
+    state = _read_notification_state()
+    jobs = state.get("jobs")
+    if not isinstance(jobs, list) or not jobs:
+        return
+    now_utc = datetime.now(timezone.utc)
+    changed = False
+    for job in jobs:
+        if not isinstance(job, dict):
+            continue
+        if str(job.get("status") or "") != "pending":
+            continue
+        scheduled_for_raw = str(job.get("scheduled_for") or "").strip()
+        if not scheduled_for_raw:
+            continue
+        try:
+            scheduled_for = datetime.fromisoformat(scheduled_for_raw)
+        except ValueError:
+            job["status"] = "failed"
+            job["error"] = "invalid_schedule"
+            changed = True
+            continue
+        if scheduled_for.tzinfo is None:
+            scheduled_for = scheduled_for.replace(tzinfo=timezone.utc)
+        if scheduled_for > now_utc:
+            continue
+        recipient_ids = job.get("recipient_ids")
+        recipient_set = {int(uid) for uid in recipient_ids if str(uid).isdigit()} if isinstance(recipient_ids, list) else set()
+        sent_count = await send_notification_message(
+            context,
+            recipient_ids=recipient_set,
+            message_text=str(job.get("message") or "").strip(),
+        )
+        job["status"] = "sent"
+        job["sent_at"] = now_utc.isoformat()
+        job["sent_count"] = sent_count
+        changed = True
+    if changed:
+        try:
+            _write_notification_state(state)
+        except sqlite3.Error:
+            logger.exception("Failed to persist notification schedule state")
+
+
 def main() -> None:
     application = ApplicationBuilder().token(get_token()).build()
+    if application.job_queue:
+        application.job_queue.run_repeating(notification_schedule_worker, interval=60, first=15)
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("menu", start_command))
     application.add_handler(CommandHandler("admin", admin_command))
