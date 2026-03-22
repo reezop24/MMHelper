@@ -630,8 +630,6 @@ async def maybe_log_event_activation(
     full_name: str = "",
 ) -> None:
     admin_group_id = get_admin_group_id()
-    if not admin_group_id:
-        return
     campaign = get_current_webinar_campaign()
     state = _read_activation_state()
     campaigns = state.setdefault("campaigns", {})
@@ -658,6 +656,8 @@ async def maybe_log_event_activation(
         _write_activation_state(state)
     except sqlite3.Error:
         logger.exception("Failed to persist event activation state")
+    if not admin_group_id:
+        return
     try:
         await context.bot.send_message(
             chat_id=admin_group_id,
