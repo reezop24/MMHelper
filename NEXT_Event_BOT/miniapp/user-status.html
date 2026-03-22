@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>User Status</title>
+  <style>
+    :root {
+      --bg: #110b0d;
+      --card: #1d1215;
+      --line: #5a3035;
+      --text: #fff2f5;
+      --muted: #e0c7cd;
+      --accent: #f59e0b;
+      --accent-2: #f97316;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at top, #2b1418 0%, var(--bg) 60%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .page { max-width: 760px; margin: 0 auto; padding: 22px 16px 28px; }
+    .card {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 18px;
+      background: rgba(29, 18, 21, 0.94);
+    }
+    h1 { margin: 0 0 8px; font-size: 26px; }
+    p { margin: 0; color: var(--muted); line-height: 1.55; }
+    .tabs, .mini-tabs {
+      display: grid;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .tabs { grid-template-columns: repeat(4, 1fr); }
+    .mini-tabs { grid-template-columns: repeat(3, 1fr); }
+    .tab-btn {
+      margin: 0;
+      width: 100%;
+      border: 1px solid #8d4d54;
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: rgba(56, 24, 29, 0.86);
+      color: #f4e2e6;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .tab-btn.active {
+      background: linear-gradient(90deg, var(--accent) 0%, var(--accent-2) 100%);
+      color: #2e1400;
+      border-color: var(--accent);
+    }
+    .hidden { display: none !important; }
+    .section { margin-top: 16px; }
+    label { display: block; margin: 0 0 6px; font-size: 13px; font-weight: 700; color: var(--text); }
+    select {
+      width: 100%;
+      border: 1px solid #8d4d54;
+      border-radius: 12px;
+      background: #2d181c;
+      color: var(--text);
+      padding: 11px 12px;
+      font-size: 14px;
+      outline: none;
+    }
+    .empty {
+      margin-top: 14px;
+      border: 1px solid #744147;
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(31, 20, 23, 0.95);
+      color: #f0dde1;
+      font-size: 14px;
+    }
+    .user-list {
+      margin-top: 14px;
+      display: grid;
+      gap: 10px;
+    }
+    .user-card {
+      border: 1px solid #744147;
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(31, 20, 23, 0.95);
+    }
+    .user-card p { margin: 0; color: #f0dde1; }
+    .user-card p + p { margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="card">
+      <h1>User Status</h1>
+      <p>Status user mengikut kategori dan webinar semasa.</p>
+
+      <div class="tabs">
+        <button id="tabBootcamp" type="button" class="tab-btn">Bootcamp</button>
+        <button id="tabSeminar" type="button" class="tab-btn">Seminar</button>
+        <button id="tabWebinar" type="button" class="tab-btn">Webinar</button>
+        <button id="tabTradeTalk" type="button" class="tab-btn">TradeTalk</button>
+      </div>
+
+      <section id="panelBootcamp" class="section hidden">
+        <div class="empty">No user.</div>
+      </section>
+
+      <section id="panelSeminar" class="section hidden">
+        <div class="empty">No user.</div>
+      </section>
+
+      <section id="panelWebinar" class="section hidden">
+        <div>
+          <label for="webinarSelect">Pilih Webinar</label>
+          <select id="webinarSelect">
+            <option value="fullflow">Webinar FULLFLOW (April)</option>
+          </select>
+        </div>
+
+        <div class="mini-tabs">
+          <button id="miniS1" type="button" class="tab-btn">SIRI 1</button>
+          <button id="miniS2" type="button" class="tab-btn">SIRI 2</button>
+          <button id="miniS3" type="button" class="tab-btn">SIRI 3</button>
+        </div>
+
+        <div id="webinarEmpty" class="empty hidden">No user.</div>
+        <div id="userList" class="user-list hidden"></div>
+      </section>
+
+      <section id="panelTradeTalk" class="section hidden">
+        <div class="empty">No user.</div>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      function parsePayload() {
+        try {
+          var raw = new URLSearchParams(window.location.search || "").get("user_status_payload");
+          if (!raw) return { webinars: { fullflow: { "1": [], "2": [], "3": [] } } };
+          var parsed = JSON.parse(raw);
+          return parsed && typeof parsed === "object" ? parsed : { webinars: { fullflow: { "1": [], "2": [], "3": [] } } };
+        } catch (err) {
+          return { webinars: { fullflow: { "1": [], "2": [], "3": [] } } };
+        }
+      }
+
+      var payload = parsePayload();
+      var webinarSelect = document.getElementById("webinarSelect");
+      var userList = document.getElementById("userList");
+      var webinarEmpty = document.getElementById("webinarEmpty");
+      var panels = {
+        bootcamp: document.getElementById("panelBootcamp"),
+        seminar: document.getElementById("panelSeminar"),
+        webinar: document.getElementById("panelWebinar"),
+        tradetalk: document.getElementById("panelTradeTalk")
+      };
+      var tabButtons = {
+        bootcamp: document.getElementById("tabBootcamp"),
+        seminar: document.getElementById("tabSeminar"),
+        webinar: document.getElementById("tabWebinar"),
+        tradetalk: document.getElementById("tabTradeTalk")
+      };
+      var miniButtons = {
+        "1": document.getElementById("miniS1"),
+        "2": document.getElementById("miniS2"),
+        "3": document.getElementById("miniS3")
+      };
+      var activeSeries = "1";
+
+      function openPanel(name) {
+        Object.keys(panels).forEach(function (key) {
+          panels[key].classList.toggle("hidden", key !== name);
+          tabButtons[key].classList.toggle("active", key === name);
+        });
+      }
+
+      function renderSeries(series) {
+        activeSeries = String(series || "1");
+        Object.keys(miniButtons).forEach(function (key) {
+          miniButtons[key].classList.toggle("active", key === activeSeries);
+        });
+        var webinars = payload.webinars && payload.webinars.fullflow ? payload.webinars.fullflow : {};
+        var rows = webinars[activeSeries];
+        userList.innerHTML = "";
+        if (!Array.isArray(rows) || rows.length === 0) {
+          webinarEmpty.classList.remove("hidden");
+          userList.classList.add("hidden");
+          return;
+        }
+        webinarEmpty.classList.add("hidden");
+        userList.classList.remove("hidden");
+        rows.forEach(function (row) {
+          var card = document.createElement("div");
+          card.className = "user-card";
+          card.innerHTML =
+            "<p><strong>" + String(row.name || "-") + "</strong></p>" +
+            "<p>User ID: " + String(row.user_id || "-") + "</p>" +
+            "<p>Whitelist Category: " + String(row.category || "-") + "</p>";
+          userList.appendChild(card);
+        });
+      }
+
+      Object.keys(tabButtons).forEach(function (key) {
+        tabButtons[key].addEventListener("click", function () {
+          openPanel(key);
+          if (key === "webinar") {
+            renderSeries(activeSeries);
+          }
+        });
+      });
+
+      Object.keys(miniButtons).forEach(function (key) {
+        miniButtons[key].addEventListener("click", function () { renderSeries(key); });
+      });
+
+      webinarSelect.addEventListener("change", function () { renderSeries(activeSeries); });
+    })();
+  </script>
+</body>
+</html>

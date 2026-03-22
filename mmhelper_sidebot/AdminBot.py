@@ -2434,6 +2434,19 @@ def render_admin_submission_text(item: dict) -> str:
         "under_ib_reezo": "Client Under IB Reezo",
     }
     flow_text = flow_text_map.get(base_flow, base_flow)
+    ib_req = item.get("ib_request_submitted")
+    ib_req_text = ""
+    if base_flow == "ib_transfer":
+        ib_req_text = f"Submit Request IB: {'Ya' if ib_req else 'Belum'}\n"
+    api_check_text = ""
+    api_ib_status = item.get("api_is_client_under_ib")
+    api_message = str(item.get("api_check_message") or "").strip()
+    if api_ib_status is True:
+        api_check_text = "API Check (Wallet ID): ✅ PASS\n"
+    elif api_ib_status is False:
+        api_check_text = "API Check (Wallet ID): ❌ FAIL\n"
+    elif api_message:
+        api_check_text = f"API Check (Wallet ID): ⚠️ {api_message}\n"
     if _is_webinar_registration_flow(flow):
         return (
             "📚 Webinar Registration Submit\n\n"
@@ -2443,6 +2456,8 @@ def render_admin_submission_text(item: dict) -> str:
             f"Username: {username_text}\n"
             f"Nama: {item.get('full_name')}\n"
             f"Wallet ID: {item.get('wallet_id')}\n"
+            f"{ib_req_text}"
+            f"{api_check_text}"
             f"Deposit Minimum USD{deposit_required_usd}: {deposit_text}\n"
             f"No Telefon: {item.get('phone_number')}\n"
             f"Status: {status_text}"
@@ -2466,19 +2481,6 @@ def render_admin_submission_text(item: dict) -> str:
             f"{requested_line}"
             f"Status: {status_text}"
         )
-    ib_req = item.get("ib_request_submitted")
-    ib_req_text = ""
-    if base_flow == "ib_transfer":
-        ib_req_text = f"Submit Request IB: {'Ya' if ib_req else 'Belum'}\n"
-    api_check_text = ""
-    api_ib_status = item.get("api_is_client_under_ib")
-    api_message = str(item.get("api_check_message") or "").strip()
-    if api_ib_status is True:
-        api_check_text = "API Check (Under IB): ✅ PASS\n"
-    elif api_ib_status is False:
-        api_check_text = "API Check (Under IB): ❌ FAIL\n"
-    elif api_message:
-        api_check_text = f"API Check (Under IB): ⚠️ {api_message}\n"
     return (
         "🆕 NEXTexclusive Verification Submit\n\n"
         f"Flow: {flow_text}\n"
@@ -3869,7 +3871,7 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         api_is_client_under_ib = None
         api_check_message = ""
-        if base_flow in {"ib_transfer", "under_ib_reezo"}:
+        if _is_webinar_registration_flow(registration_flow) or base_flow in {"ib_transfer", "under_ib_reezo"}:
             api_is_client_under_ib, api_check_message = amarkets_check_is_client(wallet_id)
             update_submission_fields(
                 submission_id=str(saved.get("submission_id")),

@@ -37,6 +37,7 @@ MENU_HOME = "🏠 Home"
 MENU_ADMIN_PANEL = "⚠️ Admin Panel ⚠️"
 MENU_UPDATE_ZOOM = "Update link zoom"
 MENU_NOTIFICATION_SENDER = "Notification sender"
+MENU_USER_STATUS = "User Status"
 
 BOOTCAMP_PLACEHOLDER = "Tiada Bootcamp aktif buat masa ini"
 SEMINAR_PLACEHOLDER = "Tiada Seminar aktif buat masa ini"
@@ -68,6 +69,7 @@ SERIES_NUMBER_BY_LABEL = {
 DEFAULT_SHARED_DB_PATH = Path(__file__).resolve().parent.parent / "db" / "mmhelper_shared.db"
 NEXT_EVENT_ZOOM_STATE_KEY = "next_event_zoom_state"
 NEXT_EVENT_NOTIFICATION_STATE_KEY = "next_event_notification_state"
+NEXT_EVENT_ACTIVATION_STATE_KEY = "next_event_activation_state"
 MY_TZ = ZoneInfo("Asia/Kuala_Lumpur")
 
 
@@ -125,6 +127,16 @@ def get_admin_bot_url() -> str:
     )
     url = str(url or "").strip()
     return url if url.startswith("https://t.me/") else ""
+
+
+def get_admin_group_id() -> int | None:
+    raw = (os.getenv("SIDEBOT_ADMIN_GROUP_ID") or "").strip()
+    if not raw:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        return None
 
 
 def _connect_shared_db() -> sqlite3.Connection:
@@ -234,6 +246,21 @@ def _write_notification_state(data: dict) -> None:
         _write_kv_json(conn, NEXT_EVENT_NOTIFICATION_STATE_KEY, data)
 
 
+def _read_activation_state() -> dict:
+    default = {"campaigns": {}}
+    try:
+        with _connect_shared_db() as conn:
+            return _read_kv_json(conn, NEXT_EVENT_ACTIVATION_STATE_KEY, default)
+    except sqlite3.Error:
+        logger.warning("Failed to read activation state for NEXT event bot", exc_info=True)
+        return default
+
+
+def _write_activation_state(data: dict) -> None:
+    with _connect_shared_db() as conn:
+        _write_kv_json(conn, NEXT_EVENT_ACTIVATION_STATE_KEY, data)
+
+
 def get_zoom_update_webapp_url() -> str:
     base = (os.getenv("NEXT_EVENT_ADMIN_WEBAPP_URL") or os.getenv("NEXT_EVENT_WEBAPP_URL") or "").strip()
     if not base.lower().startswith("https://"):
@@ -261,6 +288,20 @@ def get_notification_sender_webapp_url() -> str:
         built = f"{base}/notification-sender.html"
     sep = "&" if "?" in built else "?"
     return f"{built}{sep}{urlencode({'campaign': get_current_webinar_campaign()})}"
+
+
+def get_user_status_webapp_url() -> str:
+    base = (os.getenv("NEXT_EVENT_ADMIN_WEBAPP_URL") or os.getenv("NEXT_EVENT_WEBAPP_URL") or "").strip()
+    if not base.lower().startswith("https://"):
+        return ""
+    if base.endswith("/"):
+        built = f"{base}user-status.html"
+    elif base.endswith(".html"):
+        built = f"{base.rsplit('/', 1)[0]}/user-status.html"
+    else:
+        built = f"{base}/user-status.html"
+    sep = "&" if "?" in built else "?"
+    return f"{built}{sep}{urlencode({'campaign': get_current_webinar_campaign(), 'user_status_payload': _user_status_payload()})}"
 
 
 def get_zoom_entry(campaign: str, series_number: str, session_number: str) -> dict | None:
@@ -439,6 +480,145 @@ def get_webinar_whitelist_user_ids(campaign: str, series_number: str) -> set[int
     return out
 
 
+def _display_name_for_user_id(user_id: str, vip_whitelist: dict, webinar_state: dict, campaign: str) -> str:
+    if isinstance(vip_whitelist.get("vip2", {}), dict):
+        row = vip_whitelist.get("vip2", {}).get("users", {}).get(user_id)
+        if isinstance(row, dict) and str(row.get("full_name") or "").strip():
+            return str(row.get("full_name") or "").strip()
+    if isinstance(vip_whitelist.get("vip3", {}), dict):
+        row = vip_whitelist.get("vip3", {}).get("users", {}).get(user_id)
+        if isinstance(row, dict) and str(row.get("full_name") or "").strip():
+            return str(row.get("full_name") or "").strip()
+    campaigns = webinar_state.get("campaigns")
+    if isinstance(campaigns, dict):
+        campaign_row = campaigns.get(campaign)
+        if isinstance(campaign_row, dict):
+            series = campaign_row.get("series")
+            if isinstance(series, dict):
+                for series_row in series.values():
+                    if not isinstance(series_row, dict):
+                        continue
+                    users = series_row.get("users")
+                    if not isinstance(users, dict):
+                        continue
+                    row = users.get(user_id)
+                    if isinstance(row, dict) and str(row.get("full_name") or "").strip():
+                        return str(row.get("full_name") or "").strip()
+    return "-"
+
+
+def _user_status_payload() -> str:
+    campaign = get_current_webinar_campaign()
+    out: dict[str, object] = {
+        "campaign": campaign,
+        "webinars": {
+            "fullflow": {
+                "1": [],
+                "2": [],
+                "3": [],
+            }
+        },
+    }
+    vip_whitelist = _read_vip_whitelist()
+    webinar_state = _read_webinar_access_state()
+
+    vip2_users = vip_whitelist.get("vip2", {}).get("users", {}) if isinstance(vip_whitelist.get("vip2"), dict) else {}
+    vip3_users = vip_whitelist.get("vip3", {}).get("users", {}) if isinstance(vip_whitelist.get("vip3"), dict) else {}
+    webinars = out["webinars"]["fullflow"]  # type: ignore[index]
+
+    for user_id in sorted(vip2_users.keys()) if isinstance(vip2_users, dict) else []:
+        name = _display_name_for_user_id(str(user_id), vip_whitelist, webinar_state, campaign)
+        for series_number in ("1", "2", "3"):
+            webinars[series_number].append({"user_id": str(user_id), "name": name, "category": "NEXTexclusive member"})  # type: ignore[index]
+
+    for user_id in sorted(vip3_users.keys()) if isinstance(vip3_users, dict) else []:
+        name = _display_name_for_user_id(str(user_id), vip_whitelist, webinar_state, campaign)
+        webinars["1"].append({"user_id": str(user_id), "name": name, "category": "NEXTeVideo26 subscriber"})  # type: ignore[index]
+        webinars["2"].append({"user_id": str(user_id), "name": name, "category": "NEXTeVideo26 subscriber (recording)"})  # type: ignore[index]
+        webinars["3"].append({"user_id": str(user_id), "name": name, "category": "NEXTeVideo26 subscriber (recording)"})  # type: ignore[index]
+
+    campaigns = webinar_state.get("campaigns")
+    if isinstance(campaigns, dict):
+        campaign_row = campaigns.get(campaign)
+        if isinstance(campaign_row, dict):
+            series = campaign_row.get("series")
+            if isinstance(series, dict):
+                for series_number in ("1", "2", "3"):
+                    series_row = series.get(series_number)
+                    if not isinstance(series_row, dict):
+                        continue
+                    users = series_row.get("users")
+                    if not isinstance(users, dict):
+                        continue
+                    for user_id, row in users.items():
+                        name = "-"
+                        if isinstance(row, dict) and str(row.get("full_name") or "").strip():
+                            name = str(row.get("full_name") or "").strip()
+                        webinars[series_number].append({"user_id": str(user_id), "name": name, "category": "Peserta"})  # type: ignore[index]
+
+    for series_number in ("1", "2", "3"):
+        seen: set[str] = set()
+        unique_rows: list[dict[str, str]] = []
+        rows = webinars[series_number]  # type: ignore[index]
+        if not isinstance(rows, list):
+            continue
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            key = f"{row.get('user_id')}|{row.get('category')}"
+            if key in seen:
+                continue
+            seen.add(key)
+            unique_rows.append(row)
+        webinars[series_number] = unique_rows  # type: ignore[index]
+
+    return json.dumps(out, ensure_ascii=False)
+
+
+async def maybe_log_event_activation(context: ContextTypes.DEFAULT_TYPE, user_id: int, role_label: str) -> None:
+    admin_group_id = get_admin_group_id()
+    if not admin_group_id:
+        return
+    campaign = get_current_webinar_campaign()
+    state = _read_activation_state()
+    campaigns = state.setdefault("campaigns", {})
+    if not isinstance(campaigns, dict):
+        campaigns = {}
+        state["campaigns"] = campaigns
+    campaign_row = campaigns.setdefault(campaign, {})
+    if not isinstance(campaign_row, dict):
+        campaign_row = {}
+        campaigns[campaign] = campaign_row
+    users = campaign_row.setdefault("users", {})
+    if not isinstance(users, dict):
+        users = {}
+        campaign_row["users"] = users
+    user_key = str(user_id)
+    if user_key in users:
+        return
+    users[user_key] = {
+        "role": role_label,
+        "activated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    try:
+        _write_activation_state(state)
+    except sqlite3.Error:
+        logger.exception("Failed to persist event activation state")
+    try:
+        await context.bot.send_message(
+            chat_id=admin_group_id,
+            text=(
+                "✅ NEXT Event Bot Activation\n\n"
+                f"Campaign: {campaign}\n"
+                f"User ID: {user_id}\n"
+                f"Kategori: {role_label}\n"
+                "Status: User telah tekan Start dalam NEXT Event Bot"
+            ),
+        )
+    except Exception:
+        logger.exception("Failed sending event activation notification to admin group")
+
+
 def resolve_notification_recipients(
     *,
     target_mode: str,
@@ -584,10 +764,16 @@ def build_admin_menu() -> ReplyKeyboardMarkup:
         notification_button = KeyboardButton(MENU_NOTIFICATION_SENDER, web_app=WebAppInfo(url=notification_sender_url))
     else:
         notification_button = KeyboardButton(MENU_NOTIFICATION_SENDER)
+    user_status_url = get_user_status_webapp_url()
+    if user_status_url:
+        user_status_button = KeyboardButton(MENU_USER_STATUS, web_app=WebAppInfo(url=user_status_url))
+    else:
+        user_status_button = KeyboardButton(MENU_USER_STATUS)
     return ReplyKeyboardMarkup(
         keyboard=[
             [zoom_button],
             [notification_button],
+            [user_status_button],
             [KeyboardButton(MENU_BACK), KeyboardButton(MENU_HOME)],
         ],
         resize_keyboard=True,
@@ -760,6 +946,14 @@ def is_free_user(user_id: int | None) -> bool:
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data["menu_level"] = LEVEL_MAIN
     user_id = update.effective_user.id if update.effective_user else None
+    if isinstance(user_id, int):
+        whitelist = _read_vip_whitelist()
+        vip2_users = whitelist.get("vip2", {}).get("users", {})
+        vip3_users = whitelist.get("vip3", {}).get("users", {})
+        if isinstance(vip2_users, dict) and str(user_id) in vip2_users:
+            await maybe_log_event_activation(context, user_id, "NEXTexclusive member")
+        elif isinstance(vip3_users, dict) and str(user_id) in vip3_users:
+            await maybe_log_event_activation(context, user_id, "NEXTeVideo26 subscriber")
     await show_main_menu(update, build_start_welcome_text(user_id))
     message = update.effective_message
     if not message or not is_free_user(user_id):
