@@ -483,16 +483,6 @@ def get_webinar_whitelist_user_ids(campaign: str, series_number: str) -> set[int
 
 
 def _display_name_for_user_id(user_id: str, vip_whitelist: dict, webinar_state: dict, campaign: str, activation_state: dict | None = None) -> str:
-    if isinstance(activation_state, dict):
-        campaigns = activation_state.get("campaigns")
-        if isinstance(campaigns, dict):
-            campaign_row = campaigns.get(campaign)
-            if isinstance(campaign_row, dict):
-                users = campaign_row.get("users")
-                if isinstance(users, dict):
-                    row = users.get(user_id)
-                    if isinstance(row, dict) and str(row.get("full_name") or "").strip():
-                        return str(row.get("full_name") or "").strip()
     if isinstance(vip_whitelist.get("vip2", {}), dict):
         row = vip_whitelist.get("vip2", {}).get("users", {}).get(user_id)
         if isinstance(row, dict) and str(row.get("full_name") or "").strip():
@@ -513,6 +503,16 @@ def _display_name_for_user_id(user_id: str, vip_whitelist: dict, webinar_state: 
                     users = series_row.get("users")
                     if not isinstance(users, dict):
                         continue
+                    row = users.get(user_id)
+                    if isinstance(row, dict) and str(row.get("full_name") or "").strip():
+                        return str(row.get("full_name") or "").strip()
+    if isinstance(activation_state, dict):
+        campaigns = activation_state.get("campaigns")
+        if isinstance(campaigns, dict):
+            campaign_row = campaigns.get(campaign)
+            if isinstance(campaign_row, dict):
+                users = campaign_row.get("users")
+                if isinstance(users, dict):
                     row = users.get(user_id)
                     if isinstance(row, dict) and str(row.get("full_name") or "").strip():
                         return str(row.get("full_name") or "").strip()
