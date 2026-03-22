@@ -981,6 +981,31 @@ def is_free_user(user_id: int | None) -> bool:
     return all(get_series_access_level(user_id, series_number) == "none" for series_number in ("1", "2", "3"))
 
 
+async def maybe_log_vip_activation_from_event_bot(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    user = update.effective_user
+    if user is None:
+        return
+    user_id = user.id
+    whitelist = _read_vip_whitelist()
+    vip2_users = whitelist.get("vip2", {}).get("users", {})
+    vip3_users = whitelist.get("vip3", {}).get("users", {})
+    if isinstance(vip2_users, dict) and str(user_id) in vip2_users:
+        await maybe_log_event_activation(
+            context,
+            user_id,
+            "NEXTexclusive member",
+            full_name=str(user.full_name or "").strip(),
+        )
+        return
+    if isinstance(vip3_users, dict) and str(user_id) in vip3_users:
+        await maybe_log_event_activation(
+            context,
+            user_id,
+            "NEXTeVideo26 subscriber",
+            full_name=str(user.full_name or "").strip(),
+        )
+
+
 async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     context.user_data["menu_level"] = LEVEL_MAIN
     user_id = update.effective_user.id if update.effective_user else None
@@ -1012,6 +1037,7 @@ async def menu_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     message = update.effective_message
     if not message or not message.text:
         return
+    await maybe_log_vip_activation_from_event_bot(update, context)
 
     text = message.text.strip()
     selected_series_label = str(context.user_data.get("selected_series_label") or "")
