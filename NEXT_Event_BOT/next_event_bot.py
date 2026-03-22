@@ -185,7 +185,7 @@ def _read_vip_whitelist() -> dict:
         with _connect_shared_db() as conn:
             rows = conn.execute(
                 """
-                SELECT tier, user_id, status
+                SELECT tier, user_id, telegram_username, full_name, status
                 FROM vip_whitelist
                 """
             ).fetchall()
@@ -200,6 +200,8 @@ def _read_vip_whitelist() -> dict:
             continue
         out.setdefault(tier, {"users": {}}).setdefault("users", {})[user_id] = {
             "user_id": user_id,
+            "telegram_username": str(row["telegram_username"] or "").strip(),
+            "full_name": str(row["full_name"] or "").strip(),
             "status": status,
         }
     return out
@@ -480,7 +482,17 @@ def get_webinar_whitelist_user_ids(campaign: str, series_number: str) -> set[int
     return out
 
 
-def _display_name_for_user_id(user_id: str, vip_whitelist: dict, webinar_state: dict, campaign: str) -> str:
+def _display_name_for_user_id(user_id: str, vip_whitelist: dict, webinar_state: dict, campaign: str, activation_state: dict | None = None) -> str:
+    if isinstance(activation_state, dict):
+        campaigns = activation_state.get("campaigns")
+        if isinstance(campaigns, dict):
+            campaign_row = campaigns.get(campaign)
+            if isinstance(campaign_row, dict):
+                users = campaign_row.get("users")
+                if isinstance(users, dict):
+                    row = users.get(user_id)
+                    if isinstance(row, dict) and str(row.get("full_name") or "").strip():
+                        return str(row.get("full_name") or "").strip()
     if isinstance(vip_whitelist.get("vip2", {}), dict):
         row = vip_whitelist.get("vip2", {}).get("users", {}).get(user_id)
         if isinstance(row, dict) and str(row.get("full_name") or "").strip():
@@ -507,6 +519,53 @@ def _display_name_for_user_id(user_id: str, vip_whitelist: dict, webinar_state: 
     return "-"
 
 
+def _has_any_series_access(user_id: int | None) -> bool:
+    if not isinstance(user_id, int):
+        return False
+    return any(get_series_access_level(user_id, series_number) != "none" for series_number in ("1", "2", "3"))
+
+
+def _event_role_label_for_user(user_id: int | None) -> str:
+    if not isinstance(user_id, int):
+        return "User"
+    if user_id == get_superuser_id():
+        return "SUPERUSER"
+    whitelist = _read_vip_whitelist()
+    vip2_users = whitelist.get("vip2", {}).get("users", {})
+    vip3_users = whitelist.get("vip3", {}).get("users", {})
+    if isinstance(vip2_users, dict) and str(user_id) in vip2_users:
+        return "NEXTexclusive member"
+    if isinstance(vip3_users, dict) and str(user_id) in vip3_users:
+        return "NEXTeVideo26 subscriber"
+    if _has_any_series_access(user_id):
+        return "Peserta"
+    return "Free User / User Biasa"
+
+
+def _category_for_series(user_id: int, series_number: str, vip_whitelist: dict, webinar_state: dict, campaign: str) -> str:
+    user_key = str(user_id)
+    if user_id == get_superuser_id():
+        return "SUPERUSER"
+    vip2_users = vip_whitelist.get("vip2", {}).get("users", {}) if isinstance(vip_whitelist.get("vip2"), dict) else {}
+    vip3_users = vip_whitelist.get("vip3", {}).get("users", {}) if isinstance(vip_whitelist.get("vip3"), dict) else {}
+    if isinstance(vip2_users, dict) and user_key in vip2_users:
+        return "NEXTexclusive member"
+    if isinstance(vip3_users, dict) and user_key in vip3_users:
+        return "NEXTeVideo26 subscriber" if str(series_number) == "1" else "NEXTeVideo26 subscriber (recording)"
+    campaigns = webinar_state.get("campaigns")
+    if isinstance(campaigns, dict):
+        campaign_row = campaigns.get(campaign)
+        if isinstance(campaign_row, dict):
+            series = campaign_row.get("series")
+            if isinstance(series, dict):
+                series_row = series.get(str(series_number))
+                if isinstance(series_row, dict):
+                    users = series_row.get("users")
+                    if isinstance(users, dict) and user_key in users:
+                        return "Peserta"
+    return ""
+
+
 def _user_status_payload() -> str:
     campaign = get_current_webinar_campaign()
     out: dict[str, object] = {
@@ -521,40 +580,28 @@ def _user_status_payload() -> str:
     }
     vip_whitelist = _read_vip_whitelist()
     webinar_state = _read_webinar_access_state()
-
-    vip2_users = vip_whitelist.get("vip2", {}).get("users", {}) if isinstance(vip_whitelist.get("vip2"), dict) else {}
-    vip3_users = vip_whitelist.get("vip3", {}).get("users", {}) if isinstance(vip_whitelist.get("vip3"), dict) else {}
+    activation_state = _read_activation_state()
     webinars = out["webinars"]["fullflow"]  # type: ignore[index]
+    activation_campaigns = activation_state.get("campaigns")
+    activation_users = {}
+    if isinstance(activation_campaigns, dict):
+        activation_row = activation_campaigns.get(campaign)
+        if isinstance(activation_row, dict):
+            activation_users = activation_row.get("users") if isinstance(activation_row.get("users"), dict) else {}
 
-    for user_id in sorted(vip2_users.keys()) if isinstance(vip2_users, dict) else []:
-        name = _display_name_for_user_id(str(user_id), vip_whitelist, webinar_state, campaign)
+    for user_id in sorted(activation_users.keys(), key=lambda value: int(value) if str(value).isdigit() else value):
+        if not str(user_id).isdigit():
+            continue
+        numeric_user_id = int(str(user_id))
+        name = _display_name_for_user_id(str(user_id), vip_whitelist, webinar_state, campaign, activation_state)
         for series_number in ("1", "2", "3"):
-            webinars[series_number].append({"user_id": str(user_id), "name": name, "category": "NEXTexclusive member"})  # type: ignore[index]
-
-    for user_id in sorted(vip3_users.keys()) if isinstance(vip3_users, dict) else []:
-        name = _display_name_for_user_id(str(user_id), vip_whitelist, webinar_state, campaign)
-        webinars["1"].append({"user_id": str(user_id), "name": name, "category": "NEXTeVideo26 subscriber"})  # type: ignore[index]
-        webinars["2"].append({"user_id": str(user_id), "name": name, "category": "NEXTeVideo26 subscriber (recording)"})  # type: ignore[index]
-        webinars["3"].append({"user_id": str(user_id), "name": name, "category": "NEXTeVideo26 subscriber (recording)"})  # type: ignore[index]
-
-    campaigns = webinar_state.get("campaigns")
-    if isinstance(campaigns, dict):
-        campaign_row = campaigns.get(campaign)
-        if isinstance(campaign_row, dict):
-            series = campaign_row.get("series")
-            if isinstance(series, dict):
-                for series_number in ("1", "2", "3"):
-                    series_row = series.get(series_number)
-                    if not isinstance(series_row, dict):
-                        continue
-                    users = series_row.get("users")
-                    if not isinstance(users, dict):
-                        continue
-                    for user_id, row in users.items():
-                        name = "-"
-                        if isinstance(row, dict) and str(row.get("full_name") or "").strip():
-                            name = str(row.get("full_name") or "").strip()
-                        webinars[series_number].append({"user_id": str(user_id), "name": name, "category": "Peserta"})  # type: ignore[index]
+            access_level = get_series_access_level(numeric_user_id, series_number)
+            if access_level == "none":
+                continue
+            category = _category_for_series(numeric_user_id, series_number, vip_whitelist, webinar_state, campaign)
+            if not category:
+                continue
+            webinars[series_number].append({"user_id": str(user_id), "name": name, "category": category})  # type: ignore[index]
 
     for series_number in ("1", "2", "3"):
         seen: set[str] = set()
@@ -575,7 +622,13 @@ def _user_status_payload() -> str:
     return json.dumps(out, ensure_ascii=False)
 
 
-async def maybe_log_event_activation(context: ContextTypes.DEFAULT_TYPE, user_id: int, role_label: str) -> None:
+async def maybe_log_event_activation(
+    context: ContextTypes.DEFAULT_TYPE,
+    user_id: int,
+    role_label: str,
+    *,
+    full_name: str = "",
+) -> None:
     admin_group_id = get_admin_group_id()
     if not admin_group_id:
         return
@@ -598,6 +651,7 @@ async def maybe_log_event_activation(context: ContextTypes.DEFAULT_TYPE, user_id
         return
     users[user_key] = {
         "role": role_label,
+        "full_name": str(full_name or "").strip(),
         "activated_at": datetime.now(timezone.utc).isoformat(),
     }
     try:
@@ -890,23 +944,7 @@ def build_start_welcome_text(user_id: int | None) -> str:
     if user_id == get_superuser_id():
         role_line = "Kategori akaun anda: SUPERUSER"
     else:
-        whitelist = _read_vip_whitelist()
-        vip2_users = whitelist.get("vip2", {}).get("users", {})
-        vip3_users = whitelist.get("vip3", {}).get("users", {})
-        if isinstance(vip2_users, dict) and str(user_id) in vip2_users:
-            role_line = "Kategori akaun anda: NEXTexclusive member"
-        elif isinstance(vip3_users, dict) and str(user_id) in vip3_users:
-            role_line = "Kategori akaun anda: NEXTeVideo26 subscriber"
-        else:
-            has_any_series_access = any(
-                get_series_access_level(user_id, series_number) != "none"
-                for series_number in ("1", "2", "3")
-            )
-            role_line = (
-                "Kategori akaun anda: Peserta"
-                if has_any_series_access
-                else "Kategori akaun anda: Free User / User Biasa"
-            )
+        role_line = f"Kategori akaun anda: {_event_role_label_for_user(user_id)}"
 
     s1 = get_series_access_level(user_id, "1")
     s2 = get_series_access_level(user_id, "2")
@@ -947,13 +985,14 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     context.user_data["menu_level"] = LEVEL_MAIN
     user_id = update.effective_user.id if update.effective_user else None
     if isinstance(user_id, int):
-        whitelist = _read_vip_whitelist()
-        vip2_users = whitelist.get("vip2", {}).get("users", {})
-        vip3_users = whitelist.get("vip3", {}).get("users", {})
-        if isinstance(vip2_users, dict) and str(user_id) in vip2_users:
-            await maybe_log_event_activation(context, user_id, "NEXTexclusive member")
-        elif isinstance(vip3_users, dict) and str(user_id) in vip3_users:
-            await maybe_log_event_activation(context, user_id, "NEXTeVideo26 subscriber")
+        role_label = _event_role_label_for_user(user_id)
+        if role_label != "Free User / User Biasa" and _has_any_series_access(user_id):
+            await maybe_log_event_activation(
+                context,
+                user_id,
+                role_label,
+                full_name=str(update.effective_user.full_name or "").strip() if update.effective_user else "",
+            )
     await show_main_menu(update, build_start_welcome_text(user_id))
     message = update.effective_message
     if not message or not is_free_user(user_id):
