@@ -422,7 +422,7 @@ def build_payload() -> dict[str, Any]:
                 "items": [
                     *[f"{row['title']} ({row['start_local']})" for row in upcoming_events[:2]],
                     *([f"eVideo available on {available_entries[0]['available_on']}"] if available_entries else []),
-                ][:3],
+                ],
             },
         ],
         "system": {
