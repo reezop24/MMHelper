@@ -23,10 +23,10 @@
       ]
     },
     ticker: [
-      { time: "10:41 PM", pill: "Admin", pill_class: "red", text: "Request payment baru diterima dari ReezoAdmin_Bot." },
-      { time: "10:39 PM", pill: "Webinar", pill_class: "amber", text: "Sophia Norezuan daftar Webinar FULLFLOW SIRI 1." },
-      { time: "10:32 PM", pill: "eVideo", pill_class: "blue", text: "Intermediate topik 10 available on 2026-03-10." },
-      { time: "10:28 PM", pill: "Event", pill_class: "green", text: "Webinar FULLFLOW SIRI 1 pada 07 Apr 2026 09:00 PM MYT." }
+      { time: "10:41 PM", date: "27 Mar 2026", pill: "Admin", pill_class: "red", text: "Request payment baru diterima dari ReezoAdmin_Bot." },
+      { time: "10:39 PM", date: "27 Mar 2026", pill: "Webinar", pill_class: "amber", text: "Sophia Norezuan daftar Webinar FULLFLOW SIRI 1." },
+      { time: "10:32 PM", date: "27 Mar 2026", pill: "eVideo", pill_class: "blue", text: "Intermediate topik 10 available on 2026-03-10." },
+      { time: "10:28 PM", date: "27 Mar 2026", pill: "Event", pill_class: "green", text: "Webinar FULLFLOW SIRI 1 pada 07 Apr 2026 09:00 PM MYT." }
     ]
   };
 
@@ -79,7 +79,10 @@
   function tickerHtml(item) {
     return (
       '<span class="ticker-item">' +
+      '<span class="ticker-timewrap">' +
       '<span class="ticker-time">' + escapeHtml(item.time || "-") + '</span>' +
+      '<span class="ticker-date">' + escapeHtml(item.date || "-") + '</span>' +
+      '</span>' +
       '<span class="pill ' + escapeHtml(item.pill_class || "blue") + '">' + escapeHtml(item.pill || "-") + '</span>' +
       '<span>' + escapeHtml(item.text || "-") + '</span>' +
       '</span>'

@@ -61,6 +61,10 @@ def _fmt_time(dt: datetime) -> str:
     return dt.astimezone(MY_TZ).strftime("%I:%M %p")
 
 
+def _fmt_date(dt: datetime) -> str:
+    return dt.astimezone(MY_TZ).strftime("%d %b %Y")
+
+
 def _service_status(name: str) -> str:
     try:
         result = subprocess.run(
@@ -270,6 +274,7 @@ def build_payload() -> dict[str, Any]:
                     "priority": "amber" if status == "pending" else "green",
                     "title": "Daftar Webinar",
                     "time": _fmt_time(submitted_at),
+                    "date": _fmt_date(submitted_at),
                     "desc": f"{item['name']} daftar {item['title']}. {api_text}.",
                     "pill": "Webinar",
                     "pill_class": "amber",
@@ -284,6 +289,7 @@ def build_payload() -> dict[str, Any]:
                     "priority": "red" if status == "pending" else "green",
                     "title": item["title"],
                     "time": _fmt_time(submitted_at),
+                    "date": _fmt_date(submitted_at),
                     "desc": f"{item['name']} hantar permohonan baru.",
                     "pill": "Admin",
                     "pill_class": "red",
@@ -306,6 +312,7 @@ def build_payload() -> dict[str, Any]:
                     "priority": "red",
                     "title": f"Error Log: {service}",
                     "time": now_local.strftime("%I:%M %p"),
+                    "date": now_local.strftime("%d %b %Y"),
                     "desc": error_line[:180],
                     "pill": "System",
                     "pill_class": "red",
@@ -323,6 +330,7 @@ def build_payload() -> dict[str, Any]:
                 "priority": "blue",
                 "title": "eVideo Reminder",
                 "time": now_local.strftime("%I:%M %p"),
+                "date": now_local.strftime("%d %b %Y"),
                 "desc": f"{first['level'].title()} Topik {first['topic_no']} available on {first['available_on']}.",
                 "pill": "eVideo",
                 "pill_class": "blue",
@@ -340,6 +348,7 @@ def build_payload() -> dict[str, Any]:
                 "priority": "amber",
                 "title": "Upcoming Event",
                 "time": now_local.strftime("%I:%M %p"),
+                "date": now_local.strftime("%d %b %Y"),
                 "desc": f"{event['title']} bermula {event['start_local']}.",
                 "pill": "Event",
                 "pill_class": "green",
@@ -370,6 +379,7 @@ def build_payload() -> dict[str, Any]:
     ticker = [
         {
             "time": row["time"],
+            "date": row.get("date") or now_local.strftime("%d %b %Y"),
             "pill": row["pill"],
             "pill_class": row["pill_class"],
             "text": row["text"],
@@ -377,7 +387,15 @@ def build_payload() -> dict[str, Any]:
         for row in timeline[:15]
     ]
     if not ticker:
-        ticker.append({"time": now_local.strftime("%I:%M %p"), "pill": "System", "pill_class": "blue", "text": "Tiada event penting buat masa ini."})
+        ticker.append(
+            {
+                "time": now_local.strftime("%I:%M %p"),
+                "date": now_local.strftime("%d %b %Y"),
+                "pill": "System",
+                "pill_class": "blue",
+                "text": "Tiada event penting buat masa ini.",
+            }
+        )
 
     return {
         "ok": True,
