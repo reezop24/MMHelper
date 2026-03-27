@@ -1,0 +1,30 @@
+OPS HUD Windows Setup
+
+1. Bila HUD live di Vercel, buka fail:
+   ops-hud-launch-edge.bat
+
+2. Tukar line ini:
+   set "HUD_URL=https://YOUR-HUD-DOMAIN.vercel.app/ops-hud.html"
+
+   kepada domain HUD sebenar, contoh:
+   set "HUD_URL=https://mm-helper-hud.vercel.app/ops-hud.html"
+
+3. Double click fail .bat itu untuk test.
+
+4. Drag window Edge itu ke monitor kecil.
+
+5. Tutup Edge dari monitor kecil itu.
+   Windows biasanya akan ingat monitor terakhir untuk launch seterusnya.
+
+6. Untuk auto buka masa PC start:
+   - tekan Win + R
+   - taip: shell:startup
+   - copy shortcut fail ops-hud-launch-edge.bat ke folder itu
+
+7. Jika kau nak HUD buka terus masa login Windows:
+   - pastikan shortcut itu berada dalam Startup folder
+   - Edge akan launch fullscreen ke URL HUD
+
+Nota:
+- Kalau browser buka di monitor salah, cuba drag ke monitor kecil sekali dan close dari situ dulu.
+- Kalau masih degil, next step kita boleh guna AutoHotkey atau NirCmd untuk paksa monitor tertentu.

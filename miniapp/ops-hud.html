@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MM Helper Ops HUD</title>
+  <style>
+    :root {
+      --bg: #081019;
+      --panel: rgba(12, 20, 31, 0.92);
+      --panel-2: rgba(15, 26, 40, 0.96);
+      --line: rgba(123, 170, 219, 0.18);
+      --text: #eaf4ff;
+      --muted: #92a9bf;
+      --good: #41d98b;
+      --warn: #ffb347;
+      --bad: #ff5b62;
+      --info: #53b7ff;
+      --glow: rgba(83, 183, 255, 0.14);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      overflow: hidden;
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 14% 18%, rgba(36, 87, 150, 0.24), transparent 24%),
+        radial-gradient(circle at 86% 24%, rgba(41, 154, 116, 0.18), transparent 18%),
+        linear-gradient(135deg, #04080d 0%, #081019 42%, #0b1520 100%);
+    }
+
+    .hud {
+      width: 100vw;
+      height: 100vh;
+      display: grid;
+      grid-template-rows: 1fr 20vh;
+      gap: 1.1vh;
+      padding: 1.1vh 0.7vw;
+    }
+
+    .ticker,
+    .column,
+    .clock-overlay {
+      border: 1px solid var(--line);
+      border-radius: 1.4vh;
+      background: var(--panel);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.03), 0 12px 32px rgba(0,0,0,0.24);
+      backdrop-filter: blur(8px);
+    }
+
+    .main {
+      display: grid;
+      grid-template-columns: 1.25fr 0.9fr 0.9fr;
+      gap: 0.7vw;
+      min-height: 0;
+    }
+
+    .column {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      padding: 1.2vh 0.8vw;
+      background:
+        linear-gradient(180deg, rgba(18, 31, 46, 0.98) 0%, rgba(11, 20, 31, 0.95) 100%);
+    }
+
+    .alerts-column {
+      background:
+        linear-gradient(180deg, rgba(14, 34, 54, 0.98) 0%, rgba(10, 24, 39, 0.96) 100%);
+      border-color: rgba(78, 163, 255, 0.24);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.03),
+        0 12px 32px rgba(8, 31, 58, 0.28),
+        0 0 0 1px rgba(78, 163, 255, 0.12),
+        0 0 28px rgba(78, 163, 255, 0.12);
+    }
+
+    .queue-column {
+      background:
+        linear-gradient(180deg, rgba(42, 28, 15, 0.98) 0%, rgba(25, 17, 10, 0.96) 100%);
+      border-color: rgba(255, 179, 71, 0.28);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.03),
+        0 12px 32px rgba(54, 30, 7, 0.28),
+        0 0 0 1px rgba(255, 179, 71, 0.12),
+        0 0 28px rgba(255, 179, 71, 0.1);
+    }
+
+    .health-column {
+      background:
+        linear-gradient(180deg, rgba(16, 37, 42, 0.98) 0%, rgba(11, 24, 27, 0.96) 100%);
+      border-color: rgba(70, 214, 183, 0.24);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.03),
+        0 12px 32px rgba(8, 42, 37, 0.28),
+        0 0 0 1px rgba(70, 214, 183, 0.12),
+        0 0 28px rgba(70, 214, 183, 0.1);
+    }
+
+    .alerts-column .section-head h2 { color: #9ed1ff; }
+    .alerts-column .section-head span { color: #7fb6eb; }
+    .queue-column .section-head h2 { color: #ffd08a; }
+    .queue-column .section-head span { color: #f0bb71; }
+    .health-column .section-head h2 { color: #92efd7; }
+    .health-column .section-head span { color: #75d8c0; }
+
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.8vw;
+      margin-bottom: 0.8vh;
+    }
+
+    .section-head h2 {
+      margin: 0;
+      font-size: 42px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+    }
+
+    .section-head span {
+      color: var(--muted);
+      font-size: 24px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .stack {
+      display: grid;
+      gap: 0.8vh;
+      min-height: 0;
+    }
+
+    .alert-card,
+    .queue-card,
+    .health-card {
+      border: 1px solid rgba(255,255,255,0.06);
+      border-left-width: 4px;
+      border-radius: 1.15vh;
+      padding: 1vh 0.7vw;
+      background: var(--panel-2);
+      min-height: 0;
+    }
+
+    .alerts-column .alert-card {
+      background: rgba(14, 29, 45, 0.96);
+      border-color: rgba(78, 163, 255, 0.18);
+    }
+
+    .queue-column .queue-card {
+      background: rgba(38, 24, 14, 0.96);
+      border-color: rgba(255, 179, 71, 0.18);
+    }
+
+    .health-column .health-card {
+      background: rgba(15, 31, 35, 0.96);
+      border-color: rgba(70, 214, 183, 0.18);
+    }
+
+    .priority-red { border-left-color: var(--bad); }
+    .priority-amber { border-left-color: var(--warn); }
+    .priority-green { border-left-color: var(--good); }
+    .priority-blue { border-left-color: var(--info); }
+
+    .card-top {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 0.7vw;
+    }
+
+    .card-title {
+      margin: 0;
+      font-size: 50px;
+      font-weight: 700;
+      line-height: 1.15;
+    }
+
+    .card-time,
+    .card-tag {
+      color: var(--muted);
+      font-size: 24px;
+      white-space: nowrap;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .card-desc {
+      margin-top: 0.45vh;
+      font-size: 40px;
+      color: #f0f6fd;
+      line-height: 1.3;
+    }
+
+    .queue-metric {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.7vw;
+    }
+
+    .queue-metric strong {
+      font-size: 86px;
+      line-height: 1;
+    }
+
+    .queue-list {
+      margin: 0.7vh 0 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 0.45vh;
+      color: #eef5fc;
+      font-size: 36px;
+    }
+
+    .health-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.7vw;
+      margin-top: 0.8vh;
+    }
+
+    .health-card h3 {
+      margin: 0;
+      font-size: 28px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .health-value {
+      margin-top: 0.8vh;
+      font-size: 56px;
+      font-weight: 800;
+      line-height: 1;
+    }
+
+    .health-sub {
+      margin-top: 0.45vh;
+      color: #c9d9e8;
+      font-size: 24px;
+      line-height: 1.3;
+    }
+
+    .status-list {
+      display: grid;
+      gap: 0.6vh;
+      margin-top: 0.8vh;
+    }
+
+    .status-row {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 0.5vw;
+      align-items: center;
+      font-size: 34px;
+    }
+
+    .clock-overlay {
+      position: fixed;
+      top: 1.1vh;
+      right: 0.8vw;
+      z-index: 20;
+      padding: 0.9vh 0.8vw;
+      background: rgba(9, 18, 29, 0.84);
+      min-width: 10.5vw;
+      text-align: right;
+    }
+
+    .clock-time {
+      font-size: 66px;
+      line-height: 1;
+      font-weight: 800;
+      color: #f1f7ff;
+    }
+
+    .clock-date {
+      margin-top: 0.35vh;
+      font-size: 26px;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .dot {
+      width: 0.9vh;
+      height: 0.9vh;
+      border-radius: 999px;
+      box-shadow: 0 0 14px currentColor;
+    }
+
+    .dot.green { color: var(--good); background: var(--good); }
+    .dot.amber { color: var(--warn); background: var(--warn); }
+    .dot.red { color: var(--bad); background: var(--bad); }
+    .dot.blue { color: var(--info); background: var(--info); }
+
+    .ticker {
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+      position: relative;
+      padding: 0 0.8vw;
+      background:
+        linear-gradient(180deg, rgba(128, 10, 24, 0.98) 0%, rgba(101, 8, 19, 0.98) 100%);
+      border: 1px solid rgba(255, 93, 112, 0.28);
+      box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.04),
+        0 10px 26px rgba(77, 0, 10, 0.24);
+    }
+
+    .ticker-label {
+      flex: 0 0 auto;
+      padding-right: 0.7vw;
+      margin-right: 0.7vw;
+      border-right: 1px solid rgba(255,255,255,0.12);
+      font-size: 36px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.11em;
+      color: #ffd7dc;
+    }
+
+    .ticker-track {
+      white-space: nowrap;
+      display: inline-block;
+      will-change: transform;
+      animation: ticker-scroll 38s linear infinite;
+      font-size: 56px;
+      line-height: 1;
+      font-weight: 800;
+      color: #fff4f6;
+    }
+
+    .ticker-item {
+      display: inline-flex;
+      align-items: center;
+      margin-right: 2vw;
+      gap: 0.8vw;
+    }
+
+    .ticker-time {
+      color: #ffd0d6;
+      font-weight: 700;
+      font-size: 42px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.35vh 0.55vw;
+      border-radius: 999px;
+      font-size: 28px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #09111a;
+    }
+
+    .pill.red { background: var(--bad); }
+    .pill.amber { background: var(--warn); }
+    .pill.green { background: var(--good); }
+    .pill.blue { background: var(--info); }
+
+    @keyframes ticker-scroll {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+
+    @media (max-width: 1400px) {
+      .main {
+        grid-template-columns: 1.1fr 0.95fr 0.95fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="clock-overlay">
+    <div id="clock" class="clock-time">--:--:--</div>
+    <div id="clockDate" class="clock-date">--</div>
+  </div>
+  <div class="hud">
+    <section class="main">
+      <section class="column alerts-column">
+        <div class="section-head">
+          <h2>Live Alerts</h2>
+          <span>Latest high signal</span>
+        </div>
+        <div id="alertsStack" class="stack"></div>
+      </section>
+
+      <section class="column queue-column">
+        <div class="section-head">
+          <h2>Pending Queue</h2>
+          <span>Action needed</span>
+        </div>
+        <div id="queueStack" class="stack"></div>
+      </section>
+
+      <section class="column health-column">
+        <div class="section-head">
+          <h2>System Health</h2>
+          <span>Runtime snapshot</span>
+        </div>
+
+        <article class="health-card priority-green">
+          <h3>System Pulse</h3>
+          <div id="systemPulse" class="health-value">Stable</div>
+          <div id="systemPulseSub" class="health-sub">Live snapshot from VPS</div>
+        </article>
+
+        <div class="health-grid">
+          <article class="health-card priority-blue" style="margin-top: 0;">
+            <h3>RAM</h3>
+            <div id="ramValue" class="health-value">-</div>
+            <div class="health-sub">Headroom masih selesa</div>
+          </article>
+
+          <article class="health-card priority-blue" style="margin-top: 0;">
+            <h3>Storage</h3>
+            <div id="storageValue" class="health-value">-</div>
+            <div class="health-sub">Ruang masih banyak</div>
+          </article>
+        </div>
+
+        <div id="servicesList" class="status-list" style="margin-top: 10px;"></div>
+      </section>
+    </section>
+
+    <footer class="ticker">
+      <div class="ticker-label">Live Feed</div>
+      <div id="tickerTrack" class="ticker-track"></div>
+    </footer>
+  </div>
+
+  <script src="ops-hud.js"></script>
+  <script>
+    (function () {
+      var clock = document.getElementById("clock");
+      var clockDate = document.getElementById("clockDate");
+      function renderClock() {
+        var now = new Date();
+        clock.textContent = now.toLocaleTimeString("en-GB", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit"
+        });
+        clockDate.textContent = now.toLocaleDateString("en-GB", {
+          weekday: "short",
+          day: "2-digit",
+          month: "short",
+          year: "numeric"
+        });
+      }
+      renderClock();
+      setInterval(renderClock, 1000);
+    })();
+  </script>
+</body>
+</html>

@@ -36,7 +36,7 @@
   var records30 = safeParseArray(params.get("records_30d"));
 
   document.getElementById("summaryName").textContent = params.get("name") || "-";
-  document.getElementById("summaryDate").textContent = params.get("saved_date") || "-";
+  document.getElementById("summaryDate").textContent = params.get("reference_date") || params.get("saved_date") || "-";
 
   function renderRows(rows) {
     txListEl.innerHTML = "";
