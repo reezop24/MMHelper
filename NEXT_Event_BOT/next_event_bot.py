@@ -67,6 +67,7 @@ SERIES_NUMBER_BY_LABEL = {
     MENU_SERIES_3: "3",
 }
 DEFAULT_SHARED_DB_PATH = Path(__file__).resolve().parent.parent / "db" / "mmhelper_shared.db"
+SIDEBOT_ENV_PATH = Path(__file__).resolve().parent.parent / "mmhelper_sidebot" / ".env"
 NEXT_EVENT_ZOOM_STATE_KEY = "next_event_zoom_state"
 NEXT_EVENT_NOTIFICATION_STATE_KEY = "next_event_notification_state"
 NEXT_EVENT_ACTIVATION_STATE_KEY = "next_event_activation_state"
@@ -129,8 +130,24 @@ def get_admin_bot_url() -> str:
     return url if url.startswith("https://t.me/") else ""
 
 
+def _fallback_sidebot_env_value(key: str) -> str:
+    try:
+        if not SIDEBOT_ENV_PATH.exists():
+            return ""
+        for line in SIDEBOT_ENV_PATH.read_text(encoding="utf-8").splitlines():
+            raw = line.strip()
+            if not raw or raw.startswith("#") or "=" not in raw:
+                continue
+            left, right = raw.split("=", 1)
+            if left.strip() == key:
+                return right.strip()
+    except Exception:
+        logger.warning("Failed reading sidebot env fallback value for key=%s", key, exc_info=True)
+    return ""
+
+
 def get_admin_group_id() -> int | None:
-    raw = (os.getenv("SIDEBOT_ADMIN_GROUP_ID") or "").strip()
+    raw = (os.getenv("SIDEBOT_ADMIN_GROUP_ID") or _fallback_sidebot_env_value("SIDEBOT_ADMIN_GROUP_ID") or "").strip()
     if not raw:
         return None
     try:

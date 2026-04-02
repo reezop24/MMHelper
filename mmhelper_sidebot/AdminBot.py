@@ -4458,9 +4458,19 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
             except Exception:
                 logger.exception("Failed sending webinar special invitation admin notification")
 
+        reply_markup = main_menu_keyboard(user.id)
+        next_event_bot_url = get_next_event_bot_url()
+        if next_event_bot_url:
+            reply_markup = InlineKeyboardMarkup(
+                [[InlineKeyboardButton("Aktifkan Akses Webinar", url=next_event_bot_url)]]
+            )
         await message.reply_text(
-            f"✅ Special invitation berjaya disahkan.\nAkses webinar {get_current_webinar_campaign()} SIRI {series} telah direkod.",
-            reply_markup=main_menu_keyboard(user.id),
+            (
+                f"✅ Special invitation berjaya disahkan.\n"
+                f"Akses webinar {get_current_webinar_campaign()} SIRI {series} telah direkod.\n"
+                "Untuk aktifkan akses webinar, sila tekan butang di bawah dan tekan Start dalam NEXT Event Bot."
+            ),
+            reply_markup=reply_markup,
         )
         return
 
