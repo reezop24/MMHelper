@@ -14,6 +14,8 @@ from zoneinfo import ZoneInfo
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, Update, WebAppInfo
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes, MessageHandler, filters
 
+from content_catalog import WEBINAR_CONTENT
+
 logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s %(message)s",
     level=logging.INFO,
@@ -68,6 +70,7 @@ SERIES_NUMBER_BY_LABEL = {
 }
 DEFAULT_SHARED_DB_PATH = Path(__file__).resolve().parent.parent / "db" / "mmhelper_shared.db"
 SIDEBOT_ENV_PATH = Path(__file__).resolve().parent.parent / "mmhelper_sidebot" / ".env"
+VIDEO_BOT_ENV_PATH = Path(__file__).resolve().parent.parent / "mmhelper_video_bot" / ".env"
 NEXT_EVENT_ZOOM_STATE_KEY = "next_event_zoom_state"
 NEXT_EVENT_NOTIFICATION_STATE_KEY = "next_event_notification_state"
 NEXT_EVENT_ACTIVATION_STATE_KEY = "next_event_activation_state"
@@ -146,6 +149,22 @@ def _fallback_sidebot_env_value(key: str) -> str:
     return ""
 
 
+def _fallback_video_bot_env_value(key: str) -> str:
+    try:
+        if not VIDEO_BOT_ENV_PATH.exists():
+            return ""
+        for line in VIDEO_BOT_ENV_PATH.read_text(encoding="utf-8").splitlines():
+            raw = line.strip()
+            if not raw or raw.startswith("#") or "=" not in raw:
+                continue
+            left, right = raw.split("=", 1)
+            if left.strip() == key:
+                return right.strip()
+    except Exception:
+        logger.warning("Failed reading video bot env fallback value for key=%s", key, exc_info=True)
+    return ""
+
+
 def get_admin_group_id() -> int | None:
     raw = (os.getenv("SIDEBOT_ADMIN_GROUP_ID") or _fallback_sidebot_env_value("SIDEBOT_ADMIN_GROUP_ID") or "").strip()
     if not raw:
@@ -154,6 +173,92 @@ def get_admin_group_id() -> int | None:
         return int(raw)
     except ValueError:
         return None
+
+
+def get_event_storage_group_id() -> int | None:
+    raw = (
+        os.getenv("NEXT_EVENT_DB_GROUP_ID")
+        or os.getenv("EVENT_DB_GROUP_ID")
+        or os.getenv("VIDEO_DB_GROUP_ID")
+        or _fallback_video_bot_env_value("VIDEO_DB_GROUP_ID")
+        or ""
+    ).strip()
+    if not raw:
+        return None
+    try:
+        return int(raw)
+    except ValueError:
+        return None
+
+
+def _normalize_message_ids(value: object) -> list[int]:
+    if isinstance(value, int):
+        return [value] if value > 0 else []
+    if isinstance(value, list):
+        out: list[int] = []
+        for row in value:
+            try:
+                message_id = int(row)
+            except (TypeError, ValueError):
+                continue
+            if message_id > 0:
+                out.append(message_id)
+        return out
+    return []
+
+
+def get_series_storage_content(campaign: str, series_number: str, content_key: str, session_number: str = "") -> list[int]:
+    campaign_row = WEBINAR_CONTENT.get(str(campaign or "").strip().lower())
+    if not isinstance(campaign_row, dict):
+        return []
+    series_row = campaign_row.get(str(series_number or "").strip())
+    if not isinstance(series_row, dict):
+        return []
+    if content_key == "recordings":
+        recordings = series_row.get("recordings")
+        if not isinstance(recordings, dict):
+            return []
+        return _normalize_message_ids(recordings.get(str(session_number or "").strip()))
+    return _normalize_message_ids(series_row.get(content_key))
+
+
+async def send_storage_messages(
+    context: ContextTypes.DEFAULT_TYPE,
+    *,
+    target_user_id: int,
+    campaign: str,
+    series_number: str,
+    content_key: str,
+    session_number: str = "",
+) -> int:
+    storage_group_id = get_event_storage_group_id()
+    if storage_group_id is None:
+        return 0
+    message_ids = get_series_storage_content(
+        campaign=campaign,
+        series_number=series_number,
+        content_key=content_key,
+        session_number=session_number,
+    )
+    if not message_ids:
+        return 0
+    sent_count = 0
+    for message_id in message_ids:
+        try:
+            await context.bot.copy_message(
+                chat_id=target_user_id,
+                from_chat_id=storage_group_id,
+                message_id=message_id,
+            )
+            sent_count += 1
+        except Exception:
+            logger.exception(
+                "Failed to copy event storage message user_id=%s group_id=%s message_id=%s",
+                target_user_id,
+                storage_group_id,
+                message_id,
+            )
+    return sent_count
 
 
 def _connect_shared_db() -> sqlite3.Connection:
@@ -536,6 +641,149 @@ def _display_name_for_user_id(user_id: str, vip_whitelist: dict, webinar_state: 
     return "-"
 
 
+def _registered_telegram_username_for_user_id(
+    user_id: str,
+    vip_whitelist: dict,
+    webinar_state: dict,
+    campaign: str,
+    activation_state: dict | None = None,
+) -> str:
+    if isinstance(vip_whitelist.get("vip2", {}), dict):
+        row = vip_whitelist.get("vip2", {}).get("users", {}).get(user_id)
+        if isinstance(row, dict) and str(row.get("telegram_username") or "").strip():
+            return str(row.get("telegram_username") or "").strip()
+    if isinstance(vip_whitelist.get("vip3", {}), dict):
+        row = vip_whitelist.get("vip3", {}).get("users", {}).get(user_id)
+        if isinstance(row, dict) and str(row.get("telegram_username") or "").strip():
+            return str(row.get("telegram_username") or "").strip()
+    campaigns = webinar_state.get("campaigns")
+    if isinstance(campaigns, dict):
+        campaign_row = campaigns.get(campaign)
+        if isinstance(campaign_row, dict):
+            series = campaign_row.get("series")
+            if isinstance(series, dict):
+                for series_row in series.values():
+                    if not isinstance(series_row, dict):
+                        continue
+                    users = series_row.get("users")
+                    if not isinstance(users, dict):
+                        continue
+                    row = users.get(user_id)
+                    if isinstance(row, dict) and str(row.get("telegram_username") or "").strip():
+                        return str(row.get("telegram_username") or "").strip()
+    if isinstance(activation_state, dict):
+        campaigns = activation_state.get("campaigns")
+        if isinstance(campaigns, dict):
+            campaign_row = campaigns.get(campaign)
+            if isinstance(campaign_row, dict):
+                users = campaign_row.get("users")
+                if isinstance(users, dict):
+                    row = users.get(user_id)
+                    if isinstance(row, dict) and str(row.get("telegram_username") or "").strip():
+                        return str(row.get("telegram_username") or "").strip()
+    return ""
+
+
+async def _notification_identity_for_user(
+    context: ContextTypes.DEFAULT_TYPE,
+    user_id: int,
+    *,
+    vip_whitelist: dict,
+    webinar_state: dict,
+    activation_state: dict,
+    campaign: str,
+) -> dict[str, str]:
+    user_key = str(user_id)
+    registered_name = _display_name_for_user_id(user_key, vip_whitelist, webinar_state, campaign, activation_state)
+    stored_username = _registered_telegram_username_for_user_id(user_key, vip_whitelist, webinar_state, campaign, activation_state)
+    telegram_name = ""
+    telegram_username = ""
+
+    campaigns = activation_state.get("campaigns")
+    if isinstance(campaigns, dict):
+        campaign_row = campaigns.get(campaign)
+        if isinstance(campaign_row, dict):
+            users = campaign_row.get("users")
+            if isinstance(users, dict):
+                row = users.get(user_key)
+                if isinstance(row, dict):
+                    telegram_name = str(row.get("full_name") or "").strip()
+                    telegram_username = str(row.get("telegram_username") or "").strip()
+
+    try:
+        chat = await context.bot.get_chat(user_id)
+        telegram_name = str(getattr(chat, "full_name", "") or telegram_name).strip() or telegram_name
+        telegram_username = str(getattr(chat, "username", "") or telegram_username).strip() or telegram_username
+    except Exception:
+        logger.exception("Failed fetching chat identity user_id=%s", user_id)
+
+    if not telegram_username:
+        telegram_username = stored_username
+
+    return {
+        "user_id": user_key,
+        "registered_name": registered_name if registered_name != "-" else "",
+        "telegram_name": telegram_name,
+        "telegram_username": telegram_username,
+    }
+
+
+def _notification_entry_text(row: dict[str, str]) -> str:
+    registered_name = str(row.get("registered_name") or "-").strip() or "-"
+    telegram_name = str(row.get("telegram_name") or "-").strip() or "-"
+    telegram_username = str(row.get("telegram_username") or "").strip()
+    username_text = f" (@{telegram_username})" if telegram_username else ""
+    return f"- {registered_name} | {telegram_name}{username_text} | {row.get('user_id')}"
+
+
+def _notification_report_text(
+    *,
+    target_label: str,
+    campaign: str,
+    result: dict[str, object],
+    scheduled_for: str = "",
+) -> str:
+    sent_rows = result.get("sent") if isinstance(result.get("sent"), list) else []
+    failed_rows = result.get("failed") if isinstance(result.get("failed"), list) else []
+    lines = [
+        "✅ Laporan penghantaran notifikasi",
+        f"Target: {target_label}",
+        f"Campaign: {campaign}",
+    ]
+    if scheduled_for:
+        lines.append(f"Scheduled: {scheduled_for}")
+    lines.extend(
+        [
+            f"Berjaya: {len(sent_rows)}",
+            f"Gagal: {len(failed_rows)}",
+            "",
+            "Senarai berjaya:",
+        ]
+    )
+    if sent_rows:
+        for row in sent_rows[:20]:
+            if isinstance(row, dict):
+                lines.append(_notification_entry_text(row))
+        if len(sent_rows) > 20:
+            lines.append(f"... dan {len(sent_rows) - 20} lagi.")
+    else:
+        lines.append("- Tiada")
+    lines.append("")
+    lines.append("Senarai gagal:")
+    if failed_rows:
+        for row in failed_rows[:10]:
+            if not isinstance(row, dict):
+                continue
+            lines.append(
+                f"- {row.get('user_id')} | {str(row.get('error') or 'send_failed').strip() or 'send_failed'}"
+            )
+        if len(failed_rows) > 10:
+            lines.append(f"... dan {len(failed_rows) - 10} lagi.")
+    else:
+        lines.append("- Tiada")
+    return "\n".join(lines)
+
+
 def _has_any_series_access(user_id: int | None) -> bool:
     if not isinstance(user_id, int):
         return False
@@ -645,6 +893,7 @@ async def maybe_log_event_activation(
     role_label: str,
     *,
     full_name: str = "",
+    telegram_username: str = "",
 ) -> None:
     admin_group_id = get_admin_group_id()
     campaign = get_current_webinar_campaign()
@@ -667,6 +916,7 @@ async def maybe_log_event_activation(
     users[user_key] = {
         "role": role_label,
         "full_name": str(full_name or "").strip(),
+        "telegram_username": str(telegram_username or "").strip(),
         "activated_at": datetime.now(timezone.utc).isoformat(),
     }
     try:
@@ -900,15 +1150,40 @@ async def send_notification_message(
     *,
     recipient_ids: set[int],
     message_text: str,
-) -> int:
-    sent_count = 0
+    campaign: str,
+) -> dict[str, object]:
+    vip_whitelist = _read_vip_whitelist()
+    webinar_state = _read_webinar_access_state()
+    activation_state = _read_activation_state()
+    sent_rows: list[dict[str, str]] = []
+    failed_rows: list[dict[str, str]] = []
     for target_user_id in sorted(recipient_ids):
         try:
             await context.bot.send_message(chat_id=target_user_id, text=message_text)
-            sent_count += 1
-        except Exception:
+            sent_rows.append(
+                await _notification_identity_for_user(
+                    context,
+                    target_user_id,
+                    vip_whitelist=vip_whitelist,
+                    webinar_state=webinar_state,
+                    activation_state=activation_state,
+                    campaign=campaign,
+                )
+            )
+        except Exception as exc:
             logger.exception("Failed sending notification user_id=%s", target_user_id)
-    return sent_count
+            failed_rows.append(
+                {
+                    "user_id": str(target_user_id),
+                    "error": str(exc.__class__.__name__ or "send_failed"),
+                }
+            )
+    return {
+        "sent": sent_rows,
+        "failed": failed_rows,
+        "sent_count": len(sent_rows),
+        "failed_count": len(failed_rows),
+    }
 
 
 def build_zoom_series_text(series_number: str) -> str:
@@ -1012,6 +1287,7 @@ async def maybe_log_vip_activation_from_event_bot(update: Update, context: Conte
             user_id,
             "NEXTexclusive member",
             full_name=str(user.full_name or "").strip(),
+            telegram_username=str(user.username or "").strip(),
         )
         return
     if isinstance(vip3_users, dict) and str(user_id) in vip3_users:
@@ -1020,6 +1296,7 @@ async def maybe_log_vip_activation_from_event_bot(update: Update, context: Conte
             user_id,
             "NEXTeVideo26 subscriber",
             full_name=str(user.full_name or "").strip(),
+            telegram_username=str(user.username or "").strip(),
         )
 
 
@@ -1034,6 +1311,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
                 user_id,
                 role_label,
                 full_name=str(update.effective_user.full_name or "").strip() if update.effective_user else "",
+                telegram_username=str(update.effective_user.username or "").strip() if update.effective_user else "",
             )
     await show_main_menu(update, build_start_welcome_text(user_id))
     message = update.effective_message
@@ -1133,6 +1411,16 @@ async def menu_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             deny_text = RECORDING_ONLY_TEXT if access_level == "recording_only" else FULL_ACCESS_REQUIRED_TEXT
             await show_series_content_menu(update, deny_text)
             return
+        sent_count = await send_storage_messages(
+            context,
+            target_user_id=current_user_id,
+            campaign=get_current_webinar_campaign(),
+            series_number=selected_series_number,
+            content_key="pdf",
+        )
+        if sent_count > 0:
+            await show_series_content_menu(update, f"✅ {sent_count} fail PDF/eBook telah dihantar.")
+            return
         await show_series_content_menu(update, CONTENT_PLACEHOLDER)
         return
 
@@ -1151,6 +1439,16 @@ async def menu_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             deny_text = RECORDING_ONLY_TEXT if access_level == "recording_only" else FULL_ACCESS_REQUIRED_TEXT
             await show_series_content_menu(update, deny_text)
             return
+        sent_count = await send_storage_messages(
+            context,
+            target_user_id=current_user_id,
+            campaign=get_current_webinar_campaign(),
+            series_number=selected_series_number,
+            content_key="extra_videos",
+        )
+        if sent_count > 0:
+            await show_series_content_menu(update, f"✅ {sent_count} video bantuan tambahan telah dihantar.")
+            return
         await show_series_content_menu(update, CONTENT_PLACEHOLDER)
         return
 
@@ -1168,6 +1466,18 @@ async def menu_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         if access_level not in {"full", "recording_only"}:
             await show_series_content_menu(update, "Akses rakaman untuk siri ini belum tersedia pada akaun anda.")
             context.user_data["menu_level"] = LEVEL_SERIES_CONTENT
+            return
+        session_number = "1" if text == session_1_label else "2"
+        sent_count = await send_storage_messages(
+            context,
+            target_user_id=current_user_id,
+            campaign=get_current_webinar_campaign(),
+            series_number=selected_series_number,
+            content_key="recordings",
+            session_number=session_number,
+        )
+        if sent_count > 0:
+            await show_recordings_menu(update, f"✅ {sent_count} rakaman untuk {text} telah dihantar.", session_1_label, session_2_label)
             return
         await show_recordings_menu(update, CONTENT_PLACEHOLDER, session_1_label, session_2_label)
         return
@@ -1341,13 +1651,18 @@ async def handle_webapp_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
             )
             return
 
-        sent_count = await send_notification_message(
+        result = await send_notification_message(
             context,
             recipient_ids=recipient_ids,
             message_text=message_text,
+            campaign=campaign,
         )
         await message.reply_text(
-            f"✅ Notifikasi dihantar segera.\nTarget: {target_label}\nCampaign: {campaign}\nJumlah penerima berjaya: {sent_count}",
+            _notification_report_text(
+                target_label=target_label,
+                campaign=campaign,
+                result=result,
+            ),
             reply_markup=build_admin_menu(),
         )
         return
@@ -1515,15 +1830,38 @@ async def notification_schedule_worker(context: ContextTypes.DEFAULT_TYPE) -> No
             event_name=str(job.get("event_name") or ""),
             series_number=str(job.get("series") or ""),
         )
-        sent_count = await send_notification_message(
+        result = await send_notification_message(
             context,
             recipient_ids=recipient_set,
             message_text=str(job.get("message") or "").strip(),
+            campaign=str(job.get("campaign") or get_current_webinar_campaign()),
         )
         job["status"] = "sent"
         job["sent_at"] = now_utc.isoformat()
-        job["sent_count"] = sent_count
+        job["sent_count"] = int(result.get("sent_count") or 0)
+        job["failed_count"] = int(result.get("failed_count") or 0)
         changed = True
+        superuser_id = get_superuser_id()
+        if isinstance(superuser_id, int):
+            try:
+                await context.bot.send_message(
+                    chat_id=superuser_id,
+                    text=_notification_report_text(
+                        target_label=_notification_target_label(
+                            target_mode=str(job.get("target_mode") or ""),
+                            target_value=str(job.get("target_value") or ""),
+                            campaign=str(job.get("campaign") or get_current_webinar_campaign()),
+                            event_kind=str(job.get("event_kind") or ""),
+                            event_name=str(job.get("event_name") or ""),
+                            series_number=str(job.get("series") or ""),
+                        ),
+                        campaign=str(job.get("campaign") or get_current_webinar_campaign()),
+                        result=result,
+                        scheduled_for=scheduled_for_raw,
+                    ),
+                )
+            except Exception:
+                logger.exception("Failed sending scheduled notification report to superuser")
     if changed:
         try:
             _write_notification_state(state)
